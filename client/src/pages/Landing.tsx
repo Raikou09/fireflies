@@ -48,7 +48,7 @@ export default function Landing() {
               size="lg"
               variant="outline"
               onClick={() => window.location.href = "/api/login"}
-              className="border-white text-white hover:bg-white hover:text-primary text-lg px-8 py-4"
+              className="border-white bg-transparent text-white hover:bg-white hover:text-primary text-lg px-8 py-4"
             >
               List Your Court
             </Button>
