@@ -98,11 +98,17 @@ export default function CourtsGrid({ filters }: CourtsGridProps) {
                       <MapPin className="h-4 w-4 mr-1" />
                       {court.area}, {court.city}
                     </p>
-                    <div className="flex items-center space-x-4 mb-4">
-                      <span className="flex items-center text-sm text-gray-500">
-                        <span className="mr-1">🏀</span>
-                        {court.sport}
-                      </span>
+                    <div className="mb-4">
+                      <div className="flex flex-wrap gap-2 mb-2">
+                        {court.availableSports?.slice(0, 3).map((sport, index) => (
+                          <span key={index} className="bg-primary/10 text-primary px-2 py-1 rounded-full text-xs font-medium">
+                            {sport}
+                          </span>
+                        ))}
+                        {court.availableSports?.length > 3 && (
+                          <span className="text-gray-500 text-xs">+{court.availableSports.length - 3} more</span>
+                        )}
+                      </div>
                       <span className="flex items-center text-sm text-gray-500">
                         <Clock className="h-4 w-4 mr-1" />
                         {court.openingTime} - {court.closingTime}

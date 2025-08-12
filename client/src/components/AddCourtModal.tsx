@@ -25,7 +25,6 @@ export default function AddCourtModal({ isOpen, onClose }: AddCourtModalProps) {
   
   const [formData, setFormData] = useState({
     name: "",
-    sport: "",
     city: "",
     area: "",
     description: "",
@@ -36,6 +35,8 @@ export default function AddCourtModal({ isOpen, onClose }: AddCourtModalProps) {
     rules: "",
   });
 
+  const [selectedSports, setSelectedSports] = useState<string[]>([]);
+
   const [availableDays, setAvailableDays] = useState<string[]>([
     "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"
   ]);
@@ -45,7 +46,8 @@ export default function AddCourtModal({ isOpen, onClose }: AddCourtModalProps) {
     mutationFn: async (courtData: any) => {
       const response = await apiRequest("POST", "/api/courts", {
         ...courtData,
-        availableDays
+        availableDays,
+        availableSports: selectedSports
       });
       return response.json();
     },
@@ -118,7 +120,6 @@ export default function AddCourtModal({ isOpen, onClose }: AddCourtModalProps) {
   const resetForm = () => {
     setFormData({
       name: "",
-      sport: "",
       city: "",
       area: "",
       description: "",
@@ -128,6 +129,7 @@ export default function AddCourtModal({ isOpen, onClose }: AddCourtModalProps) {
       closingTime: "",
       rules: "",
     });
+    setSelectedSports([]);
     setAvailableDays(["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]);
     setImageUrl("");
   };
@@ -144,14 +146,28 @@ export default function AddCourtModal({ isOpen, onClose }: AddCourtModalProps) {
     );
   };
 
+  const handleSportToggle = (sport: string) => {
+    setSelectedSports(prev => 
+      prev.includes(sport) 
+        ? prev.filter(s => s !== sport)
+        : [...prev, sport]
+    );
+  };
+
+  const sportsOptions = [
+    "Football", "Basketball", "Volleyball", "Tennis", "Netball", "Rugby",
+    "Cricket", "Badminton", "Table Tennis", "Swimming", "Athletics", 
+    "Hockey", "Handball", "Squash", "Boxing"
+  ];
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.name || !formData.sport || !formData.city || !formData.area || 
+    if (!formData.name || selectedSports.length === 0 || !formData.city || !formData.area || 
         !formData.hourlyRate || !formData.openingTime || !formData.closingTime || availableDays.length === 0) {
       toast({
         title: "Missing Information",
-        description: "Please fill in all required fields and select at least one day.",
+        description: "Please fill in all required fields, select at least one sport, and select at least one day.",
         variant: "destructive",
       });
       return;
@@ -181,23 +197,6 @@ export default function AddCourtModal({ isOpen, onClose }: AddCourtModalProps) {
   };
 
   const cities = ["Nairobi", "Mombasa", "Kisumu", "Nakuru", "Eldoret"];
-  const sports = [
-    "Football", 
-    "Basketball", 
-    "Volleyball", 
-    "Tennis", 
-    "Netball", 
-    "Rugby", 
-    "Cricket", 
-    "Badminton", 
-    "Table Tennis", 
-    "Swimming", 
-    "Athletics", 
-    "Hockey", 
-    "Handball", 
-    "Squash",
-    "Boxing"
-  ];
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -223,20 +222,25 @@ export default function AddCourtModal({ isOpen, onClose }: AddCourtModalProps) {
                 required
               />
             </div>
-            <div>
-              <Label>Sport Type *</Label>
-              <Select value={formData.sport} onValueChange={(value) => handleInputChange("sport", value)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select sport" />
-                </SelectTrigger>
-                <SelectContent>
-                  {sports.map((sport) => (
-                    <SelectItem key={sport} value={sport}>
+            <div className="md:col-span-2">
+              <Label className="mb-3 block">Available Sports * (Select all sports available at this location)</Label>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3 max-h-48 overflow-y-auto border border-gray-200 rounded-lg p-4">
+                {sportsOptions.map((sport) => (
+                  <div key={sport} className="flex items-center space-x-2">
+                    <Checkbox
+                      id={sport}
+                      checked={selectedSports.includes(sport)}
+                      onCheckedChange={() => handleSportToggle(sport)}
+                    />
+                    <Label htmlFor={sport} className="text-sm font-normal cursor-pointer">
                       {sport}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                    </Label>
+                  </div>
+                ))}
+              </div>
+              <p className="text-sm text-gray-500 mt-2">
+                Select {selectedSports.length > 0 ? selectedSports.length : '0'} sport{selectedSports.length !== 1 ? 's' : ''} selected
+              </p>
             </div>
           </div>
 

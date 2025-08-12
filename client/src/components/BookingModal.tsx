@@ -26,6 +26,7 @@ export default function BookingModal({ court, isOpen, onClose }: BookingModalPro
   
   const [bookingDate, setBookingDate] = useState("");
   const [selectedTimeSlot, setSelectedTimeSlot] = useState("");
+  const [selectedSport, setSelectedSport] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
   const [customerEmail, setCustomerEmail] = useState(user?.email || "");
   const [selectedEquipment, setSelectedEquipment] = useState<string[]>([]);
@@ -71,6 +72,7 @@ export default function BookingModal({ court, isOpen, onClose }: BookingModalPro
   const resetForm = () => {
     setBookingDate("");
     setSelectedTimeSlot("");
+    setSelectedSport("");
     setCustomerPhone("");
     setCustomerEmail(user?.email || "");
     setSelectedEquipment([]);
@@ -96,10 +98,10 @@ export default function BookingModal({ court, isOpen, onClose }: BookingModalPro
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!court || !bookingDate || !selectedTimeSlot || !customerPhone) {
+    if (!court || !bookingDate || !selectedTimeSlot || !selectedSport || !customerPhone) {
       toast({
         title: "Missing Information",
-        description: "Please fill in all required fields.",
+        description: "Please fill in all required fields including sport selection.",
         variant: "destructive",
       });
       return;
@@ -107,6 +109,7 @@ export default function BookingModal({ court, isOpen, onClose }: BookingModalPro
 
     const bookingData = {
       courtId: court.id,
+      selectedSport,
       bookingDate,
       timeSlot: selectedTimeSlot,
       totalAmount: calculateTotal().toString(),
@@ -167,6 +170,24 @@ export default function BookingModal({ court, isOpen, onClose }: BookingModalPro
               min={new Date().toISOString().split('T')[0]}
               required
             />
+          </div>
+
+          {/* Sport Selection */}
+          <div>
+            <Label className="mb-3 block">Select Sport *</Label>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+              {court.availableSports?.map((sport) => (
+                <Button
+                  key={sport}
+                  type="button"
+                  variant={selectedSport === sport ? "default" : "outline"}
+                  className={selectedSport === sport ? "bg-primary text-white" : ""}
+                  onClick={() => setSelectedSport(sport)}
+                >
+                  {sport}
+                </Button>
+              ))}
+            </div>
           </div>
 
           {/* Time Slots */}

@@ -41,7 +41,7 @@ export const courts = pgTable("courts", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   vendorId: varchar("vendor_id").notNull().references(() => users.id),
   name: text("name").notNull(),
-  sport: varchar("sport").notNull(),
+  availableSports: text("available_sports").array().notNull(), // Array of sports available at this location
   city: varchar("city").notNull(),
   area: varchar("area").notNull(),
   description: text("description"),
@@ -73,6 +73,7 @@ export const bookings = pgTable("bookings", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   customerId: varchar("customer_id").notNull().references(() => users.id),
   courtId: varchar("court_id").notNull().references(() => courts.id),
+  selectedSport: varchar("selected_sport").notNull(), // The specific sport chosen for this booking
   bookingDate: varchar("booking_date").notNull(),
   timeSlot: varchar("time_slot").notNull(),
   duration: integer("duration").default(1), // hours

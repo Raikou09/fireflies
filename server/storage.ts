@@ -96,7 +96,8 @@ export class DatabaseStorage implements IStorage {
     }
 
     if (filters?.sport && filters.sport !== "All Sports") {
-      whereConditions.push(eq(courts.sport, filters.sport));
+      // Check if the sport is in the availableSports array
+      whereConditions.push(sql`${courts.availableSports} @> ARRAY[${filters.sport}]`);
     }
 
     const query = db
