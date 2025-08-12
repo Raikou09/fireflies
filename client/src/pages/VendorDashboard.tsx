@@ -129,6 +129,22 @@ export default function VendorDashboard() {
     },
   });
 
+  // Fetch vendor bookings
+  const { data: vendorBookings = [] } = useQuery({
+    queryKey: ['/api/vendor/bookings'],
+    enabled: isAuthenticated,
+    queryFn: async () => {
+      const token = localStorage.getItem('vendorToken');
+      const response = await fetch('/api/vendor/bookings', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      if (!response.ok) throw new Error('Failed to fetch vendor bookings');
+      return response.json();
+    },
+  });
+
   const handleLogout = () => {
     localStorage.removeItem('vendorToken');
     toast({
@@ -219,9 +235,10 @@ export default function VendorDashboard() {
 
         {/* Detailed Analytics */}
         <Tabs defaultValue="courts" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="courts">Court Analytics</TabsTrigger>
             <TabsTrigger value="cities">City Performance</TabsTrigger>
+            <TabsTrigger value="bookings">View Bookings</TabsTrigger>
             <TabsTrigger value="overview">Business Overview</TabsTrigger>
           </TabsList>
 
@@ -337,6 +354,65 @@ export default function VendorDashboard() {
                 </Card>
               ))}
             </div>
+          </TabsContent>
+
+          {/* View Bookings Tab */}
+          <TabsContent value="bookings" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <Calendar className="h-5 w-5 mr-2" />
+                  All Bookings ({vendorBookings.length})
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {vendorBookings.length === 0 ? (
+                  <div className="text-center py-8">
+                    <Calendar className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                    <p className="text-gray-500">No bookings found</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {vendorBookings.map((booking: any) => (
+                      <div key={booking.id} className="border border-gray-200 rounded-lg p-4">
+                        <div className="flex justify-between items-start mb-3">
+                          <div>
+                            <h4 className="font-semibold text-lg">{booking.court?.name}</h4>
+                            <p className="text-gray-600 flex items-center">
+                              <MapPin className="h-4 w-4 mr-1" />
+                              {booking.court?.city}
+                            </p>
+                          </div>
+                          <Badge 
+                            variant={booking.status === 'active' ? 'default' : booking.status === 'completed' ? 'secondary' : 'destructive'}
+                          >
+                            {booking.status}
+                          </Badge>
+                        </div>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                          <div>
+                            <p className="text-gray-600">Sport & Date</p>
+                            <p className="font-medium">{booking.selectedSport}</p>
+                            <p className="text-gray-500">{booking.bookingDate}</p>
+                          </div>
+                          <div>
+                            <p className="text-gray-600">Time & Customer</p>
+                            <p className="font-medium">{booking.timeSlot}</p>
+                            <p className="text-gray-500">{booking.customerPhone}</p>
+                          </div>
+                          <div>
+                            <p className="text-gray-600">Amount & Payment</p>
+                            <p className="font-medium text-primary">{formatCurrency(Number(booking.totalAmount))}</p>
+                            <p className="text-gray-500">{booking.paymentMethod}</p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </TabsContent>
 
           {/* Business Overview Tab */}

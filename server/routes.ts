@@ -348,15 +348,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Vendor analytics
-  app.get("/api/vendor/stats", isAuthenticated, async (req: any, res) => {
+  // Vendor stats with token authentication
+  app.get("/api/vendor/stats", async (req, res) => {
     try {
-      const vendorId = req.user.claims.sub;
+      const vendorToken = req.headers.authorization?.replace('Bearer ', '');
+      if (!vendorToken || !vendorToken.startsWith('vendor_')) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const vendorId = vendorToken.split('_')[1];
       const stats = await storage.getVendorStats(vendorId);
       res.json(stats);
     } catch (error) {
       console.error("Error fetching vendor stats:", error);
       res.status(500).json({ message: "Failed to fetch stats" });
+    }
+  });
+
+  // Vendor courts with token authentication  
+  app.get("/api/vendor/courts", async (req, res) => {
+    try {
+      const vendorToken = req.headers.authorization?.replace('Bearer ', '');
+      if (!vendorToken || !vendorToken.startsWith('vendor_')) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const vendorId = vendorToken.split('_')[1];
+      const courts = await storage.getCourtsByVendor(vendorId);
+      res.json(courts);
+    } catch (error) {
+      console.error("Error fetching vendor courts:", error);
+      res.status(500).json({ message: "Failed to fetch courts" });
+    }
+  });
+
+  // Vendor bookings with token authentication
+  app.get("/api/vendor/bookings", async (req, res) => {
+    try {
+      const vendorToken = req.headers.authorization?.replace('Bearer ', '');
+      if (!vendorToken || !vendorToken.startsWith('vendor_')) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const vendorId = vendorToken.split('_')[1];
+      const bookings = await storage.getBookingsByVendor(vendorId);
+      res.json(bookings);
+    } catch (error) {
+      console.error("Error fetching vendor bookings:", error);
+      res.status(500).json({ message: "Failed to fetch bookings" });
     }
   });
 

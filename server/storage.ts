@@ -395,6 +395,147 @@ export class DatabaseStorage implements IStorage {
     };
   }
 
+  // Vendor Court Analytics
+  async getVendorCourtAnalytics(vendorId: string) {
+    const vendorCourts = await db
+      .select()
+      .from(courts)
+      .where(and(eq(courts.vendorId, vendorId), eq(courts.isActive, true)));
+
+    const analytics = [];
+    
+    for (const court of vendorCourts) {
+      // Get total bookings for this court
+      const [{ count: totalBookings }] = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(bookings)
+        .where(eq(bookings.courtId, court.id));
+
+      // Get revenue for this court
+      const [{ sum: revenue }] = await db
+        .select({ sum: sql<number>`coalesce(sum(${bookings.totalAmount}), 0)` })
+        .from(bookings)
+        .where(and(
+          eq(bookings.courtId, court.id),
+          eq(bookings.paymentStatus, "completed")
+        ));
+
+      // Get popular sports for this court
+      const popularSports = await db
+        .select({
+          sport: bookings.selectedSport,
+          bookings: sql<number>`count(*)`
+        })
+        .from(bookings)
+        .where(eq(bookings.courtId, court.id))
+        .groupBy(bookings.selectedSport)
+        .orderBy(sql`count(*) desc`)
+        .limit(5);
+
+      // Get recent bookings for this court
+      const recentBookings = await db
+        .select({
+          date: bookings.bookingDate,
+          sport: bookings.selectedSport,
+          revenue: bookings.totalAmount,
+          customerPhone: bookings.customerPhone
+        })
+        .from(bookings)
+        .where(eq(bookings.courtId, court.id))
+        .orderBy(desc(bookings.createdAt))
+        .limit(10);
+
+      analytics.push({
+        courtId: court.id,
+        courtName: court.name,
+        city: court.city,
+        totalBookings: Number(totalBookings) || 0,
+        revenue: Number(revenue) || 0,
+        averageRating: Number(court.rating) || 0,
+        popularSports: popularSports.map(s => ({
+          sport: s.sport,
+          bookings: Number(s.bookings) || 0
+        })),
+        recentBookings: recentBookings.map(b => ({
+          date: b.date,
+          sport: b.sport,
+          revenue: Number(b.revenue) || 0,
+          customerPhone: b.customerPhone
+        }))
+      });
+    }
+
+    return analytics;
+  }
+
+  // Vendor City Analytics
+  async getVendorCityAnalytics(vendorId: string) {
+    const cities = await db
+      .select({ 
+        city: courts.city,
+        count: sql<number>`count(*)`
+      })
+      .from(courts)
+      .where(and(eq(courts.vendorId, vendorId), eq(courts.isActive, true)))
+      .groupBy(courts.city);
+
+    const analytics = [];
+    
+    for (const cityInfo of cities) {
+      const city = cityInfo.city;
+      
+      // Get total bookings for this city
+      const [{ count: totalBookings }] = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(bookings)
+        .leftJoin(courts, eq(bookings.courtId, courts.id))
+        .where(and(
+          eq(courts.vendorId, vendorId),
+          eq(courts.city, city)
+        ));
+
+      // Get revenue for this city
+      const [{ sum: revenue }] = await db
+        .select({ sum: sql<number>`coalesce(sum(${bookings.totalAmount}), 0)` })
+        .from(bookings)
+        .leftJoin(courts, eq(bookings.courtId, courts.id))
+        .where(and(
+          eq(courts.vendorId, vendorId),
+          eq(courts.city, city),
+          eq(bookings.paymentStatus, "completed")
+        ));
+
+      // Get popular sports for this city
+      const popularSports = await db
+        .select({
+          sport: bookings.selectedSport,
+          bookings: sql<number>`count(*)`
+        })
+        .from(bookings)
+        .leftJoin(courts, eq(bookings.courtId, courts.id))
+        .where(and(
+          eq(courts.vendorId, vendorId),
+          eq(courts.city, city)
+        ))
+        .groupBy(bookings.selectedSport)
+        .orderBy(sql`count(*) desc`)
+        .limit(5);
+
+      analytics.push({
+        city,
+        totalCourts: Number(cityInfo.count) || 0,
+        totalBookings: Number(totalBookings) || 0,
+        revenue: Number(revenue) || 0,
+        popularSports: popularSports.map(s => ({
+          sport: s.sport,
+          bookings: Number(s.bookings) || 0
+        }))
+      });
+    }
+
+    return analytics;
+  }
+
   // Admin operations
   async getPendingCourts(): Promise<CourtWithDetails[]> {
     const results = await db
@@ -454,118 +595,7 @@ export class DatabaseStorage implements IStorage {
     return updatedCourt;
   }
 
-  async getVendorCourtAnalytics(vendorId: string) {
-    try {
-      // Get vendor courts
-      const vendorCourts = await db.select().from(courts).where(eq(courts.vendorId, vendorId));
-      
-      const courtAnalytics = [];
 
-      for (const court of vendorCourts) {
-        // Get bookings for this court
-        const courtBookings = await db.select().from(bookings).where(eq(bookings.courtId, court.id));
-        
-        // Calculate court stats
-        const totalBookings = courtBookings.length;
-        const revenue = courtBookings.reduce((sum, b) => sum + (b.totalAmount || 0), 0);
-        const averageRating = Math.random() * 1.5 + 3.5; // Mock rating between 3.5-5.0
-        
-        // Get popular sports
-        const sportsMap = new Map<string, number>();
-        courtBookings.forEach(booking => {
-          const sport = booking.sport || 'General';
-          sportsMap.set(sport, (sportsMap.get(sport) || 0) + 1);
-        });
-        
-        const popularSports = Array.from(sportsMap.entries())
-          .map(([sport, bookings]) => ({ sport, bookings }))
-          .sort((a, b) => b.bookings - a.bookings);
-
-        // Get recent bookings
-        const recentBookings = courtBookings
-          .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-          .slice(0, 5)
-          .map(booking => ({
-            date: new Date(booking.date).toLocaleDateString(),
-            sport: booking.sport || 'General',
-            revenue: booking.totalAmount || 0,
-            customerPhone: booking.customerPhone || 'N/A'
-          }));
-
-        courtAnalytics.push({
-          courtId: court.id,
-          courtName: court.name,
-          city: court.city,
-          totalBookings,
-          revenue,
-          averageRating: parseFloat(averageRating.toFixed(1)),
-          popularSports,
-          recentBookings
-        });
-      }
-
-      return courtAnalytics;
-    } catch (error) {
-      console.error("Error getting vendor court analytics:", error);
-      return [];
-    }
-  }
-
-  async getVendorCityAnalytics(vendorId: string) {
-    try {
-      // Get vendor courts
-      const vendorCourts = await db.select().from(courts).where(eq(courts.vendorId, vendorId));
-      
-      // Group courts by city
-      const cityMap = new Map<string, any[]>();
-      vendorCourts.forEach(court => {
-        if (!cityMap.has(court.city)) {
-          cityMap.set(court.city, []);
-        }
-        cityMap.get(court.city)!.push(court);
-      });
-
-      const cityAnalytics = [];
-
-      for (const [city, cityCourts] of cityMap.entries()) {
-        // Get all bookings for courts in this city
-        const courtIds = cityCourts.map(c => c.id);
-        const cityBookings = courtIds.length > 0 ? 
-          await db.select().from(bookings).where(
-            sql`${bookings.courtId} IN (${sql.join(courtIds.map(id => sql.literal(`'${id}'`)), sql`, `)})`
-          ) : [];
-
-        const totalCourts = cityCourts.length;
-        const totalBookings = cityBookings.length;
-        const revenue = cityBookings.reduce((sum, b) => sum + (b.totalAmount || 0), 0);
-
-        // Calculate popular sports in this city
-        const sportsMap = new Map<string, number>();
-        cityBookings.forEach(booking => {
-          const sport = booking.sport || 'General';
-          sportsMap.set(sport, (sportsMap.get(sport) || 0) + 1);
-        });
-
-        const popularSports = Array.from(sportsMap.entries())
-          .map(([sport, bookings]) => ({ sport, bookings }))
-          .sort((a, b) => b.bookings - a.bookings)
-          .slice(0, 5); // Top 5 sports
-
-        cityAnalytics.push({
-          city,
-          totalCourts,
-          totalBookings,
-          revenue,
-          popularSports
-        });
-      }
-
-      return cityAnalytics.sort((a, b) => b.revenue - a.revenue);
-    } catch (error) {
-      console.error("Error getting vendor city analytics:", error);
-      return [];
-    }
-  }
 }
 
 export const storage = new DatabaseStorage();
