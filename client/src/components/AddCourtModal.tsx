@@ -181,7 +181,23 @@ export default function AddCourtModal({ isOpen, onClose }: AddCourtModalProps) {
   };
 
   const cities = ["Nairobi", "Mombasa", "Kisumu", "Nakuru", "Eldoret"];
-  const sports = ["Basketball", "Tennis", "Football", "Volleyball", "Badminton"];
+  const sports = [
+    "Football", 
+    "Basketball", 
+    "Volleyball", 
+    "Tennis", 
+    "Netball", 
+    "Rugby", 
+    "Cricket", 
+    "Badminton", 
+    "Table Tennis", 
+    "Swimming", 
+    "Athletics", 
+    "Hockey", 
+    "Handball", 
+    "Squash",
+    "Boxing"
+  ];
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>

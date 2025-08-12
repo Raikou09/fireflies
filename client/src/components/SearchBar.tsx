@@ -16,7 +16,24 @@ export default function SearchBar({ onSearch }: SearchBarProps) {
   };
 
   const cities = ["Nairobi", "Mombasa", "Kisumu", "Nakuru", "Eldoret"];
-  const sports = ["All Sports", "Volleyball", "Tennis", "Football", "Volleyball", "Badminton"];
+  const sports = [
+    "All Sports", 
+    "Football", 
+    "Basketball", 
+    "Volleyball", 
+    "Tennis", 
+    "Netball", 
+    "Rugby", 
+    "Cricket", 
+    "Badminton", 
+    "Table Tennis", 
+    "Swimming", 
+    "Athletics", 
+    "Hockey", 
+    "Handball", 
+    "Squash",
+    "Boxing"
+  ];
 
   return (
     <div className="bg-white p-6 rounded-2xl shadow-xl max-w-2xl mx-auto">
