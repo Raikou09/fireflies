@@ -352,9 +352,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/vendor/stats", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
+      console.log("Vendor stats - User ID:", userId);
       const user = await storage.getUser(userId);
+      console.log("Vendor stats - Found user:", user);
       
       if (!user || user.user_type !== "vendor") {
+        console.log("Vendor stats - Access denied. User type:", user?.user_type);
         return res.status(403).json({ message: "Access denied. Vendor account required." });
       }
 

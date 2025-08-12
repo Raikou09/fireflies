@@ -23,10 +23,12 @@ import {
   TrendingUp,
   MapPin,
   LogOut,
-  AlertCircle
+  AlertCircle,
+  ArrowLeft
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { Link } from "wouter";
 
 interface VendorStats {
   totalCourts: number;
@@ -195,6 +197,13 @@ export default function VendorDashboard() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center space-x-4">
+              <Link href="/">
+                <Button variant="ghost" size="sm" className="flex items-center space-x-2">
+                  <ArrowLeft className="h-4 w-4" />
+                  <span>Back to Home</span>
+                </Button>
+              </Link>
+              <div className="h-8 w-px bg-gray-200"></div>
               <Building2 className="h-8 w-8 text-primary" />
               <div>
                 <h1 className="text-xl font-semibold text-gray-900">Vendor Dashboard</h1>
