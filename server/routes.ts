@@ -354,7 +354,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.user.claims.sub;
       const user = await storage.getUser(userId);
       
-      if (!user || user.userType !== "vendor") {
+      if (!user || user.user_type !== "vendor") {
         return res.status(403).json({ message: "Access denied. Vendor account required." });
       }
 
@@ -372,7 +372,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.user.claims.sub;
       const user = await storage.getUser(userId);
       
-      if (!user || user.userType !== "vendor") {
+      if (!user || user.user_type !== "vendor") {
         return res.status(403).json({ message: "Access denied. Vendor account required." });
       }
 
@@ -390,7 +390,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.user.claims.sub;
       const user = await storage.getUser(userId);
       
-      if (!user || user.userType !== "vendor") {
+      if (!user || user.user_type !== "vendor") {
         return res.status(403).json({ message: "Access denied. Vendor account required." });
       }
 
@@ -408,7 +408,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.user.claims.sub;
       const user = await storage.getUser(userId);
       
-      const isVendor = user?.userType === "vendor";
+      const isVendor = user?.user_type === "vendor";
       res.json({ 
         isVendor,
         user: isVendor ? user : null
@@ -425,7 +425,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.user.claims.sub;
       const user = await storage.getUser(userId);
       
-      if (!user || user.userType !== "vendor") {
+      if (!user || user.user_type !== "vendor") {
         return res.status(403).json({ message: "Access denied. Vendor account required." });
       }
 
@@ -443,7 +443,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.user.claims.sub;
       const user = await storage.getUser(userId);
       
-      if (!user || user.userType !== "vendor") {
+      if (!user || user.user_type !== "vendor") {
         return res.status(403).json({ message: "Access denied. Vendor account required." });
       }
 

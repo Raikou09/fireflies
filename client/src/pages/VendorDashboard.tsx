@@ -73,6 +73,13 @@ export default function VendorDashboard() {
         return;
       }
 
+      // Check if user has user_type field directly
+      if ((user as any)?.user_type === "vendor" || (user as any)?.userType === "vendor") {
+        setIsVendor(true);
+        setVendorCheckLoading(false);
+        return;
+      }
+
       try {
         const response = await fetch('/api/vendor/check');
         if (response.ok) {
@@ -81,6 +88,8 @@ export default function VendorDashboard() {
         }
       } catch (error) {
         console.error("Error checking vendor status:", error);
+        // Fallback: check if user object has vendor type  
+        setIsVendor((user as any)?.user_type === "vendor" || (user as any)?.userType === "vendor");
       } finally {
         setVendorCheckLoading(false);
       }
@@ -115,7 +124,7 @@ export default function VendorDashboard() {
   });
 
   // Fetch vendor bookings
-  const { data: vendorBookings = [] } = useQuery({
+  const { data: vendorBookings = [] } = useQuery<any[]>({
     queryKey: ['/api/vendor/bookings'],
     enabled: isAuthenticated && isVendor,
   });
@@ -194,7 +203,7 @@ export default function VendorDashboard() {
             </div>
             <div className="flex items-center space-x-4">
               <div className="text-sm text-gray-600">
-                Welcome, {user?.firstName || user?.email}
+                Welcome, {(user as any)?.firstName || (user as any)?.email}
               </div>
               <Button variant="outline" onClick={handleLogout}>
                 <LogOut className="h-4 w-4 mr-2" />

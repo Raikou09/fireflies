@@ -15,7 +15,7 @@ import {
   type BookingWithDetails,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, desc, sql } from "drizzle-orm";
+import { eq, and, desc, sql, gte, lte } from "drizzle-orm";
 
 export interface IStorage {
   // User operations (required for Replit Auth)
@@ -236,7 +236,7 @@ export class DatabaseStorage implements IStorage {
     const result = await db
       .delete(courts)
       .where(and(eq(courts.id, id), eq(courts.vendorId, vendorId)));
-    return result.rowCount > 0;
+    return (result.rowCount || 0) > 0;
   }
 
   // Equipment operations
@@ -268,7 +268,7 @@ export class DatabaseStorage implements IStorage {
     const result = await db
       .delete(equipment)
       .where(eq(equipment.id, id));
-    return result.rowCount > 0;
+    return (result.rowCount || 0) > 0;
   }
 
   // Booking operations
@@ -329,7 +329,7 @@ export class DatabaseStorage implements IStorage {
     };
   }
 
-  async updateBookingStatus(id: string, status: string): Promise<Booking | undefined> {
+  async updateBookingStatus(id: string, status: "active" | "completed" | "cancelled"): Promise<Booking | undefined> {
     const [updatedBooking] = await db
       .update(bookings)
       .set({ status, updatedAt: new Date() })
