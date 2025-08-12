@@ -54,6 +54,11 @@ export interface IStorage {
     monthlyRevenue: number;
     averageRating: number;
   }>;
+
+  // Admin operations
+  getPendingCourts(): Promise<CourtWithDetails[]>;
+  approveCourt(courtId: string, adminNotes?: string): Promise<Court | undefined>;
+  rejectCourt(courtId: string, adminNotes?: string): Promise<Court | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -84,20 +89,22 @@ export class DatabaseStorage implements IStorage {
     sport?: string;
     search?: string;
   }): Promise<CourtWithDetails[]> {
-    let query = db
+    let whereConditions = [eq(courts.isActive, true), eq(courts.approvalStatus, "approved")];
+
+    if (filters?.city) {
+      whereConditions.push(eq(courts.city, filters.city));
+    }
+
+    if (filters?.sport && filters.sport !== "All Sports") {
+      whereConditions.push(eq(courts.sport, filters.sport));
+    }
+
+    const query = db
       .select()
       .from(courts)
       .leftJoin(users, eq(courts.vendorId, users.id))
       .leftJoin(equipment, eq(courts.id, equipment.courtId))
-      .where(eq(courts.isActive, true));
-
-    if (filters?.city) {
-      query = query.where(eq(courts.city, filters.city));
-    }
-
-    if (filters?.sport && filters.sport !== "All Sports") {
-      query = query.where(eq(courts.sport, filters.sport));
-    }
+      .where(and(...whereConditions));
 
     const results = await query.orderBy(desc(courts.createdAt));
 
@@ -316,7 +323,8 @@ export class DatabaseStorage implements IStorage {
       .where(and(eq(courts.vendorId, vendorId), eq(courts.isActive, true)));
 
     // Get active bookings for current month
-    const currentMonth = new Date().toISOString().slice(0, 7);
+    const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+    const endOfMonth = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0);
     const [{ count: activeBookings }] = await db
       .select({ count: sql<number>`count(*)` })
       .from(bookings)
@@ -325,7 +333,8 @@ export class DatabaseStorage implements IStorage {
         and(
           eq(courts.vendorId, vendorId),
           eq(bookings.status, "active"),
-          sql`date_trunc('month', ${bookings.createdAt}) = ${currentMonth || new Date().toISOString().slice(0, 7)}`
+          sql`${bookings.createdAt} >= ${startOfMonth}`,
+          sql`${bookings.createdAt} <= ${endOfMonth}`
         )
       );
 
@@ -338,7 +347,8 @@ export class DatabaseStorage implements IStorage {
         and(
           eq(courts.vendorId, vendorId),
           eq(bookings.paymentStatus, "completed"),
-          sql`date_trunc('month', ${bookings.createdAt}) = ${currentMonth || new Date().toISOString().slice(0, 7)}`
+          sql`${bookings.createdAt} >= ${startOfMonth}`,
+          sql`${bookings.createdAt} <= ${endOfMonth}`
         )
       );
 
@@ -354,6 +364,65 @@ export class DatabaseStorage implements IStorage {
       monthlyRevenue: Number(monthlyRevenue) || 0,
       averageRating: Number(averageRating) || 0,
     };
+  }
+
+  // Admin operations
+  async getPendingCourts(): Promise<CourtWithDetails[]> {
+    const results = await db
+      .select()
+      .from(courts)
+      .leftJoin(users, eq(courts.vendorId, users.id))
+      .leftJoin(equipment, eq(courts.id, equipment.courtId))
+      .where(eq(courts.approvalStatus, "pending"))
+      .orderBy(desc(courts.createdAt));
+
+    // Group results by court
+    const courtMap = new Map<string, CourtWithDetails>();
+    
+    for (const row of results) {
+      if (!row.courts) continue;
+      
+      const courtId = row.courts.id;
+      if (!courtMap.has(courtId)) {
+        courtMap.set(courtId, {
+          ...row.courts,
+          vendor: row.users!,
+          equipment: [],
+        });
+      }
+      
+      if (row.equipment) {
+        courtMap.get(courtId)!.equipment.push(row.equipment);
+      }
+    }
+
+    return Array.from(courtMap.values());
+  }
+
+  async approveCourt(courtId: string, adminNotes?: string): Promise<Court | undefined> {
+    const [updatedCourt] = await db
+      .update(courts)
+      .set({ 
+        approvalStatus: "approved",
+        adminNotes,
+        updatedAt: new Date() 
+      })
+      .where(eq(courts.id, courtId))
+      .returning();
+    return updatedCourt;
+  }
+
+  async rejectCourt(courtId: string, adminNotes?: string): Promise<Court | undefined> {
+    const [updatedCourt] = await db
+      .update(courts)
+      .set({ 
+        approvalStatus: "rejected",
+        adminNotes,
+        updatedAt: new Date() 
+      })
+      .where(eq(courts.id, courtId))
+      .returning();
+    return updatedCourt;
   }
 }
 

@@ -1,4 +1,5 @@
-import { Volleyball, ChevronDown } from "lucide-react";
+import { Volleyball, ChevronDown, Shield } from "lucide-react";
+import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import {
@@ -8,13 +9,22 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
+interface User {
+  id: string;
+  email?: string;
+  firstName?: string;
+  lastName?: string;
+  profileImageUrl?: string;
+  userType: string;
+}
+
 interface NavigationProps {
   userMode: "customer" | "vendor";
   setUserMode: (mode: "customer" | "vendor") => void;
 }
 
 export default function Navigation({ userMode, setUserMode }: NavigationProps) {
-  const { user } = useAuth();
+  const { user } = useAuth() as { user: User | undefined };
 
   return (
     <header className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-50">
@@ -30,24 +40,37 @@ export default function Navigation({ userMode, setUserMode }: NavigationProps) {
           
           {/* User Type Toggle */}
           <div className="flex items-center space-x-4">
-            <div className="bg-gray-100 p-1 rounded-lg">
-              <Button
-                size="sm"
-                variant={userMode === "customer" ? "default" : "ghost"}
-                onClick={() => setUserMode("customer")}
-                className={userMode === "customer" ? "bg-primary text-white" : "text-gray-600"}
-              >
-                Customer
-              </Button>
-              <Button
-                size="sm"
-                variant={userMode === "vendor" ? "default" : "ghost"}
-                onClick={() => setUserMode("vendor")}
-                className={userMode === "vendor" ? "bg-primary text-white" : "text-gray-600"}
-              >
-                Vendor
-              </Button>
-            </div>
+            {user?.userType === "admin" ? (
+              <Link href="/admin">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="flex items-center space-x-2 border-purple-600 text-purple-600 hover:bg-purple-50"
+                >
+                  <Shield className="h-4 w-4" />
+                  <span>Admin Panel</span>
+                </Button>
+              </Link>
+            ) : (
+              <div className="bg-gray-100 p-1 rounded-lg">
+                <Button
+                  size="sm"
+                  variant={userMode === "customer" ? "default" : "ghost"}
+                  onClick={() => setUserMode("customer")}
+                  className={userMode === "customer" ? "bg-primary text-white" : "text-gray-600"}
+                >
+                  Customer
+                </Button>
+                <Button
+                  size="sm"
+                  variant={userMode === "vendor" ? "default" : "ghost"}
+                  onClick={() => setUserMode("vendor")}
+                  className={userMode === "vendor" ? "bg-primary text-white" : "text-gray-600"}
+                >
+                  Vendor
+                </Button>
+              </div>
+            )}
             
             {/* Profile Menu */}
             <DropdownMenu>

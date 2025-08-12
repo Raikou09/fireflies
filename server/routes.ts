@@ -272,6 +272,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Admin routes
+  app.get("/api/admin/pending-courts", isAuthenticated, async (req: any, res) => {
+    try {
+      const user = await storage.getUser(req.user.claims.sub);
+      if (!user || user.userType !== "admin") {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+      const pendingCourts = await storage.getPendingCourts();
+      res.json(pendingCourts);
+    } catch (error) {
+      console.error("Error fetching pending courts:", error);
+      res.status(500).json({ message: "Failed to fetch pending courts" });
+    }
+  });
+
+  app.put("/api/admin/courts/:id/approve", isAuthenticated, async (req: any, res) => {
+    try {
+      const user = await storage.getUser(req.user.claims.sub);
+      if (!user || user.userType !== "admin") {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+      const { adminNotes } = req.body;
+      const court = await storage.approveCourt(req.params.id, adminNotes);
+      if (!court) {
+        return res.status(404).json({ message: "Court not found" });
+      }
+      res.json(court);
+    } catch (error) {
+      console.error("Error approving court:", error);
+      res.status(500).json({ message: "Failed to approve court" });
+    }
+  });
+
+  app.put("/api/admin/courts/:id/reject", isAuthenticated, async (req: any, res) => {
+    try {
+      const user = await storage.getUser(req.user.claims.sub);
+      if (!user || user.userType !== "admin") {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+      const { adminNotes } = req.body;
+      const court = await storage.rejectCourt(req.params.id, adminNotes);
+      if (!court) {
+        return res.status(404).json({ message: "Court not found" });
+      }
+      res.json(court);
+    } catch (error) {
+      console.error("Error rejecting court:", error);
+      res.status(500).json({ message: "Failed to reject court" });
+    }
+  });
+
   // Vendor analytics
   app.get("/api/vendor/stats", isAuthenticated, async (req: any, res) => {
     try {

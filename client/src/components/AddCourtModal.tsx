@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { apiRequest } from "@/lib/queryClient";
@@ -35,11 +36,17 @@ export default function AddCourtModal({ isOpen, onClose }: AddCourtModalProps) {
     rules: "",
   });
 
+  const [availableDays, setAvailableDays] = useState<string[]>([
+    "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"
+  ]);
   const [imageUrl, setImageUrl] = useState("");
 
   const mutation = useMutation({
     mutationFn: async (courtData: any) => {
-      const response = await apiRequest("POST", "/api/courts", courtData);
+      const response = await apiRequest("POST", "/api/courts", {
+        ...courtData,
+        availableDays
+      });
       return response.json();
     },
     onSuccess: (court) => {
@@ -121,6 +128,7 @@ export default function AddCourtModal({ isOpen, onClose }: AddCourtModalProps) {
       closingTime: "",
       rules: "",
     });
+    setAvailableDays(["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]);
     setImageUrl("");
   };
 
@@ -128,14 +136,22 @@ export default function AddCourtModal({ isOpen, onClose }: AddCourtModalProps) {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
+  const handleDayToggle = (day: string) => {
+    setAvailableDays(prev => 
+      prev.includes(day) 
+        ? prev.filter(d => d !== day)
+        : [...prev, day]
+    );
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!formData.name || !formData.sport || !formData.city || !formData.area || 
-        !formData.hourlyRate || !formData.openingTime || !formData.closingTime) {
+        !formData.hourlyRate || !formData.openingTime || !formData.closingTime || availableDays.length === 0) {
       toast({
         title: "Missing Information",
-        description: "Please fill in all required fields.",
+        description: "Please fill in all required fields and select at least one day.",
         variant: "destructive",
       });
       return;
@@ -154,7 +170,7 @@ export default function AddCourtModal({ isOpen, onClose }: AddCourtModalProps) {
   };
 
   const handleUploadComplete = (result: UploadResult<Record<string, unknown>, Record<string, unknown>>) => {
-    if (result.successful.length > 0) {
+    if (result.successful && result.successful.length > 0) {
       const uploadedFile = result.successful[0];
       setImageUrl(uploadedFile.uploadURL as string);
       toast({
@@ -278,6 +294,25 @@ export default function AddCourtModal({ isOpen, onClose }: AddCourtModalProps) {
                 onChange={(e) => handleInputChange("closingTime", e.target.value)}
                 required
               />
+            </div>
+          </div>
+
+          {/* Available Days */}
+          <div>
+            <Label className="mb-3 block">Available Days *</Label>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              {["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"].map((day) => (
+                <div key={day} className="flex items-center space-x-2">
+                  <Checkbox
+                    id={day}
+                    checked={availableDays.includes(day)}
+                    onCheckedChange={() => handleDayToggle(day)}
+                  />
+                  <Label htmlFor={day} className="text-sm font-normal cursor-pointer">
+                    {day}
+                  </Label>
+                </div>
+              ))}
             </div>
           </div>
 
