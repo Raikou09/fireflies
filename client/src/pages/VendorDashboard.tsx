@@ -1,24 +1,32 @@
-import { useEffect, useState } from "react";
-import { useLocation } from "wouter";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { 
+  Card, 
+  CardContent, 
+  CardHeader, 
+  CardTitle 
+} from "@/components/ui/card";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useToast } from "@/hooks/use-toast";
+import { Button } from "@/components/ui/button";
 import { 
   Building2, 
-  DollarSign, 
-  TrendingUp, 
-  Users, 
-  Calendar, 
-  MapPin, 
-  LogOut,
-  BarChart3,
+  Calendar,
+  DollarSign,
   Trophy,
-  Clock
+  BarChart3,
+  TrendingUp,
+  MapPin,
+  LogOut,
+  AlertCircle
 } from "lucide-react";
-import type { CourtWithDetails } from "@shared/schema";
+import { useAuth } from "@/hooks/useAuth";
+import { useToast } from "@/hooks/use-toast";
 
 interface VendorStats {
   totalCourts: number;
@@ -52,110 +60,121 @@ interface CityAnalytics {
 }
 
 export default function VendorDashboard() {
-  const [, navigate] = useLocation();
+  const { user, isAuthenticated, isLoading } = useAuth();
   const { toast } = useToast();
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isVendor, setIsVendor] = useState(false);
+  const [vendorCheckLoading, setVendorCheckLoading] = useState(true);
 
-  // Check vendor authentication
+  // Check if current user is a vendor
   useEffect(() => {
-    const vendorToken = localStorage.getItem('vendorToken');
-    if (!vendorToken) {
-      navigate('/vendor/login');
-      return;
+    const checkVendorStatus = async () => {
+      if (!isAuthenticated || !user) {
+        setVendorCheckLoading(false);
+        return;
+      }
+
+      try {
+        const response = await fetch('/api/vendor/check');
+        if (response.ok) {
+          const data = await response.json();
+          setIsVendor(data.isVendor);
+        }
+      } catch (error) {
+        console.error("Error checking vendor status:", error);
+      } finally {
+        setVendorCheckLoading(false);
+      }
+    };
+
+    if (!isLoading) {
+      checkVendorStatus();
     }
-    setIsAuthenticated(true);
-  }, [navigate]);
+  }, [isAuthenticated, user, isLoading]);
 
   // Fetch vendor stats
-  const { data: stats } = useQuery<VendorStats>({
+  const { data: stats, isLoading: statsLoading } = useQuery<VendorStats>({
     queryKey: ['/api/vendor/stats'],
-    enabled: isAuthenticated,
-    queryFn: async () => {
-      const token = localStorage.getItem('vendorToken');
-      const response = await fetch('/api/vendor/stats', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-      if (!response.ok) throw new Error('Failed to fetch stats');
-      return response.json();
-    },
+    enabled: isAuthenticated && isVendor,
   });
 
   // Fetch vendor courts
-  const { data: courts = [] } = useQuery<CourtWithDetails[]>({
+  const { data: vendorCourts = [] } = useQuery({
     queryKey: ['/api/vendor/courts'],
-    enabled: isAuthenticated,
-    queryFn: async () => {
-      const token = localStorage.getItem('vendorToken');
-      const response = await fetch('/api/vendor/courts', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-      if (!response.ok) throw new Error('Failed to fetch courts');
-      return response.json();
-    },
+    enabled: isAuthenticated && isVendor,
   });
 
   // Fetch detailed analytics
   const { data: courtAnalytics = [] } = useQuery<CourtAnalytics[]>({
     queryKey: ['/api/vendor/analytics/courts'],
-    enabled: isAuthenticated,
-    queryFn: async () => {
-      const token = localStorage.getItem('vendorToken');
-      const response = await fetch('/api/vendor/analytics/courts', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-      if (!response.ok) throw new Error('Failed to fetch court analytics');
-      return response.json();
-    },
+    enabled: isAuthenticated && isVendor,
   });
 
   const { data: cityAnalytics = [] } = useQuery<CityAnalytics[]>({
     queryKey: ['/api/vendor/analytics/cities'],
-    enabled: isAuthenticated,
-    queryFn: async () => {
-      const token = localStorage.getItem('vendorToken');
-      const response = await fetch('/api/vendor/analytics/cities', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-      if (!response.ok) throw new Error('Failed to fetch city analytics');
-      return response.json();
-    },
+    enabled: isAuthenticated && isVendor,
   });
 
   // Fetch vendor bookings
   const { data: vendorBookings = [] } = useQuery({
     queryKey: ['/api/vendor/bookings'],
-    enabled: isAuthenticated,
-    queryFn: async () => {
-      const token = localStorage.getItem('vendorToken');
-      const response = await fetch('/api/vendor/bookings', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-      if (!response.ok) throw new Error('Failed to fetch vendor bookings');
-      return response.json();
-    },
+    enabled: isAuthenticated && isVendor,
   });
 
-  const handleLogout = () => {
-    localStorage.removeItem('vendorToken');
-    toast({
-      title: "Logged Out",
-      description: "You have been successfully logged out.",
-    });
-    navigate('/vendor/login');
+  const handleGoogleLogin = () => {
+    window.location.href = '/api/login';
   };
 
+  const handleLogout = () => {
+    window.location.href = '/api/logout';
+  };
+
+  if (isLoading || vendorCheckLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
   if (!isAuthenticated) {
-    return null;
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <Card className="w-full max-w-md">
+          <CardHeader className="text-center">
+            <Building2 className="h-12 w-12 text-primary mx-auto mb-4" />
+            <CardTitle className="text-2xl">Vendor Dashboard</CardTitle>
+            <p className="text-gray-600">Sign in with Google to access your vendor dashboard</p>
+          </CardHeader>
+          <CardContent>
+            <Button onClick={handleGoogleLogin} className="w-full">
+              Sign in with Google
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (!isVendor) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <Card className="w-full max-w-md">
+          <CardHeader className="text-center">
+            <AlertCircle className="h-12 w-12 text-orange-500 mx-auto mb-4" />
+            <CardTitle className="text-2xl">Access Restricted</CardTitle>
+            <p className="text-gray-600">This dashboard is only available to vendor accounts. Please contact support to upgrade your account.</p>
+          </CardHeader>
+          <CardContent>
+            <Button onClick={handleLogout} variant="outline" className="w-full">
+              Back to Home
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
 
   const formatCurrency = (amount: number) => `KES ${amount.toLocaleString()}`;
@@ -173,10 +192,15 @@ export default function VendorDashboard() {
                 <p className="text-sm text-gray-500">CourtBook Kenya</p>
               </div>
             </div>
-            <Button variant="outline" onClick={handleLogout}>
-              <LogOut className="h-4 w-4 mr-2" />
-              Logout
-            </Button>
+            <div className="flex items-center space-x-4">
+              <div className="text-sm text-gray-600">
+                Welcome, {user?.firstName || user?.email}
+              </div>
+              <Button variant="outline" onClick={handleLogout}>
+                <LogOut className="h-4 w-4 mr-2" />
+                Logout
+              </Button>
+            </div>
           </div>
         </div>
       </header>
@@ -320,7 +344,7 @@ export default function VendorDashboard() {
                 <Card key={city.city}>
                   <CardHeader>
                     <CardTitle className="flex items-center">
-                      <MapPin className="h-5 w-5 mr-2 text-primary" />
+                      <MapPin className="h-5 w-5 mr-2" />
                       {city.city}
                     </CardTitle>
                   </CardHeader>

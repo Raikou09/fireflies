@@ -348,16 +348,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Vendor stats with token authentication
-  app.get("/api/vendor/stats", async (req, res) => {
+  // Vendor stats with Google auth
+  app.get("/api/vendor/stats", isAuthenticated, async (req: any, res) => {
     try {
-      const vendorToken = req.headers.authorization?.replace('Bearer ', '');
-      if (!vendorToken || !vendorToken.startsWith('vendor_')) {
-        return res.status(401).json({ message: "Unauthorized" });
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (!user || user.userType !== "vendor") {
+        return res.status(403).json({ message: "Access denied. Vendor account required." });
       }
 
-      const vendorId = vendorToken.split('_')[1];
-      const stats = await storage.getVendorStats(vendorId);
+      const stats = await storage.getVendorStats(userId);
       res.json(stats);
     } catch (error) {
       console.error("Error fetching vendor stats:", error);
@@ -365,16 +366,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Vendor courts with token authentication  
-  app.get("/api/vendor/courts", async (req, res) => {
+  // Vendor courts with Google auth
+  app.get("/api/vendor/courts", isAuthenticated, async (req: any, res) => {
     try {
-      const vendorToken = req.headers.authorization?.replace('Bearer ', '');
-      if (!vendorToken || !vendorToken.startsWith('vendor_')) {
-        return res.status(401).json({ message: "Unauthorized" });
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (!user || user.userType !== "vendor") {
+        return res.status(403).json({ message: "Access denied. Vendor account required." });
       }
 
-      const vendorId = vendorToken.split('_')[1];
-      const courts = await storage.getCourtsByVendor(vendorId);
+      const courts = await storage.getCourtsByVendor(userId);
       res.json(courts);
     } catch (error) {
       console.error("Error fetching vendor courts:", error);
@@ -382,16 +384,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Vendor bookings with token authentication
-  app.get("/api/vendor/bookings", async (req, res) => {
+  // Vendor bookings with Google auth
+  app.get("/api/vendor/bookings", isAuthenticated, async (req: any, res) => {
     try {
-      const vendorToken = req.headers.authorization?.replace('Bearer ', '');
-      if (!vendorToken || !vendorToken.startsWith('vendor_')) {
-        return res.status(401).json({ message: "Unauthorized" });
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (!user || user.userType !== "vendor") {
+        return res.status(403).json({ message: "Access denied. Vendor account required." });
       }
 
-      const vendorId = vendorToken.split('_')[1];
-      const bookings = await storage.getBookingsByVendor(vendorId);
+      const bookings = await storage.getBookingsByVendor(userId);
       res.json(bookings);
     } catch (error) {
       console.error("Error fetching vendor bookings:", error);
@@ -399,42 +402,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Vendor Authentication and Advanced Analytics Routes
-  app.post("/api/vendor/login", async (req, res) => {
+  // Check if current user is vendor
+  app.get("/api/vendor/check", isAuthenticated, async (req: any, res) => {
     try {
-      const { email, password } = req.body;
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
       
-      // Simple vendor authentication (in production, use proper password hashing)
-      const vendor = await storage.getUserByEmail(email);
-      if (!vendor || vendor.userType !== "vendor" || password !== "vendor123") {
-        return res.status(401).json({ message: "Invalid credentials" });
-      }
-
-      // Generate a simple token (in production, use JWT or proper session management)
-      const vendorToken = `vendor_${vendor.id}_${Date.now()}`;
-      
+      const isVendor = user?.userType === "vendor";
       res.json({ 
-        success: true, 
-        vendorToken, 
-        vendorId: vendor.id,
-        message: "Vendor authenticated successfully" 
+        isVendor,
+        user: isVendor ? user : null
       });
     } catch (error) {
-      console.error("Vendor login error:", error);
-      res.status(500).json({ message: "Login failed" });
+      console.error("Error checking vendor status:", error);
+      res.status(500).json({ message: "Failed to check vendor status" });
     }
   });
 
-  // Vendor analytics - detailed court analytics
-  app.get("/api/vendor/analytics/courts", async (req, res) => {
+  // Vendor analytics - detailed court analytics with Google auth
+  app.get("/api/vendor/analytics/courts", isAuthenticated, async (req: any, res) => {
     try {
-      const vendorToken = req.headers.authorization?.replace('Bearer ', '');
-      if (!vendorToken || !vendorToken.startsWith('vendor_')) {
-        return res.status(401).json({ message: "Unauthorized" });
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (!user || user.userType !== "vendor") {
+        return res.status(403).json({ message: "Access denied. Vendor account required." });
       }
 
-      const vendorId = vendorToken.split('_')[1];
-      const courtAnalytics = await storage.getVendorCourtAnalytics(vendorId);
+      const courtAnalytics = await storage.getVendorCourtAnalytics(userId);
       res.json(courtAnalytics);
     } catch (error) {
       console.error("Error fetching court analytics:", error);
@@ -442,16 +437,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Vendor analytics - city performance
-  app.get("/api/vendor/analytics/cities", async (req, res) => {
+  // Vendor analytics - city performance with Google auth
+  app.get("/api/vendor/analytics/cities", isAuthenticated, async (req: any, res) => {
     try {
-      const vendorToken = req.headers.authorization?.replace('Bearer ', '');
-      if (!vendorToken || !vendorToken.startsWith('vendor_')) {
-        return res.status(401).json({ message: "Unauthorized" });
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (!user || user.userType !== "vendor") {
+        return res.status(403).json({ message: "Access denied. Vendor account required." });
       }
 
-      const vendorId = vendorToken.split('_')[1];
-      const cityAnalytics = await storage.getVendorCityAnalytics(vendorId);
+      const cityAnalytics = await storage.getVendorCityAnalytics(userId);
       res.json(cityAnalytics);
     } catch (error) {
       console.error("Error fetching city analytics:", error);

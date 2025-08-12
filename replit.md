@@ -27,14 +27,18 @@ Preferred communication style: Simple, everyday language.
 - **Build System**: ESBuild for production bundling, TSX for development
 
 ### Authentication System
-- **Customer Authentication**: Replit Auth with OpenID Connect (OIDC)
-  - Express sessions with PostgreSQL session store
+- **Unified Google Authentication**: Single authentication system for all users
+  - Express sessions with PostgreSQL session store via Replit Auth
   - Passport.js strategy with secure cookie handling
-- **Vendor Authentication**: Separate vendor login system
-  - Dedicated vendor portal with email/password authentication
-  - Token-based authentication for vendor dashboard access
-  - Comprehensive business analytics and court management interface
-- **User Types**: Role-based access control (customer/vendor) with separate authentication flows
+  - OpenID Connect (OIDC) integration
+- **Role-Based Access Control**: User type differentiation (customer/vendor/admin) via database field
+  - Vendors: Access to comprehensive business dashboard and analytics
+  - Customers: Standard booking and browsing functionality
+  - Admins: Platform management and court approval system
+- **Vendor Dashboard**: Google-authenticated access to business analytics
+  - Revenue tracking per court and city
+  - Booking management and customer insights
+  - Performance analytics and growth opportunities
 
 ### Data Storage
 - **Database**: PostgreSQL with Neon serverless for scalability
@@ -49,15 +53,16 @@ Preferred communication style: Simple, everyday language.
 - **File Types**: Court images and other multimedia assets
 
 ### Key Features Implementation
-- **Dual Interface**: Separate customer and vendor portals with dedicated authentication
+- **Unified Authentication**: Single Google sign-in for all user types with role-based routing
 - **Search & Filtering**: Location-based court discovery with multi-sport filtering
 - **Booking System**: Time slot management with real-time availability
 - **Payment Integration**: M-Pesa payment method integration
-- **Vendor Portal**: Comprehensive business dashboard with authentication
+- **Vendor Dashboard**: Comprehensive business analytics accessible via Google authentication
   - Revenue tracking per court and city
   - Booking analytics and popular sports insights
-  - Recent booking history and customer information
+  - Recent booking history and customer information  
   - Multi-city performance comparison
+  - Accessible via user dropdown menu for vendor accounts
 - **Admin Panel**: Court approval system and platform management
 - **Real-time Updates**: Live booking status and notifications
 

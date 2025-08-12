@@ -7,7 +7,6 @@ import { useAuth } from "@/hooks/useAuth";
 import Landing from "@/pages/Landing";
 import Home from "@/pages/Home";
 import Admin from "@/pages/Admin";
-import VendorLogin from "@/pages/VendorLogin";
 import VendorDashboard from "@/pages/VendorDashboard";
 import NotFound from "@/pages/not-found";
 
@@ -16,8 +15,7 @@ function Router() {
 
   return (
     <Switch>
-      {/* Vendor Routes - Separate Authentication */}
-      <Route path="/vendor/login" component={VendorLogin} />
+      {/* Vendor Dashboard - Google Auth Required */}
       <Route path="/vendor/dashboard" component={VendorDashboard} />
       
       {/* Public Routes - No Authentication Required */}

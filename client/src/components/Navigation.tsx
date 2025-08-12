@@ -75,6 +75,13 @@ export default function Navigation({ userMode, setUserMode }: NavigationProps) {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
+                    {user?.userType === "vendor" && (
+                      <DropdownMenuItem asChild>
+                        <Link href="/vendor/dashboard">
+                          Vendor Dashboard
+                        </Link>
+                      </DropdownMenuItem>
+                    )}
                     <DropdownMenuItem onClick={() => window.location.href = "/api/logout"}>
                       Sign Out
                     </DropdownMenuItem>
