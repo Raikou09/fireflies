@@ -20,15 +20,10 @@ function Router() {
       <Route path="/vendor/login" component={VendorLogin} />
       <Route path="/vendor/dashboard" component={VendorDashboard} />
       
-      {/* Main App Routes */}
-      {isLoading || !isAuthenticated ? (
-        <Route path="/" component={Landing} />
-      ) : (
-        <>
-          <Route path="/" component={Home} />
-          <Route path="/admin" component={Admin} />
-        </>
-      )}
+      {/* Public Routes - No Authentication Required */}
+      <Route path="/" component={Home} />
+      <Route path="/admin" component={Admin} />
+      
       <Route component={NotFound} />
     </Switch>
   );

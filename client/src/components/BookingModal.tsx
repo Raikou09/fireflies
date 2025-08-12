@@ -20,7 +20,7 @@ interface BookingModalProps {
 }
 
 export default function BookingModal({ court, isOpen, onClose }: BookingModalProps) {
-  const { user } = useAuth();
+  const { user, isAuthenticated } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   
@@ -97,6 +97,19 @@ export default function BookingModal({ court, isOpen, onClose }: BookingModalPro
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Check authentication first
+    if (!isAuthenticated) {
+      toast({
+        title: "Login Required",
+        description: "Please sign in to book a court.",
+        variant: "destructive",
+      });
+      setTimeout(() => {
+        window.location.href = "/api/login";
+      }, 1000);
+      return;
+    }
     
     if (!court || !bookingDate || !selectedTimeSlot || !selectedSport || !customerPhone) {
       toast({

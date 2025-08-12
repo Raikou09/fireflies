@@ -5,13 +5,19 @@ import { storage } from "./storage";
 
 // Google OAuth configuration
 export function setupGoogleAuth(app: Express) {
+  // Only setup Google OAuth if credentials are provided
+  if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
+    console.log("Google OAuth credentials not provided. Skipping Google authentication setup.");
+    return;
+  }
+
   // Google OAuth Strategy
   passport.use(new GoogleStrategy({
-    clientID: process.env.GOOGLE_CLIENT_ID || "",
-    clientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
+    clientID: process.env.GOOGLE_CLIENT_ID,
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET,
     callbackURL: "/api/auth/google/callback"
   },
-  async (accessToken, refreshToken, profile, done) => {
+  async (accessToken: string, refreshToken: string, profile: any, done: any) => {
     try {
       // Extract user info from Google profile
       const googleId = profile.id;
