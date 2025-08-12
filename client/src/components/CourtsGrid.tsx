@@ -20,14 +20,7 @@ export default function CourtsGrid({ filters }: CourtsGridProps) {
     staleTime: 0,
   });
 
-  // Debug logging
-  console.log("CourtsGrid Debug:", { 
-    filters, 
-    courts, 
-    courtsLength: courts?.length, 
-    isLoading,
-    courtsData: courts?.slice(0, 2)
-  });
+
 
   const handleBookCourt = (court: CourtWithDetails) => {
     setSelectedCourt(court);
@@ -75,12 +68,7 @@ export default function CourtsGrid({ filters }: CourtsGridProps) {
             </div>
           </div>
 
-          <div className="mb-4 p-4 bg-yellow-100 rounded">
-            <p><strong>Debug Info:</strong> Found {courts?.length || 0} courts for {filters.city} / {filters.sport}</p>
-            <p><strong>Loading:</strong> {isLoading ? 'Yes' : 'No'}</p>
-            {courts?.length > 0 && <p><strong>First court:</strong> {courts[0]?.name}</p>}
-          </div>
-          
+
           {courts.length === 0 ? (
             <div className="text-center py-12">
               <p className="text-gray-500 text-lg">No courts found. Try adjusting your search filters.</p>

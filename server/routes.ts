@@ -76,7 +76,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/courts/:id", async (req, res) => {
+  // Route for specific court by ID (with UUID check)
+  app.get("/api/courts/:id([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})", async (req, res) => {
     try {
       const court = await storage.getCourtById(req.params.id);
       if (!court) {
@@ -86,6 +87,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching court:", error);
       res.status(500).json({ message: "Failed to fetch court" });
+    }
+  });
+
+  // Route for courts by city and sport
+  app.get("/api/courts/:city/:sport", async (req, res) => {
+    try {
+      const { city, sport } = req.params;
+      const { search } = req.query;
+      const courts = await storage.getCourts({
+        city: city === 'All Cities' ? undefined : city,
+        sport: sport === 'All Sports' ? undefined : sport,
+        search: search as string,
+      });
+      res.json(courts);
+    } catch (error) {
+      console.error("Error fetching courts:", error);
+      res.status(500).json({ message: "Failed to fetch courts" });
     }
   });
 
