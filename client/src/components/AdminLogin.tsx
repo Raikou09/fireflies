@@ -130,11 +130,11 @@ export default function AdminLogin({ onLoginSuccess }: AdminLoginProps) {
 
           <div className="mt-6 p-4 bg-blue-50 rounded-lg">
             <p className="text-sm text-blue-800">
-              <strong>For demo purposes:</strong>
+              <strong>Admin Credentials:</strong>
               <br />
               Username: <code className="bg-blue-100 px-1 rounded">admin</code>
               <br />
-              Password: <code className="bg-blue-100 px-1 rounded">courtbook2025</code>
+              Password: <code className="bg-blue-100 px-1 rounded">admin123</code>
             </p>
           </div>
         </CardContent>
