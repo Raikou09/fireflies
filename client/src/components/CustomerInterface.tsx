@@ -1,7 +1,17 @@
+import { useState } from "react";
 import SearchBar from "./SearchBar";
 import CourtsGrid from "./CourtsGrid";
 
 export default function CustomerInterface() {
+  const [searchFilters, setSearchFilters] = useState({ 
+    location: "Nairobi", 
+    sport: "All Sports" 
+  });
+
+  const handleSearch = (filters: { location: string; sport: string }) => {
+    setSearchFilters(filters);
+  };
+
   return (
     <div className="customer-interface">
       {/* Hero Section with Search */}
@@ -14,12 +24,12 @@ export default function CustomerInterface() {
             Find and book courts in Nairobi, Mombasa, Kisumu and beyond
           </p>
           
-          <SearchBar />
+          <SearchBar onSearch={handleSearch} />
         </div>
       </section>
 
       {/* Courts Grid */}
-      <CourtsGrid />
+      <CourtsGrid filters={{ city: searchFilters.location, sport: searchFilters.sport }} />
     </div>
   );
 }

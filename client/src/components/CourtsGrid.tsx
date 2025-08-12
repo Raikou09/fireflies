@@ -6,10 +6,13 @@ import { Star, Clock, MapPin, Filter, Map } from "lucide-react";
 import BookingModal from "./BookingModal";
 import type { CourtWithDetails } from "@shared/schema";
 
-export default function CourtsGrid() {
+interface CourtsGridProps {
+  filters: { city: string; sport: string };
+}
+
+export default function CourtsGrid({ filters }: CourtsGridProps) {
   const [selectedCourt, setSelectedCourt] = useState<CourtWithDetails | null>(null);
   const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
-  const [filters, setFilters] = useState({ city: "Nairobi", sport: "All Sports" });
 
   const { data: courts = [], isLoading, refetch } = useQuery({
     queryKey: ["/api/courts", filters.city, filters.sport],
