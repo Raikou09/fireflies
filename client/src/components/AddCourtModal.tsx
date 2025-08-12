@@ -173,7 +173,12 @@ export default function AddCourtModal({ isOpen, onClose }: AddCourtModalProps) {
       return;
     }
 
-    mutation.mutate(formData);
+    mutation.mutate({
+      ...formData,
+      availableSports: selectedSports,
+      availableDays,
+      imageUrl: imageUrl || undefined
+    });
   };
 
   const getUploadParameters = async () => {
