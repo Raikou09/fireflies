@@ -75,7 +75,7 @@ export default function Navigation({ userMode, setUserMode }: NavigationProps) {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    {user?.userType === "vendor" && (
+                    {((user as any)?.user_type === "vendor" || (user as any)?.userType === "vendor") && (
                       <DropdownMenuItem asChild>
                         <Link href="/vendor/dashboard">
                           Vendor Dashboard

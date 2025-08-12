@@ -17,6 +17,7 @@ function Router() {
     <Switch>
       {/* Vendor Dashboard - Google Auth Required */}
       <Route path="/vendor/dashboard" component={VendorDashboard} />
+      <Route path="/vendor-dashboard" component={VendorDashboard} />
       
       {/* Public Routes - No Authentication Required */}
       <Route path="/" component={Home} />
