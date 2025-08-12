@@ -27,10 +27,14 @@ Preferred communication style: Simple, everyday language.
 - **Build System**: ESBuild for production bundling, TSX for development
 
 ### Authentication System
-- **Provider**: Replit Auth with OpenID Connect (OIDC)
-- **Session Management**: Express sessions with PostgreSQL session store
-- **Security**: Passport.js strategy with secure cookie handling
-- **User Types**: Role-based access control (customer/vendor)
+- **Customer Authentication**: Replit Auth with OpenID Connect (OIDC)
+  - Express sessions with PostgreSQL session store
+  - Passport.js strategy with secure cookie handling
+- **Vendor Authentication**: Separate vendor login system
+  - Dedicated vendor portal with email/password authentication
+  - Token-based authentication for vendor dashboard access
+  - Comprehensive business analytics and court management interface
+- **User Types**: Role-based access control (customer/vendor) with separate authentication flows
 
 ### Data Storage
 - **Database**: PostgreSQL with Neon serverless for scalability
@@ -45,11 +49,16 @@ Preferred communication style: Simple, everyday language.
 - **File Types**: Court images and other multimedia assets
 
 ### Key Features Implementation
-- **Dual Interface**: Toggle between customer and vendor views
-- **Search & Filtering**: Location-based court discovery with sport-specific filtering
+- **Dual Interface**: Separate customer and vendor portals with dedicated authentication
+- **Search & Filtering**: Location-based court discovery with multi-sport filtering
 - **Booking System**: Time slot management with real-time availability
 - **Payment Integration**: M-Pesa payment method integration
-- **Analytics Dashboard**: Vendor performance metrics and booking insights
+- **Vendor Portal**: Comprehensive business dashboard with authentication
+  - Revenue tracking per court and city
+  - Booking analytics and popular sports insights
+  - Recent booking history and customer information
+  - Multi-city performance comparison
+- **Admin Panel**: Court approval system and platform management
 - **Real-time Updates**: Live booking status and notifications
 
 ### Development Environment

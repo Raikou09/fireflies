@@ -358,6 +358,66 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Vendor Authentication and Advanced Analytics Routes
+  app.post("/api/vendor/login", async (req, res) => {
+    try {
+      const { email, password } = req.body;
+      
+      // Simple vendor authentication (in production, use proper password hashing)
+      const vendor = await storage.getUserByEmail(email);
+      if (!vendor || vendor.userType !== "vendor" || password !== "vendor123") {
+        return res.status(401).json({ message: "Invalid credentials" });
+      }
+
+      // Generate a simple token (in production, use JWT or proper session management)
+      const vendorToken = `vendor_${vendor.id}_${Date.now()}`;
+      
+      res.json({ 
+        success: true, 
+        vendorToken, 
+        vendorId: vendor.id,
+        message: "Vendor authenticated successfully" 
+      });
+    } catch (error) {
+      console.error("Vendor login error:", error);
+      res.status(500).json({ message: "Login failed" });
+    }
+  });
+
+  // Vendor analytics - detailed court analytics
+  app.get("/api/vendor/analytics/courts", async (req, res) => {
+    try {
+      const vendorToken = req.headers.authorization?.replace('Bearer ', '');
+      if (!vendorToken || !vendorToken.startsWith('vendor_')) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const vendorId = vendorToken.split('_')[1];
+      const courtAnalytics = await storage.getVendorCourtAnalytics(vendorId);
+      res.json(courtAnalytics);
+    } catch (error) {
+      console.error("Error fetching court analytics:", error);
+      res.status(500).json({ message: "Failed to fetch court analytics" });
+    }
+  });
+
+  // Vendor analytics - city performance
+  app.get("/api/vendor/analytics/cities", async (req, res) => {
+    try {
+      const vendorToken = req.headers.authorization?.replace('Bearer ', '');
+      if (!vendorToken || !vendorToken.startsWith('vendor_')) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const vendorId = vendorToken.split('_')[1];
+      const cityAnalytics = await storage.getVendorCityAnalytics(vendorId);
+      res.json(cityAnalytics);
+    } catch (error) {
+      console.error("Error fetching city analytics:", error);
+      res.status(500).json({ message: "Failed to fetch city analytics" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

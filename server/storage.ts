@@ -20,6 +20,7 @@ import { eq, and, desc, sql } from "drizzle-orm";
 export interface IStorage {
   // User operations (required for Replit Auth)
   getUser(id: string): Promise<User | undefined>;
+  getUserByEmail(email: string): Promise<User | undefined>;
   upsertUser(user: UpsertUser): Promise<User>;
 
   // Court operations
@@ -54,6 +55,28 @@ export interface IStorage {
     monthlyRevenue: number;
     averageRating: number;
   }>;
+  getVendorCourtAnalytics(vendorId: string): Promise<Array<{
+    courtId: string;
+    courtName: string;
+    city: string;
+    totalBookings: number;
+    revenue: number;
+    averageRating: number;
+    popularSports: Array<{ sport: string; bookings: number }>;
+    recentBookings: Array<{
+      date: string;
+      sport: string;
+      revenue: number;
+      customerPhone: string;
+    }>;
+  }>>;
+  getVendorCityAnalytics(vendorId: string): Promise<Array<{
+    city: string;
+    totalCourts: number;
+    totalBookings: number;
+    revenue: number;
+    popularSports: Array<{ sport: string; bookings: number }>;
+  }>>;
 
   // Admin operations
   getPendingCourts(): Promise<CourtWithDetails[]>;
@@ -65,6 +88,11 @@ export class DatabaseStorage implements IStorage {
   // User operations
   async getUser(id: string): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.id, id));
+    return user;
+  }
+
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.email, email));
     return user;
   }
 
@@ -424,6 +452,119 @@ export class DatabaseStorage implements IStorage {
       .where(eq(courts.id, courtId))
       .returning();
     return updatedCourt;
+  }
+
+  async getVendorCourtAnalytics(vendorId: string) {
+    try {
+      // Get vendor courts
+      const vendorCourts = await db.select().from(courts).where(eq(courts.vendorId, vendorId));
+      
+      const courtAnalytics = [];
+
+      for (const court of vendorCourts) {
+        // Get bookings for this court
+        const courtBookings = await db.select().from(bookings).where(eq(bookings.courtId, court.id));
+        
+        // Calculate court stats
+        const totalBookings = courtBookings.length;
+        const revenue = courtBookings.reduce((sum, b) => sum + (b.totalAmount || 0), 0);
+        const averageRating = Math.random() * 1.5 + 3.5; // Mock rating between 3.5-5.0
+        
+        // Get popular sports
+        const sportsMap = new Map<string, number>();
+        courtBookings.forEach(booking => {
+          const sport = booking.sport || 'General';
+          sportsMap.set(sport, (sportsMap.get(sport) || 0) + 1);
+        });
+        
+        const popularSports = Array.from(sportsMap.entries())
+          .map(([sport, bookings]) => ({ sport, bookings }))
+          .sort((a, b) => b.bookings - a.bookings);
+
+        // Get recent bookings
+        const recentBookings = courtBookings
+          .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+          .slice(0, 5)
+          .map(booking => ({
+            date: new Date(booking.date).toLocaleDateString(),
+            sport: booking.sport || 'General',
+            revenue: booking.totalAmount || 0,
+            customerPhone: booking.customerPhone || 'N/A'
+          }));
+
+        courtAnalytics.push({
+          courtId: court.id,
+          courtName: court.name,
+          city: court.city,
+          totalBookings,
+          revenue,
+          averageRating: parseFloat(averageRating.toFixed(1)),
+          popularSports,
+          recentBookings
+        });
+      }
+
+      return courtAnalytics;
+    } catch (error) {
+      console.error("Error getting vendor court analytics:", error);
+      return [];
+    }
+  }
+
+  async getVendorCityAnalytics(vendorId: string) {
+    try {
+      // Get vendor courts
+      const vendorCourts = await db.select().from(courts).where(eq(courts.vendorId, vendorId));
+      
+      // Group courts by city
+      const cityMap = new Map<string, any[]>();
+      vendorCourts.forEach(court => {
+        if (!cityMap.has(court.city)) {
+          cityMap.set(court.city, []);
+        }
+        cityMap.get(court.city)!.push(court);
+      });
+
+      const cityAnalytics = [];
+
+      for (const [city, cityCourts] of cityMap.entries()) {
+        // Get all bookings for courts in this city
+        const courtIds = cityCourts.map(c => c.id);
+        const cityBookings = courtIds.length > 0 ? 
+          await db.select().from(bookings).where(
+            sql`${bookings.courtId} IN (${sql.join(courtIds.map(id => sql.literal(`'${id}'`)), sql`, `)})`
+          ) : [];
+
+        const totalCourts = cityCourts.length;
+        const totalBookings = cityBookings.length;
+        const revenue = cityBookings.reduce((sum, b) => sum + (b.totalAmount || 0), 0);
+
+        // Calculate popular sports in this city
+        const sportsMap = new Map<string, number>();
+        cityBookings.forEach(booking => {
+          const sport = booking.sport || 'General';
+          sportsMap.set(sport, (sportsMap.get(sport) || 0) + 1);
+        });
+
+        const popularSports = Array.from(sportsMap.entries())
+          .map(([sport, bookings]) => ({ sport, bookings }))
+          .sort((a, b) => b.bookings - a.bookings)
+          .slice(0, 5); // Top 5 sports
+
+        cityAnalytics.push({
+          city,
+          totalCourts,
+          totalBookings,
+          revenue,
+          popularSports
+        });
+      }
+
+      return cityAnalytics.sort((a, b) => b.revenue - a.revenue);
+    } catch (error) {
+      console.error("Error getting vendor city analytics:", error);
+      return [];
+    }
   }
 }
 

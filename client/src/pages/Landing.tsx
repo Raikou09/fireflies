@@ -47,10 +47,10 @@ export default function Landing() {
             <Button 
               size="lg"
               variant="outline"
-              onClick={() => window.location.href = "/api/login"}
+              onClick={() => window.location.href = "/vendor/login"}
               className="border-white bg-transparent text-white hover:bg-white hover:text-primary text-lg px-8 py-4"
             >
-              List Your Court
+              Vendor Portal
             </Button>
           </div>
 
