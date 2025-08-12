@@ -272,13 +272,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Admin routes
-  app.get("/api/admin/pending-courts", isAuthenticated, async (req: any, res) => {
+  // Admin authentication
+  app.post("/api/admin/login", async (req, res) => {
     try {
-      const user = await storage.getUser(req.user.claims.sub);
-      if (!user || user.userType !== "admin") {
-        return res.status(403).json({ message: "Admin access required" });
+      const { username, password } = req.body;
+      
+      // Simple admin credentials check (you can enhance this with proper hashing)
+      if (username === "admin" && password === "courtbook2025") {
+        res.json({ success: true, message: "Admin authenticated" });
+      } else {
+        res.status(401).json({ message: "Invalid credentials" });
       }
+    } catch (error) {
+      console.error("Error during admin login:", error);
+      res.status(500).json({ message: "Authentication error" });
+    }
+  });
+
+  // Admin routes
+  app.get("/api/admin/pending-courts", async (req: any, res) => {
+    try {
       const pendingCourts = await storage.getPendingCourts();
       res.json(pendingCourts);
     } catch (error) {
@@ -287,12 +300,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/admin/courts/:id/approve", isAuthenticated, async (req: any, res) => {
+  app.put("/api/admin/courts/:id/approve", async (req: any, res) => {
     try {
-      const user = await storage.getUser(req.user.claims.sub);
-      if (!user || user.userType !== "admin") {
-        return res.status(403).json({ message: "Admin access required" });
-      }
       const { adminNotes } = req.body;
       const court = await storage.approveCourt(req.params.id, adminNotes);
       if (!court) {
@@ -305,12 +314,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/admin/courts/:id/reject", isAuthenticated, async (req: any, res) => {
+  app.put("/api/admin/courts/:id/reject", async (req: any, res) => {
     try {
-      const user = await storage.getUser(req.user.claims.sub);
-      if (!user || user.userType !== "admin") {
-        return res.status(403).json({ message: "Admin access required" });
-      }
       const { adminNotes } = req.body;
       const court = await storage.rejectCourt(req.params.id, adminNotes);
       if (!court) {
