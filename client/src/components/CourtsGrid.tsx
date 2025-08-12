@@ -11,9 +11,10 @@ export default function CourtsGrid() {
   const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
   const [filters, setFilters] = useState({ city: "Nairobi", sport: "All Sports" });
 
-  const { data: courts = [], isLoading } = useQuery({
+  const { data: courts = [], isLoading, refetch } = useQuery({
     queryKey: ["/api/courts", filters.city, filters.sport],
     refetchInterval: false,
+    staleTime: 0,
   });
 
   const handleBookCourt = (court: CourtWithDetails) => {

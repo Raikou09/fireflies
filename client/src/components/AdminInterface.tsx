@@ -58,6 +58,7 @@ export default function AdminInterface() {
         description: "The court has been approved and is now live.",
       });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/pending-courts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/courts"] });
       setShowApprovalModal(false);
       setSelectedCourt(null);
       setAdminNotes("");
@@ -92,6 +93,7 @@ export default function AdminInterface() {
         description: "The court submission has been rejected.",
       });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/pending-courts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/courts"] });
       setShowApprovalModal(false);
       setSelectedCourt(null);
       setAdminNotes("");
