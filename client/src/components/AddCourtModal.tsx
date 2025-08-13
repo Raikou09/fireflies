@@ -63,8 +63,8 @@ export default function AddCourtModal({ isOpen, onClose }: AddCourtModalProps) {
         setCourtImage(court.id);
       } else {
         toast({
-          title: "Court Created!",
-          description: "Your court has been successfully added.",
+          title: "Court Submitted for Approval!",
+          description: "Your court has been submitted and is pending admin approval. You'll be able to receive bookings once it's approved.",
         });
         queryClient.invalidateQueries({ queryKey: ["/api/vendor/courts"] });
         queryClient.invalidateQueries({ queryKey: ["/api/vendor/stats"] });
@@ -98,8 +98,8 @@ export default function AddCourtModal({ isOpen, onClose }: AddCourtModalProps) {
     },
     onSuccess: () => {
       toast({
-        title: "Court Created!",
-        description: "Your court has been successfully added with image.",
+        title: "Court Submitted for Approval!",
+        description: "Your court with image has been submitted and is pending admin approval. You'll be able to receive bookings once it's approved.",
       });
       queryClient.invalidateQueries({ queryKey: ["/api/vendor/courts"] });
       queryClient.invalidateQueries({ queryKey: ["/api/vendor/stats"] });

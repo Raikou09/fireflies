@@ -10,6 +10,8 @@ The application features dual interfaces - one for customers to search and book 
 
 Preferred communication style: Simple, everyday language.
 
+**Court Approval Policy**: Courts must require manual admin approval (not automatic approval) for platform quality control and safety standards.
+
 ## System Architecture
 
 ### Frontend Architecture
@@ -63,7 +65,7 @@ Preferred communication style: Simple, everyday language.
   - Recent booking history and customer information  
   - Multi-city performance comparison
   - Accessible via user dropdown menu for vendor accounts
-- **Admin Panel**: Court approval system and platform management
+- **Admin Panel**: Manual court approval system for quality control and platform management
 - **Real-time Updates**: Live booking status and notifications
 
 ### Development Environment

@@ -223,8 +223,8 @@ export class DatabaseStorage implements IStorage {
       .values({ 
         ...court, 
         vendorId,
-        approvalStatus: "approved", // Auto-approve new courts
-        isActive: true,
+        approvalStatus: "pending", // Courts need admin approval
+        isActive: false, // Inactive until approved
         commissionRate: "15.00" // Set default commission rate
       })
       .returning();

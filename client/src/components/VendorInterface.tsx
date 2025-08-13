@@ -10,13 +10,26 @@ export default function VendorInterface() {
   const { user, isAuthenticated, isLoading } = useAuth();
   const [isAddCourtModalOpen, setIsAddCourtModalOpen] = useState(false);
 
-  const { data: stats } = useQuery({
+  const { data: stats } = useQuery<{
+    totalCourts: number;
+    activeBookings: number;
+    monthlyRevenue: number;
+    averageRating: number;
+  }>({
     queryKey: ["/api/vendor/stats"],
     refetchInterval: false,
     enabled: isAuthenticated,
   });
 
-  const { data: courts = [] } = useQuery({
+  const { data: courts = [] } = useQuery<Array<{
+    id: string;
+    name: string;
+    city: string;
+    area: string;
+    approvalStatus: "pending" | "approved" | "rejected";
+    isActive: boolean;
+    availableSports: string[];
+  }>>({
     queryKey: ["/api/vendor/courts"],
     refetchInterval: false,
     enabled: isAuthenticated,
@@ -193,13 +206,28 @@ export default function VendorInterface() {
                         />
                         <div>
                           <h4 className="font-semibold text-gray-900">{court.name}</h4>
-                          <p className="text-sm text-gray-600">{court.sport} • {court.area}, {court.city}</p>
+                          <p className="text-sm text-gray-600">{court.availableSports.join(', ')} • {court.area}, {court.city}</p>
                           <p className="text-sm text-gray-500">KES {court.hourlyRate}/hour</p>
                         </div>
                       </div>
                       <div className="flex items-center space-x-3">
-                        <span className="px-3 py-1 bg-green-100 text-green-800 text-sm rounded-full">
-                          {court.isActive ? "Active" : "Inactive"}
+                        <span className={`px-3 py-1 text-sm rounded-full ${
+                          court.approvalStatus === 'approved' && court.isActive 
+                            ? 'bg-green-100 text-green-800' 
+                            : court.approvalStatus === 'pending'
+                            ? 'bg-yellow-100 text-yellow-800'
+                            : court.approvalStatus === 'rejected'
+                            ? 'bg-red-100 text-red-800'
+                            : 'bg-gray-100 text-gray-800'
+                        }`}>
+                          {court.approvalStatus === 'approved' 
+                            ? (court.isActive ? 'Active' : 'Approved - Inactive')
+                            : court.approvalStatus === 'pending'
+                            ? 'Pending Approval'
+                            : court.approvalStatus === 'rejected'
+                            ? 'Rejected'
+                            : 'Unknown'
+                          }
                         </span>
                         <Button variant="ghost" size="sm">
                           Edit
