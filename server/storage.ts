@@ -22,7 +22,6 @@ export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
   upsertUser(user: UpsertUser): Promise<User>;
-  updateUserType(id: string, userType: 'customer' | 'vendor' | 'admin'): Promise<User>;
 
   // Court operations
   getCourts(filters?: {
@@ -110,15 +109,6 @@ export class DatabaseStorage implements IStorage {
           updatedAt: new Date(),
         },
       })
-      .returning();
-    return user;
-  }
-
-  async updateUserType(id: string, userType: 'customer' | 'vendor' | 'admin'): Promise<User> {
-    const [user] = await db
-      .update(users)
-      .set({ userType, updatedAt: new Date() })
-      .where(eq(users.id, id))
       .returning();
     return user;
   }

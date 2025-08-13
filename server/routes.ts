@@ -436,13 +436,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get all courts analytics overview
   app.get("/api/admin/courts/analytics/overview", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
-      console.log("Analytics overview - User:", user);
+      const user = req.user as any;
       
       if (!user || user.userType !== "admin") {
-        console.log("Analytics overview - Access denied. User type:", user?.userType);
-        return res.status(403).json({ message: "Admin access required", userType: user?.userType });
+        return res.status(403).json({ message: "Admin access required" });
       }
 
       const overview = await storage.getAllCourtsAnalyticsOverview();
@@ -450,93 +447,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching analytics overview:", error);
       res.status(500).json({ message: "Failed to fetch analytics overview" });
-    }
-  });
-
-  // Make current user admin (development only)
-  app.post("/api/admin/make-me-admin", isAuthenticated, async (req: any, res) => {
-    try {
-      if (process.env.NODE_ENV !== 'development') {
-        return res.status(403).json({ message: "Only available in development" });
-      }
-
-      const userId = req.user.claims.sub;
-      let user = await storage.getUser(userId);
-      
-      if (!user) {
-        // Create user if doesn't exist
-        const claims = req.user.claims;
-        user = await storage.upsertUser({
-          id: userId,
-          email: claims.email,
-          firstName: claims.first_name,
-          lastName: claims.last_name,
-          profileImageUrl: claims.profile_image_url,
-          userType: 'admin'
-        });
-      } else {
-        // Update existing user to admin
-        user = await storage.updateUserType(userId, 'admin');
-      }
-
-      console.log("User made admin:", user);
-      res.json({ message: "User made admin successfully", user });
-    } catch (error) {
-      console.error("Error making user admin:", error);
-      res.status(500).json({ message: "Failed to make user admin", error: error.message });
-    }
-  });
-
-  // Development endpoint to setup admin without auth
-  app.post("/api/dev/setup-admin", async (req, res) => {
-    try {
-      if (process.env.NODE_ENV !== 'development') {
-        return res.status(403).json({ message: "Only available in development" });
-      }
-
-      const { userId } = req.body;
-      if (!userId) {
-        return res.status(400).json({ message: "userId is required" });
-      }
-
-      let user = await storage.getUser(userId);
-      if (!user) {
-        return res.status(404).json({ message: "User not found" });
-      }
-
-      user = await storage.updateUserType(userId, 'admin');
-      console.log("Setup admin for user:", user);
-      res.json({ message: "User made admin successfully", user });
-    } catch (error) {
-      console.error("Error setting up admin:", error);
-      res.status(500).json({ message: "Failed to setup admin", error: error.message });
-    }
-  });
-
-  // Seed dummy data endpoint (development only)
-  app.post("/api/admin/seed-data", isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
-      console.log("Seed data request - User:", user);
-      
-      if (!user || user.userType !== "admin") {
-        console.log("Seed data - Access denied. User type:", user?.userType);
-        return res.status(403).json({ message: "Admin access required", userType: user?.userType });
-      }
-
-      if (process.env.NODE_ENV !== 'development') {
-        return res.status(403).json({ message: "Seeding only available in development" });
-      }
-
-      console.log("Starting seed data process...");
-      const { seedDummyData } = await import('./seedData');
-      const result = await seedDummyData();
-      console.log("Seed data completed:", result);
-      res.json({ message: "Dummy data seeded successfully", data: result });
-    } catch (error) {
-      console.error("Error seeding dummy data:", error);
-      res.status(500).json({ message: "Failed to seed dummy data", error: error.message });
     }
   });
 
