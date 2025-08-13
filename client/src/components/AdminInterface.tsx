@@ -52,7 +52,7 @@ export default function AdminInterface() {
 
   const approveMutation = useMutation({
     mutationFn: async ({ courtId, adminNotes }: { courtId: string; adminNotes?: string }) => {
-      await apiRequest("PUT", `/api/admin/courts/${courtId}/approve`, { adminNotes });
+      await apiRequest(`/api/admin/courts/${courtId}/approve`, "PUT", { adminNotes });
     },
     onSuccess: () => {
       toast({
@@ -87,7 +87,7 @@ export default function AdminInterface() {
 
   const rejectMutation = useMutation({
     mutationFn: async ({ courtId, adminNotes }: { courtId: string; adminNotes?: string }) => {
-      await apiRequest("PUT", `/api/admin/courts/${courtId}/reject`, { adminNotes });
+      await apiRequest(`/api/admin/courts/${courtId}/reject`, "PUT", { adminNotes });
     },
     onSuccess: () => {
       toast({
