@@ -7,18 +7,54 @@ import AddCourtModal from "./AddCourtModal";
 import { useAuth } from "@/hooks/useAuth";
 
 export default function VendorInterface() {
-  const { user } = useAuth();
+  const { user, isAuthenticated, isLoading } = useAuth();
   const [isAddCourtModalOpen, setIsAddCourtModalOpen] = useState(false);
 
   const { data: stats } = useQuery({
     queryKey: ["/api/vendor/stats"],
     refetchInterval: false,
+    enabled: isAuthenticated,
   });
 
   const { data: courts = [] } = useQuery({
     queryKey: ["/api/vendor/courts"],
     refetchInterval: false,
+    enabled: isAuthenticated,
   });
+
+  // Show login prompt if not authenticated
+  if (!isLoading && !isAuthenticated) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="text-center max-w-md mx-auto p-6">
+          <h2 className="text-2xl font-bold text-gray-900 mb-4">
+            Sign In Required
+          </h2>
+          <p className="text-gray-600 mb-6">
+            Please sign in with Google to access the vendor dashboard and manage your courts.
+          </p>
+          <Button 
+            onClick={() => window.location.href = "/api/login"}
+            className="bg-primary hover:bg-green-700"
+            size="lg"
+          >
+            Sign In with Google
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading vendor dashboard...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <>

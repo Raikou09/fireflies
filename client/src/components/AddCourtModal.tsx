@@ -50,7 +50,7 @@ export default function AddCourtModal({ isOpen, onClose }: AddCourtModalProps) {
 
   const mutation = useMutation({
     mutationFn: async (courtData: any) => {
-      const response = await apiRequest("POST", "/api/courts", {
+      const response = await apiRequest("/api/courts", "POST", {
         ...courtData,
         availableDays,
         availableSports: selectedSports
@@ -94,7 +94,7 @@ export default function AddCourtModal({ isOpen, onClose }: AddCourtModalProps) {
 
   const imageUpdateMutation = useMutation({
     mutationFn: async ({ courtId, imageURL }: { courtId: string; imageURL: string }) => {
-      await apiRequest("PUT", `/api/courts/${courtId}/image`, { imageURL });
+      await apiRequest(`/api/courts/${courtId}/image`, "PUT", { imageURL });
     },
     onSuccess: () => {
       toast({
