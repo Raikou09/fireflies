@@ -415,6 +415,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get analytics for a specific court
+  app.get("/api/admin/courts/:courtId/analytics", isAuthenticated, async (req: any, res) => {
+    try {
+      const user = req.user as any;
+      
+      if (!user || user.userType !== "admin") {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const { courtId } = req.params;
+      const analytics = await storage.getCourtAnalytics(courtId);
+      res.json(analytics);
+    } catch (error) {
+      console.error("Error fetching court analytics:", error);
+      res.status(500).json({ message: "Failed to fetch analytics" });
+    }
+  });
+
+  // Get all courts analytics overview
+  app.get("/api/admin/courts/analytics/overview", isAuthenticated, async (req: any, res) => {
+    try {
+      const user = req.user as any;
+      
+      if (!user || user.userType !== "admin") {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const overview = await storage.getAllCourtsAnalyticsOverview();
+      res.json(overview);
+    } catch (error) {
+      console.error("Error fetching analytics overview:", error);
+      res.status(500).json({ message: "Failed to fetch analytics overview" });
+    }
+  });
+
   // Vendor stats with Google auth
   app.get("/api/vendor/stats", isAuthenticated, async (req: any, res) => {
     try {

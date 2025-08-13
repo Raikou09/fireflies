@@ -9,9 +9,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { apiRequest } from "@/lib/queryClient";
-import { CheckCircle, XCircle, MapPin, Clock, Calendar, Star, Database } from "lucide-react";
+import { CheckCircle, XCircle, MapPin, Clock, Calendar, Star, Database, BarChart3 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import AdminCourtsManager from "./AdminCourtsManager";
+import AdminAnalytics from "./AdminAnalytics";
 
 interface PendingCourt {
   id: string;
@@ -222,7 +223,7 @@ export default function AdminInterface() {
       </div>
 
       <Tabs defaultValue="approvals" className="w-full">
-        <TabsList className="grid w-full grid-cols-2">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="approvals" className="flex items-center gap-2">
             <Clock className="h-4 w-4" />
             Court Approvals ({courts.length} pending)
@@ -230,6 +231,10 @@ export default function AdminInterface() {
           <TabsTrigger value="management" className="flex items-center gap-2">
             <Database className="h-4 w-4" />
             All Courts & Commissions
+          </TabsTrigger>
+          <TabsTrigger value="analytics" className="flex items-center gap-2">
+            <BarChart3 className="h-4 w-4" />
+            Analytics & Performance
           </TabsTrigger>
         </TabsList>
 
@@ -345,6 +350,10 @@ export default function AdminInterface() {
 
         <TabsContent value="management" className="mt-6">
           <AdminCourtsManager />
+        </TabsContent>
+
+        <TabsContent value="analytics" className="mt-6">
+          <AdminAnalytics />
         </TabsContent>
       </Tabs>
 

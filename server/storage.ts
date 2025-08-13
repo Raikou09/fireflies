@@ -679,6 +679,212 @@ export class DatabaseStorage implements IStorage {
     return updatedCourt;
   }
 
+  async getCourtAnalytics(courtId: string) {
+    const client = await pool.connect();
+    try {
+      // Get basic court info
+      const courtResult = await client.query(
+        `SELECT c.*, u.first_name, u.last_name, u.email as vendor_email
+         FROM courts c 
+         LEFT JOIN users u ON c.vendor_id = u.id 
+         WHERE c.id = $1`,
+        [courtId]
+      );
+
+      if (courtResult.rows.length === 0) {
+        throw new Error('Court not found');
+      }
+
+      const court = courtResult.rows[0];
+
+      // Get booking statistics
+      const bookingStats = await client.query(
+        `SELECT 
+           COUNT(*) as total_bookings,
+           COUNT(CASE WHEN status = 'confirmed' THEN 1 END) as confirmed_bookings,
+           COUNT(CASE WHEN status = 'cancelled' THEN 1 END) as cancelled_bookings,
+           COUNT(CASE WHEN status = 'completed' THEN 1 END) as completed_bookings,
+           SUM(CASE WHEN status IN ('confirmed', 'completed') THEN amount ELSE 0 END) as total_revenue,
+           AVG(CASE WHEN status IN ('confirmed', 'completed') THEN amount ELSE NULL END) as avg_booking_value,
+           MIN(created_at) as first_booking_date,
+           MAX(created_at) as last_booking_date
+         FROM bookings 
+         WHERE court_id = $1`,
+        [courtId]
+      );
+
+      const stats = bookingStats.rows[0];
+
+      // Calculate commission earned (15% default or court-specific rate)
+      const commissionRate = parseFloat(court.commission_rate || '15') / 100;
+      const totalRevenue = parseFloat(stats.total_revenue || '0');
+      const commissionEarned = totalRevenue * commissionRate;
+
+      // Get monthly booking trends (last 12 months)
+      const monthlyTrends = await client.query(
+        `SELECT 
+           DATE_TRUNC('month', created_at) as month,
+           COUNT(*) as bookings_count,
+           SUM(CASE WHEN status IN ('confirmed', 'completed') THEN amount ELSE 0 END) as monthly_revenue
+         FROM bookings 
+         WHERE court_id = $1 
+           AND created_at >= NOW() - INTERVAL '12 months'
+         GROUP BY DATE_TRUNC('month', created_at)
+         ORDER BY month DESC`,
+        [courtId]
+      );
+
+      // Get recent booking trend (compare last 30 days vs previous 30 days)
+      const recentTrends = await client.query(
+        `SELECT 
+           CASE 
+             WHEN created_at >= NOW() - INTERVAL '30 days' THEN 'current_month'
+             ELSE 'previous_month'
+           END as period,
+           COUNT(*) as booking_count,
+           SUM(CASE WHEN status IN ('confirmed', 'completed') THEN amount ELSE 0 END) as revenue
+         FROM bookings 
+         WHERE court_id = $1 
+           AND created_at >= NOW() - INTERVAL '60 days'
+         GROUP BY 
+           CASE 
+             WHEN created_at >= NOW() - INTERVAL '30 days' THEN 'current_month'
+             ELSE 'previous_month'
+           END`,
+        [courtId]
+      );
+
+      // Process trend data
+      const trendData = recentTrends.rows.reduce((acc: any, row: any) => {
+        acc[row.period] = {
+          bookings: parseInt(row.booking_count),
+          revenue: parseFloat(row.revenue || '0')
+        };
+        return acc;
+      }, { current_month: { bookings: 0, revenue: 0 }, previous_month: { bookings: 0, revenue: 0 } });
+
+      const bookingTrend = trendData.current_month.bookings - trendData.previous_month.bookings;
+      const revenueTrend = trendData.current_month.revenue - trendData.previous_month.revenue;
+
+      return {
+        court: {
+          id: court.id,
+          name: court.name,
+          city: court.city,
+          area: court.area,
+          sport: court.available_sports?.[0] || 'Unknown',
+          hourlyRate: parseFloat(court.hourly_rate || '0'),
+          peakHourRate: parseFloat(court.peak_hour_rate || '0'),
+          commissionRate: parseFloat(court.commission_rate || '15'),
+          vendor: {
+            name: `${court.first_name || ''} ${court.last_name || ''}`.trim() || court.vendor_email,
+            email: court.vendor_email
+          }
+        },
+        financial: {
+          totalRevenue: totalRevenue,
+          commissionEarned: commissionEarned,
+          averageBookingValue: parseFloat(stats.avg_booking_value || '0'),
+          vendorEarnings: totalRevenue - commissionEarned
+        },
+        bookings: {
+          total: parseInt(stats.total_bookings || '0'),
+          confirmed: parseInt(stats.confirmed_bookings || '0'),
+          cancelled: parseInt(stats.cancelled_bookings || '0'),
+          completed: parseInt(stats.completed_bookings || '0'),
+          firstBookingDate: stats.first_booking_date,
+          lastBookingDate: stats.last_booking_date
+        },
+        trends: {
+          monthlyData: monthlyTrends.rows.map((row: any) => ({
+            month: row.month,
+            bookings: parseInt(row.bookings_count),
+            revenue: parseFloat(row.monthly_revenue || '0')
+          })),
+          recentBookingTrend: bookingTrend,
+          recentRevenueTrend: revenueTrend,
+          trendDirection: bookingTrend > 0 ? 'growing' : bookingTrend < 0 ? 'declining' : 'stable'
+        }
+      };
+    } catch (error) {
+      console.error('Error fetching court analytics:', error);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  async getAllCourtsAnalyticsOverview() {
+    const client = await pool.connect();
+    try {
+      // Get overview stats for all courts
+      const overviewResult = await client.query(`
+        SELECT 
+          c.id,
+          c.name,
+          c.city,
+          c.area,
+          c.available_sports,
+          c.hourly_rate,
+          c.commission_rate,
+          c.approval_status,
+          u.first_name,
+          u.last_name,
+          u.email as vendor_email,
+          COUNT(b.id) as total_bookings,
+          COALESCE(SUM(CASE WHEN b.status IN ('confirmed', 'completed') THEN b.amount ELSE 0 END), 0) as total_revenue,
+          COALESCE(AVG(CASE WHEN b.status IN ('confirmed', 'completed') THEN b.amount END), 0) as avg_booking_value,
+          COUNT(CASE WHEN b.created_at >= NOW() - INTERVAL '30 days' THEN 1 END) as recent_bookings,
+          COUNT(CASE WHEN b.created_at >= NOW() - INTERVAL '60 days' AND b.created_at < NOW() - INTERVAL '30 days' THEN 1 END) as previous_bookings
+        FROM courts c
+        LEFT JOIN users u ON c.vendor_id = u.id
+        LEFT JOIN bookings b ON c.id = b.court_id
+        WHERE c.approval_status = 'approved'
+        GROUP BY c.id, c.name, c.city, c.area, c.available_sports, c.hourly_rate, 
+                 c.commission_rate, c.approval_status, u.first_name, u.last_name, u.email
+        ORDER BY total_revenue DESC
+      `);
+
+      return overviewResult.rows.map((row: any) => {
+        const totalRevenue = parseFloat(row.total_revenue || '0');
+        const commissionRate = parseFloat(row.commission_rate || '15') / 100;
+        const commissionEarned = totalRevenue * commissionRate;
+        const bookingTrend = parseInt(row.recent_bookings || '0') - parseInt(row.previous_bookings || '0');
+
+        return {
+          id: row.id,
+          name: row.name,
+          location: `${row.city}, ${row.area}`,
+          sport: row.available_sports?.[0] || 'Unknown',
+          vendor: {
+            name: `${row.first_name || ''} ${row.last_name || ''}`.trim() || row.vendor_email,
+            email: row.vendor_email
+          },
+          financial: {
+            totalRevenue: totalRevenue,
+            commissionEarned: commissionEarned,
+            vendorEarnings: totalRevenue - commissionEarned,
+            hourlyRate: parseFloat(row.hourly_rate || '0'),
+            commissionRate: parseFloat(row.commission_rate || '15')
+          },
+          performance: {
+            totalBookings: parseInt(row.total_bookings || '0'),
+            averageBookingValue: parseFloat(row.avg_booking_value || '0'),
+            recentBookings: parseInt(row.recent_bookings || '0'),
+            previousBookings: parseInt(row.previous_bookings || '0'),
+            bookingTrend: bookingTrend,
+            trendDirection: bookingTrend > 0 ? 'growing' : bookingTrend < 0 ? 'declining' : 'stable'
+          }
+        };
+      });
+    } catch (error) {
+      console.error('Error fetching analytics overview:', error);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
 }
 
 export const storage = new DatabaseStorage();
