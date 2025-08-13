@@ -124,7 +124,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/default-commission-rate", async (req, res) => {
     try {
       // Default commission rate for new courts
-      const defaultRate = 10.00;
+      const defaultRate = 15.00;
       res.json({ defaultCommissionRate: defaultRate });
     } catch (error) {
       console.error("Error fetching default commission rate:", error);
