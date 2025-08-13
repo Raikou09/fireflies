@@ -582,6 +582,7 @@ export class DatabaseStorage implements IStorage {
       .update(courts)
       .set({ 
         approvalStatus: "approved",
+        isActive: true, // Make court active when approved
         adminNotes,
         updatedAt: new Date() 
       })
