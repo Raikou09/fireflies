@@ -1,15 +1,19 @@
 import { useState } from "react";
 import SearchBar from "./SearchBar";
-import CourtsGrid from "./CourtsGrid";
+import { LocationAwareCourts } from "./LocationAwareCourts";
 
 export default function CustomerInterface() {
   const [searchFilters, setSearchFilters] = useState({ 
     location: "Nairobi", 
     sport: "All Sports" 
   });
+  const [searchQuery, setSearchQuery] = useState("");
 
-  const handleSearch = (filters: { location: string; sport: string }) => {
+  const handleSearch = (filters: { location: string; sport: string }, query?: string) => {
     setSearchFilters(filters);
+    if (query !== undefined) {
+      setSearchQuery(query);
+    }
   };
 
   return (
@@ -21,15 +25,21 @@ export default function CustomerInterface() {
             Book Sports Courts Across Kenya
           </h1>
           <p className="text-xl text-blue-100 mb-8">
-            Find and book courts in Nairobi, Mombasa, Kisumu and beyond
+            Find and book courts near you in Nairobi, Mombasa, Kisumu and beyond
           </p>
           
           <SearchBar onSearch={handleSearch} />
         </div>
       </section>
 
-      {/* Courts Grid */}
-      <CourtsGrid filters={{ city: searchFilters.location, sport: searchFilters.sport }} />
+      {/* Location-Aware Courts Grid */}
+      <div className="max-w-6xl mx-auto px-4 py-8">
+        <LocationAwareCourts 
+          city={searchFilters.location} 
+          sport={searchFilters.sport}
+          searchQuery={searchQuery}
+        />
+      </div>
     </div>
   );
 }

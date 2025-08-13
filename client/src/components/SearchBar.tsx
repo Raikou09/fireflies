@@ -1,18 +1,20 @@
 import { useState } from "react";
 import { MapPin, Volleyball, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface SearchBarProps {
-  onSearch?: (filters: { location: string; sport: string }) => void;
+  onSearch?: (filters: { location: string; sport: string }, query?: string) => void;
 }
 
 export default function SearchBar({ onSearch }: SearchBarProps) {
   const [location, setLocation] = useState("Nairobi");
   const [sport, setSport] = useState("All Sports");
+  const [searchQuery, setSearchQuery] = useState("");
 
   const handleSearch = () => {
-    onSearch?.({ location, sport });
+    onSearch?.({ location, sport }, searchQuery);
   };
 
   const cities = ["Nairobi", "Mombasa", "Kisumu", "Nakuru", "Eldoret"];
@@ -36,8 +38,22 @@ export default function SearchBar({ onSearch }: SearchBarProps) {
   ];
 
   return (
-    <div className="bg-white p-6 rounded-2xl shadow-xl max-w-2xl mx-auto">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+    <div className="bg-white p-6 rounded-2xl shadow-xl max-w-4xl mx-auto">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="relative md:col-span-1">
+          <label className="block text-sm font-medium text-gray-700 mb-2">Search</label>
+          <div className="relative">
+            <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+            <Input
+              type="text"
+              placeholder="Court name, area..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10"
+              data-testid="input-search-query"
+            />
+          </div>
+        </div>
         <div className="relative">
           <label className="block text-sm font-medium text-gray-700 mb-2">Location</label>
           <div className="relative">
@@ -62,7 +78,7 @@ export default function SearchBar({ onSearch }: SearchBarProps) {
           <div className="relative">
             <Volleyball className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
             <Select value={sport} onValueChange={setSport}>
-              <SelectTrigger className="pl-10">
+              <SelectTrigger className="pl-10" data-testid="select-sport">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>

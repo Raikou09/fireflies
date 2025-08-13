@@ -96,11 +96,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/courts/:city/:sport", async (req, res) => {
     try {
       const { city, sport } = req.params;
-      const { search } = req.query;
+      const { search, lat, lng, maxDistance, sortByDistance } = req.query;
       const courts = await storage.getCourts({
         city: city === 'All Cities' ? undefined : city,
         sport: sport === 'All Sports' ? undefined : sport,
         search: search as string,
+        userLatitude: lat ? parseFloat(lat as string) : undefined,
+        userLongitude: lng ? parseFloat(lng as string) : undefined,
+        maxDistance: maxDistance ? parseFloat(maxDistance as string) : undefined,
+        sortByDistance: sortByDistance === 'true',
       });
       res.json(courts);
     } catch (error) {

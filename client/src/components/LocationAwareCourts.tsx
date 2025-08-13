@@ -1,0 +1,277 @@
+import { useState, useEffect } from 'react';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Slider } from '@/components/ui/slider';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
+import { MapPin, Navigation, Clock, Star } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import type { CourtWithDetails } from '@shared/schema';
+
+interface LocationAwareCourtsProps {
+  city: string;
+  sport: string;
+  searchQuery?: string;
+}
+
+interface UserLocation {
+  latitude: number;
+  longitude: number;
+}
+
+export function LocationAwareCourts({ city, sport, searchQuery }: LocationAwareCourtsProps) {
+  const [userLocation, setUserLocation] = useState<UserLocation | null>(null);
+  const [locationPermissionRequested, setLocationPermissionRequested] = useState(false);
+  const [maxDistance, setMaxDistance] = useState([10]);
+  const [sortByDistance, setSortByDistance] = useState(false);
+  const [useLocationFilter, setUseLocationFilter] = useState(false);
+
+  // Request user location
+  const requestLocation = () => {
+    setLocationPermissionRequested(true);
+    if ('geolocation' in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setUserLocation({
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude
+          });
+          setUseLocationFilter(true);
+          setSortByDistance(true);
+        },
+        (error) => {
+          console.error('Error getting location:', error);
+          alert('Could not get your location. You can still browse courts without location features.');
+        }
+      );
+    } else {
+      alert('Your browser does not support location services.');
+    }
+  };
+
+  // Fetch courts with location parameters
+  const { data: courts, isLoading, error } = useQuery({
+    queryKey: ['/api/courts', city, sport, {
+      search: searchQuery,
+      lat: useLocationFilter && userLocation ? userLocation.latitude : undefined,
+      lng: useLocationFilter && userLocation ? userLocation.longitude : undefined,
+      maxDistance: useLocationFilter ? maxDistance[0] : undefined,
+      sortByDistance: useLocationFilter && sortByDistance
+    }],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (searchQuery) params.append('search', searchQuery);
+      if (useLocationFilter && userLocation) {
+        params.append('lat', userLocation.latitude.toString());
+        params.append('lng', userLocation.longitude.toString());
+        params.append('maxDistance', maxDistance[0].toString());
+        params.append('sortByDistance', sortByDistance.toString());
+      }
+      
+      const response = await fetch(`/api/courts/${city}/${sport}?${params}`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch courts');
+      }
+      return response.json() as Promise<CourtWithDetails[]>;
+    }
+  });
+
+  if (isLoading) {
+    return (
+      <div className="space-y-4">
+        {[1, 2, 3].map(i => (
+          <Card key={i} className="animate-pulse">
+            <CardContent className="p-6">
+              <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
+              <div className="h-4 bg-gray-200 rounded w-1/2"></div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="text-center py-8">
+        <p className="text-red-600">Failed to load courts. Please try again.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Location Controls */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <MapPin className="h-5 w-5" />
+            Find Courts Near You
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {!userLocation && !locationPermissionRequested && (
+            <div className="text-center">
+              <p className="text-gray-600 mb-4">
+                Allow location access to find courts closest to you
+              </p>
+              <Button onClick={requestLocation} data-testid="button-request-location">
+                <Navigation className="h-4 w-4 mr-2" />
+                Use My Location
+              </Button>
+            </div>
+          )}
+
+          {userLocation && (
+            <div className="space-y-4">
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="use-location"
+                  checked={useLocationFilter}
+                  onCheckedChange={setUseLocationFilter}
+                  data-testid="switch-use-location"
+                />
+                <Label htmlFor="use-location">Filter by distance</Label>
+              </div>
+
+              {useLocationFilter && (
+                <>
+                  <div className="space-y-2">
+                    <Label>Maximum distance: {maxDistance[0]} km</Label>
+                    <Slider
+                      value={maxDistance}
+                      onValueChange={setMaxDistance}
+                      max={50}
+                      min={1}
+                      step={1}
+                      className="w-full"
+                      data-testid="slider-max-distance"
+                    />
+                  </div>
+
+                  <div className="flex items-center space-x-2">
+                    <Switch
+                      id="sort-distance"
+                      checked={sortByDistance}
+                      onCheckedChange={setSortByDistance}
+                      data-testid="switch-sort-distance"
+                    />
+                    <Label htmlFor="sort-distance">Sort by distance (nearest first)</Label>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Courts List */}
+      <div className="space-y-4">
+        {courts && courts.length > 0 ? (
+          courts.map((court) => (
+            <Card key={court.id} className="hover:shadow-lg transition-shadow">
+              <CardContent className="p-6">
+                <div className="flex justify-between items-start mb-4">
+                  <div>
+                    <h3 className="text-xl font-semibold mb-2" data-testid={`text-court-name-${court.id}`}>
+                      {court.name}
+                    </h3>
+                    <div className="flex items-center gap-2 text-gray-600 mb-2">
+                      <MapPin className="h-4 w-4" />
+                      <span data-testid={`text-court-location-${court.id}`}>
+                        {court.area}, {court.city}
+                      </span>
+                      {court.distance !== undefined && (
+                        <Badge variant="outline" className="ml-2" data-testid={`badge-distance-${court.id}`}>
+                          {court.distance} km away
+                        </Badge>
+                      )}
+                    </div>
+                    {court.address && (
+                      <p className="text-sm text-gray-500" data-testid={`text-court-address-${court.id}`}>
+                        {court.address}
+                      </p>
+                    )}
+                  </div>
+                  
+                  <div className="text-right">
+                    <div className="flex items-center gap-1 mb-1">
+                      <Star className="h-4 w-4 text-yellow-500 fill-current" />
+                      <span className="font-medium" data-testid={`text-court-rating-${court.id}`}>
+                        {court.rating}
+                      </span>
+                    </div>
+                    <div className="text-sm text-gray-600">
+                      <span data-testid={`text-court-bookings-${court.id}`}>
+                        {court.totalBookings} bookings
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap gap-2 mb-4">
+                  {court.availableSports.map((sportName) => (
+                    <Badge key={sportName} variant="secondary" data-testid={`badge-sport-${court.id}-${sportName}`}>
+                      {sportName}
+                    </Badge>
+                  ))}
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4 text-sm">
+                    <div className="flex items-center gap-1">
+                      <Clock className="h-4 w-4" />
+                      <span data-testid={`text-court-hours-${court.id}`}>
+                        {court.openingTime} - {court.closingTime}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="font-semibold" data-testid={`text-court-rate-${court.id}`}>
+                        KSh {court.hourlyRate}/hour
+                      </span>
+                      {court.peakHourRate && court.peakHourRate > court.hourlyRate && (
+                        <span className="text-sm text-gray-500 ml-1">
+                          (Peak: KSh {court.peakHourRate})
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <Button data-testid={`button-book-court-${court.id}`}>
+                    Book Now
+                  </Button>
+                </div>
+
+                {court.description && (
+                  <p className="text-gray-600 text-sm mt-4" data-testid={`text-court-description-${court.id}`}>
+                    {court.description}
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          ))
+        ) : (
+          <div className="text-center py-8">
+            <p className="text-gray-600">
+              {useLocationFilter 
+                ? `No courts found within ${maxDistance[0]} km of your location.`
+                : 'No courts found for the selected filters.'
+              }
+            </p>
+            {useLocationFilter && (
+              <Button 
+                variant="outline" 
+                className="mt-4"
+                onClick={() => setMaxDistance([Math.min(maxDistance[0] + 10, 50)])}
+                data-testid="button-expand-search"
+              >
+                Expand search to {Math.min(maxDistance[0] + 10, 50)} km
+              </Button>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

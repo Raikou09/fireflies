@@ -14,7 +14,7 @@ import {
   type CourtWithDetails,
   type BookingWithDetails,
 } from "@shared/schema";
-import { db } from "./db";
+import { db, pool } from "./db";
 import { eq, and, desc, sql, gte, lte } from "drizzle-orm";
 
 export interface IStorage {
@@ -28,6 +28,10 @@ export interface IStorage {
     city?: string;
     sport?: string;
     search?: string;
+    userLatitude?: number;
+    userLongitude?: number;
+    maxDistance?: number; // in km
+    sortByDistance?: boolean;
   }): Promise<CourtWithDetails[]>;
   getCourtById(id: string): Promise<CourtWithDetails | undefined>;
   getCourtsByVendor(vendorId: string): Promise<CourtWithDetails[]>;
@@ -87,6 +91,7 @@ export interface IStorage {
 }
 
 export class DatabaseStorage implements IStorage {
+  
   // User operations
   async getUser(id: string): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.id, id));
@@ -118,6 +123,10 @@ export class DatabaseStorage implements IStorage {
     city?: string;
     sport?: string;
     search?: string;
+    userLatitude?: number;
+    userLongitude?: number;
+    maxDistance?: number; // in km
+    sortByDistance?: boolean;
   }): Promise<CourtWithDetails[]> {
     let whereConditions = [eq(courts.isActive, true), eq(courts.approvalStatus, "approved")];
 
@@ -159,7 +168,60 @@ export class DatabaseStorage implements IStorage {
       }
     }
 
-    return Array.from(courtMap.values());
+    let courtsArray = Array.from(courtMap.values());
+
+    // Apply location-based filtering and sorting if user location is provided
+    if (filters?.userLatitude && filters?.userLongitude) {
+      // Add distance calculation to each court
+      courtsArray = courtsArray.map(court => ({
+        ...court,
+        distance: court.latitude && court.longitude
+          ? this.calculateDistance(
+              filters.userLatitude!,
+              filters.userLongitude!,
+              parseFloat(court.latitude),
+              parseFloat(court.longitude)
+            )
+          : null
+      }));
+
+      // Filter by max distance if specified
+      if (filters.maxDistance) {
+        courtsArray = courtsArray.filter(court => 
+          court.distance !== null && court.distance <= filters.maxDistance!
+        );
+      }
+
+      // Sort by distance if requested
+      if (filters.sortByDistance) {
+        courtsArray.sort((a, b) => {
+          if (a.distance === null && b.distance === null) return 0;
+          if (a.distance === null) return 1;
+          if (b.distance === null) return -1;
+          return a.distance - b.distance;
+        });
+      }
+    }
+
+    return courtsArray;
+  }
+
+  // Calculate distance between two coordinates using Haversine formula
+  private calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
+    const R = 6371; // Earth's radius in kilometers
+    const dLat = this.degToRad(lat2 - lat1);
+    const dLon = this.degToRad(lon2 - lon1);
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(this.degToRad(lat1)) * Math.cos(this.degToRad(lat2)) *
+      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    const distance = R * c;
+    return Math.round(distance * 10) / 10; // Round to 1 decimal place
+  }
+
+  private degToRad(deg: number): number {
+    return deg * (Math.PI / 180);
   }
 
   async getCourtById(id: string): Promise<CourtWithDetails | undefined> {

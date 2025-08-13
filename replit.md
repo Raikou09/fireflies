@@ -2,9 +2,9 @@
 
 ## Overview
 
-SportsBox is a full-stack web application that connects sports court owners (vendors) with customers looking to book sports facilities across Kenya. The platform focuses on major cities like Nairobi, Mombasa, and Kisumu, providing an easy-to-use booking system with secure M-Pesa payment integration.
+SportsBox is a full-stack web application that connects sports court owners (vendors) with customers looking to book sports facilities across Kenya. The platform focuses on major cities like Nairobi, Mombasa, and Kisumu, providing an easy-to-use booking system with secure M-Pesa payment integration and location-based court discovery.
 
-The application features dual interfaces - one for customers to search and book courts, and another for vendors to manage their facilities and bookings. Built with modern web technologies, it provides real-time booking management, file uploads for court images, and comprehensive analytics for vendors.
+The application features dual interfaces - one for customers to search and book courts with location-aware filtering, and another for vendors to manage their facilities and bookings. Built with modern web technologies, it provides real-time booking management, file uploads for court images, comprehensive analytics for vendors, and geolocation-based court discovery for enhanced user experience.
 
 ## User Preferences
 
@@ -46,6 +46,9 @@ Preferred communication style: Simple, everyday language.
 - **Database**: PostgreSQL with Neon serverless for scalability
 - **ORM**: Drizzle ORM with type-safe schema definitions
 - **Schema**: Comprehensive relational design including users, courts, equipment, bookings, and sessions
+  - Geographic data: latitude/longitude fields for location-based features
+  - Address fields for detailed court location information
+  - Distance calculations using Haversine formula implementation
 - **Migrations**: Drizzle Kit for database schema management
 
 ### File Storage & Management
@@ -56,7 +59,16 @@ Preferred communication style: Simple, everyday language.
 
 ### Key Features Implementation
 - **Unified Authentication**: Single Google sign-in for all user types with role-based routing
-- **Search & Filtering**: Location-based court discovery with multi-sport filtering
+- **Location-Aware Discovery**: GPS-based court search with distance calculation and filtering
+  - Haversine formula for accurate distance calculations
+  - Distance-based sorting (nearest first)
+  - Radius filtering (1-50km customizable range)
+  - Geolocation permission handling with fallback browsing
+- **Enhanced Search & Filtering**: Multi-parameter court discovery system
+  - Location-based filtering with GPS coordinates
+  - Multi-sport filtering across 15+ sports categories
+  - Text search for court names, areas, and descriptions
+  - City-based browsing (Nairobi, Mombasa, Kisumu, Nakuru, Eldoret)
 - **Booking System**: Time slot management with real-time availability
 - **Payment Integration**: M-Pesa payment method integration
 - **Vendor Dashboard**: Comprehensive business analytics accessible via Google authentication

@@ -44,6 +44,9 @@ export const courts = pgTable("courts", {
   availableSports: text("available_sports").array().notNull(), // Array of sports available at this location
   city: varchar("city").notNull(),
   area: varchar("area").notNull(),
+  address: text("address"),
+  latitude: decimal("latitude", { precision: 10, scale: 8 }),
+  longitude: decimal("longitude", { precision: 11, scale: 8 }),
   description: text("description"),
   hourlyRate: decimal("hourly_rate", { precision: 10, scale: 2 }).notNull(),
   peakHourRate: decimal("peak_hour_rate", { precision: 10, scale: 2 }),
@@ -165,6 +168,7 @@ export type Booking = typeof bookings.$inferSelect;
 export type CourtWithDetails = Court & {
   vendor: User;
   equipment: Equipment[];
+  distance?: number; // Distance in km when location-based filtering is applied
 };
 
 export type BookingWithDetails = Booking & {
