@@ -220,7 +220,13 @@ export class DatabaseStorage implements IStorage {
   async createCourt(vendorId: string, court: InsertCourt): Promise<Court> {
     const [newCourt] = await db
       .insert(courts)
-      .values({ ...court, vendorId })
+      .values({ 
+        ...court, 
+        vendorId,
+        approvalStatus: "approved", // Auto-approve new courts
+        isActive: true,
+        commissionRate: "15.00" // Set default commission rate
+      })
       .returning();
     return newCourt;
   }
