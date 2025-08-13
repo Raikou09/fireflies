@@ -32,9 +32,12 @@ export default function Navigation({ userMode, setUserMode }: NavigationProps) {
         <div className="flex items-center justify-between h-16">
           <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-2">
-              <Volleyball className="text-primary text-2xl" />
-              <span className="text-xl font-bold text-gray-900">CourtBook</span>
-              <span className="text-sm bg-primary text-white px-2 py-1 rounded-full">KE</span>
+              <img 
+                src="@assets/Sports Box logo_011_1755065791927.jpg" 
+                alt="SportsBox Logo" 
+                className="h-8 w-auto"
+              />
+              <span className="text-xl font-bold text-gray-900">SportsBox</span>
             </div>
           </div>
           

@@ -1,8 +1,8 @@
-# CourtBook Kenya - Sports Court Booking Platform
+# SportsBox - Sports Court Booking Platform Kenya
 
 ## Overview
 
-CourtBook Kenya is a full-stack web application that connects sports court owners (vendors) with customers looking to book sports facilities across Kenya. The platform focuses on major cities like Nairobi, Mombasa, and Kisumu, providing an easy-to-use booking system with secure M-Pesa payment integration.
+SportsBox is a full-stack web application that connects sports court owners (vendors) with customers looking to book sports facilities across Kenya. The platform focuses on major cities like Nairobi, Mombasa, and Kisumu, providing an easy-to-use booking system with secure M-Pesa payment integration.
 
 The application features dual interfaces - one for customers to search and book courts, and another for vendors to manage their facilities and bookings. Built with modern web technologies, it provides real-time booking management, file uploads for court images, and comprehensive analytics for vendors.
 

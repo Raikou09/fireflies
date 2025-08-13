@@ -70,7 +70,7 @@ export default function AdminLogin({ onLoginSuccess }: AdminLoginProps) {
             </div>
           </div>
           <CardTitle className="text-2xl font-bold text-gray-900">
-            Admin Access
+            SportsBox Admin
           </CardTitle>
           <p className="text-gray-600 mt-2">
             Enter your admin credentials to access the dashboard

@@ -399,7 +399,7 @@ export default function AddCourtModal({ isOpen, onClose }: AddCourtModalProps) {
                 <h4 className="font-medium text-blue-900">Platform Commission</h4>
               </div>
               <p className="text-sm text-blue-800">
-                CourtBook Kenya charges a <span className="font-semibold">{commissionData.defaultCommissionRate}% commission</span> on all bookings made through the platform. 
+                SportsBox charges a <span className="font-semibold">{commissionData.defaultCommissionRate}% commission</span> on all bookings made through the platform. 
                 This helps us maintain and improve our services while keeping the platform free for vendors to use.
               </p>
             </div>
