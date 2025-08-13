@@ -487,6 +487,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Development endpoint to setup admin without auth
+  app.post("/api/dev/setup-admin", async (req, res) => {
+    try {
+      if (process.env.NODE_ENV !== 'development') {
+        return res.status(403).json({ message: "Only available in development" });
+      }
+
+      const { userId } = req.body;
+      if (!userId) {
+        return res.status(400).json({ message: "userId is required" });
+      }
+
+      let user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      user = await storage.updateUserType(userId, 'admin');
+      console.log("Setup admin for user:", user);
+      res.json({ message: "User made admin successfully", user });
+    } catch (error) {
+      console.error("Error setting up admin:", error);
+      res.status(500).json({ message: "Failed to setup admin", error: error.message });
+    }
+  });
+
   // Seed dummy data endpoint (development only)
   app.post("/api/admin/seed-data", isAuthenticated, async (req: any, res) => {
     try {
