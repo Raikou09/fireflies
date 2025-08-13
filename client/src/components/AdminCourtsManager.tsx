@@ -47,7 +47,10 @@ export default function AdminCourtsManager() {
 
   const commissionMutation = useMutation({
     mutationFn: async ({ courtId, commissionRate }: { courtId: string; commissionRate: number }) => {
-      return apiRequest(`/api/admin/courts/${courtId}/commission`, "PUT", { commissionRate });
+      console.log("Updating commission for court:", courtId, "rate:", commissionRate);
+      const response = await apiRequest(`/api/admin/courts/${courtId}/commission`, "PUT", { commissionRate });
+      console.log("Commission update response:", response);
+      return response;
     },
     onSuccess: () => {
       toast({
@@ -59,6 +62,7 @@ export default function AdminCourtsManager() {
       setCommissionValues({});
     },
     onError: (error: any) => {
+      console.error("Commission update error:", error);
       toast({
         title: "Error",
         description: error.message || "Failed to update commission rate",

@@ -632,6 +632,15 @@ export class DatabaseStorage implements IStorage {
 
   // Admin: Set commission rate for a specific court
   async setCourtCommission(id: string, commissionRate: number): Promise<Court | undefined> {
+    console.log("Setting commission for court:", id, "rate:", commissionRate);
+    
+    // First check if court exists
+    const [existingCourt] = await db.select().from(courts).where(eq(courts.id, id));
+    if (!existingCourt) {
+      console.log("Court not found:", id);
+      return undefined;
+    }
+    
     const [updatedCourt] = await db
       .update(courts)
       .set({ 
@@ -640,6 +649,8 @@ export class DatabaseStorage implements IStorage {
       })
       .where(eq(courts.id, id))
       .returning();
+      
+    console.log("Commission updated successfully:", updatedCourt);
     return updatedCourt;
   }
 
