@@ -310,6 +310,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Admin routes
+  
+  // Get all courts data for admin (with detailed information)
+  app.get("/api/admin/courts/all", async (req: any, res) => {
+    try {
+      const courts = await storage.getAllCourtsWithDetails();
+      res.json(courts);
+    } catch (error) {
+      console.error("Error fetching all courts:", error);
+      res.status(500).json({ message: "Failed to fetch all courts" });
+    }
+  });
+
+  // Set commission rate for a specific court
+  app.put("/api/admin/courts/:id/commission", async (req: any, res) => {
+    try {
+      const { commissionRate } = req.body;
+      if (!commissionRate || isNaN(parseFloat(commissionRate))) {
+        return res.status(400).json({ message: "Valid commission rate is required" });
+      }
+      
+      const court = await storage.setCourtCommission(req.params.id, parseFloat(commissionRate));
+      if (!court) {
+        return res.status(404).json({ message: "Court not found" });
+      }
+      res.json({ message: "Commission rate updated successfully", court });
+    } catch (error) {
+      console.error("Error updating commission rate:", error);
+      res.status(500).json({ message: "Failed to update commission rate" });
+    }
+  });
+
   app.get("/api/admin/pending-courts", async (req: any, res) => {
     try {
       const pendingCourts = await storage.getPendingCourts();
@@ -356,8 +387,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const user = await storage.getUser(userId);
       console.log("Vendor stats - Found user:", user);
       
-      if (!user || user.user_type !== "vendor") {
-        console.log("Vendor stats - Access denied. User type:", user?.user_type);
+      if (!user || user.userType !== "vendor") {
+        console.log("Vendor stats - Access denied. User type:", user?.userType);
         return res.status(403).json({ message: "Access denied. Vendor account required." });
       }
 
@@ -375,7 +406,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.user.claims.sub;
       const user = await storage.getUser(userId);
       
-      if (!user || user.user_type !== "vendor") {
+      if (!user || user.userType !== "vendor") {
         return res.status(403).json({ message: "Access denied. Vendor account required." });
       }
 
@@ -393,7 +424,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.user.claims.sub;
       const user = await storage.getUser(userId);
       
-      if (!user || user.user_type !== "vendor") {
+      if (!user || user.userType !== "vendor") {
         return res.status(403).json({ message: "Access denied. Vendor account required." });
       }
 
@@ -411,7 +442,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.user.claims.sub;
       const user = await storage.getUser(userId);
       
-      const isVendor = user?.user_type === "vendor";
+      const isVendor = user?.userType === "vendor";
       res.json({ 
         isVendor,
         user: isVendor ? user : null
@@ -428,7 +459,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.user.claims.sub;
       const user = await storage.getUser(userId);
       
-      if (!user || user.user_type !== "vendor") {
+      if (!user || user.userType !== "vendor") {
         return res.status(403).json({ message: "Access denied. Vendor account required." });
       }
 
@@ -446,7 +477,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.user.claims.sub;
       const user = await storage.getUser(userId);
       
-      if (!user || user.user_type !== "vendor") {
+      if (!user || user.userType !== "vendor") {
         return res.status(403).json({ message: "Access denied. Vendor account required." });
       }
 

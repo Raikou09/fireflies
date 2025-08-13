@@ -80,6 +80,8 @@ export interface IStorage {
 
   // Admin operations
   getPendingCourts(): Promise<CourtWithDetails[]>;
+  getAllCourtsWithDetails(): Promise<CourtWithDetails[]>;
+  setCourtCommission(id: string, commissionRate: number): Promise<Court | undefined>;
   approveCourt(courtId: string, adminNotes?: string): Promise<Court | undefined>;
   rejectCourt(courtId: string, adminNotes?: string): Promise<Court | undefined>;
 }
@@ -595,6 +597,51 @@ export class DatabaseStorage implements IStorage {
     return updatedCourt;
   }
 
+  // Admin: Get all courts with full details (including pending/rejected)
+  async getAllCourtsWithDetails(): Promise<CourtWithDetails[]> {
+    const query = db
+      .select()
+      .from(courts)
+      .leftJoin(users, eq(courts.vendorId, users.id))
+      .leftJoin(equipment, eq(courts.id, equipment.courtId));
+
+    const results = await query.orderBy(desc(courts.createdAt));
+
+    // Group results by court
+    const courtMap = new Map<string, CourtWithDetails>();
+    
+    for (const row of results) {
+      if (!row.courts) continue;
+      
+      const courtId = row.courts.id;
+      if (!courtMap.has(courtId)) {
+        courtMap.set(courtId, {
+          ...row.courts,
+          vendor: row.users!,
+          equipment: [],
+        });
+      }
+      
+      if (row.equipment) {
+        courtMap.get(courtId)!.equipment.push(row.equipment);
+      }
+    }
+
+    return Array.from(courtMap.values());
+  }
+
+  // Admin: Set commission rate for a specific court
+  async setCourtCommission(id: string, commissionRate: number): Promise<Court | undefined> {
+    const [updatedCourt] = await db
+      .update(courts)
+      .set({ 
+        commissionRate: commissionRate.toString(),
+        updatedAt: new Date() 
+      })
+      .where(eq(courts.id, id))
+      .returning();
+    return updatedCourt;
+  }
 
 }
 

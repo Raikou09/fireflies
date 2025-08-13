@@ -9,7 +9,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { apiRequest } from "@/lib/queryClient";
-import { CheckCircle, XCircle, MapPin, Clock, Calendar, Star } from "lucide-react";
+import { CheckCircle, XCircle, MapPin, Clock, Calendar, Star, Database } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import AdminCourtsManager from "./AdminCourtsManager";
 
 interface PendingCourt {
   id: string;
@@ -152,35 +154,46 @@ export default function AdminInterface() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold">Court Approval Dashboard</h2>
-        <Badge variant="secondary" className="text-lg px-3 py-1">
-          {courts.length} Pending
-        </Badge>
+      <div>
+        <h2 className="text-2xl font-bold text-gray-900">Admin Dashboard</h2>
+        <p className="text-gray-600">Manage court approvals and commission rates</p>
       </div>
 
-      {courts.length === 0 ? (
-        <Card>
-          <CardContent className="text-center py-12">
-            <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-4" />
-            <h3 className="text-xl font-semibold mb-2">All Caught Up!</h3>
-            <p className="text-gray-600">No court submissions pending approval.</p>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="grid gap-6">
-          {courts.map((court) => (
-            <Card key={court.id} className="overflow-hidden">
-              <CardHeader className="pb-4">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-xl">{court.name}</CardTitle>
-                  <Badge variant="outline" className="text-orange-600 border-orange-600">
-                    Pending Review
-                  </Badge>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <Tabs defaultValue="approvals" className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="approvals" className="flex items-center gap-2">
+            <Clock className="h-4 w-4" />
+            Court Approvals ({courts.length} pending)
+          </TabsTrigger>
+          <TabsTrigger value="management" className="flex items-center gap-2">
+            <Database className="h-4 w-4" />
+            All Courts & Commissions
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="approvals" className="mt-6">
+          {courts.length === 0 ? (
+            <Card>
+              <CardContent className="text-center py-12">
+                <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-4" />
+                <h3 className="text-xl font-semibold mb-2">All Caught Up!</h3>
+                <p className="text-gray-600">No court submissions pending approval.</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid gap-6">
+              {courts.map((court) => (
+                <Card key={court.id} className="overflow-hidden">
+                  <CardHeader className="pb-4">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-xl">{court.name}</CardTitle>
+                      <Badge variant="outline" className="text-orange-600 border-orange-600">
+                        Pending Review
+                      </Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                   <div className="flex items-center gap-2">
                     <Star className="h-4 w-4 text-blue-500" />
                     <span className="font-medium">{court.sport}</span>
@@ -265,7 +278,13 @@ export default function AdminInterface() {
             </Card>
           ))}
         </div>
-      )}
+          )}
+        </TabsContent>
+
+        <TabsContent value="management" className="mt-6">
+          <AdminCourtsManager />
+        </TabsContent>
+      </Tabs>
 
       {/* Approval/Rejection Modal */}
       <Dialog open={showApprovalModal} onOpenChange={setShowApprovalModal}>
