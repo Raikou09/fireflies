@@ -50,7 +50,7 @@ export default function AdminCourtsManager() {
       console.log("Updating commission for court:", courtId, "rate:", commissionRate);
       const response = await apiRequest(`/api/admin/courts/${courtId}/commission`, "PUT", { commissionRate });
       console.log("Commission update response:", response);
-      return response;
+      return await response.json();
     },
     onSuccess: () => {
       toast({
