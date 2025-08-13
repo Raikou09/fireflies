@@ -391,6 +391,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Admin delete court
+  app.delete("/api/admin/courts/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const user = req.user as any;
+      
+      if (!user || user.userType !== "admin") {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const { id: courtId } = req.params;
+
+      const success = await storage.adminDeleteCourt(courtId);
+      
+      if (!success) {
+        return res.status(500).json({ message: "Failed to delete court" });
+      }
+
+      res.json({ message: "Court deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting court:", error);
+      res.status(500).json({ message: "Failed to delete court" });
+    }
+  });
+
   // Vendor stats with Google auth
   app.get("/api/vendor/stats", isAuthenticated, async (req: any, res) => {
     try {

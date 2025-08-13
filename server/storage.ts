@@ -604,6 +604,24 @@ export class DatabaseStorage implements IStorage {
     return updatedCourt;
   }
 
+  async adminDeleteCourt(courtId: string): Promise<boolean> {
+    try {
+      // First delete all related bookings
+      await db.delete(bookings).where(eq(bookings.courtId, courtId));
+      
+      // Then delete all related equipment
+      await db.delete(equipment).where(eq(equipment.courtId, courtId));
+      
+      // Finally delete the court itself
+      const result = await db.delete(courts).where(eq(courts.id, courtId));
+      
+      return true;
+    } catch (error) {
+      console.error("Error deleting court:", error);
+      return false;
+    }
+  }
+
   // Admin: Get all courts with full details (including pending/rejected)
   async getAllCourtsWithDetails(): Promise<CourtWithDetails[]> {
     const query = db

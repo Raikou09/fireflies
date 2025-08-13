@@ -6,8 +6,15 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { Building2, MapPin, DollarSign, Users, Calendar, Percent, Edit3 } from "lucide-react";
+import { Building2, MapPin, DollarSign, Users, Calendar, Percent, Edit3, Trash2 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
+import { 
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { isUnauthorizedError } from "@/lib/authUtils";
 
 interface CourtData {
   id: string;
@@ -39,6 +46,9 @@ export default function AdminCourtsManager() {
   const queryClient = useQueryClient();
   const [editingCommission, setEditingCommission] = useState<string | null>(null);
   const [commissionValues, setCommissionValues] = useState<{ [key: string]: string }>({});
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteConfirmationStep, setDeleteConfirmationStep] = useState<1 | 2>(1);
+  const [courtToDelete, setCourtToDelete] = useState<CourtData | null>(null);
   
   const { data: courts, isLoading } = useQuery<CourtData[]>({
     queryKey: ["/api/admin/courts/all"],
@@ -71,6 +81,43 @@ export default function AdminCourtsManager() {
     },
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: async (courtId: string) => {
+      await apiRequest(`/api/admin/courts/${courtId}`, "DELETE");
+    },
+    onSuccess: () => {
+      toast({
+        title: "Court Deleted",
+        description: "The court has been permanently deleted from the system.",
+        variant: "destructive",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/courts/all"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/pending-courts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/courts"] });
+      setShowDeleteModal(false);
+      setCourtToDelete(null);
+      setDeleteConfirmationStep(1);
+    },
+    onError: (error) => {
+      if (isUnauthorizedError(error)) {
+        toast({
+          title: "Unauthorized",
+          description: "You are logged out. Logging in again...",
+          variant: "destructive",
+        });
+        setTimeout(() => {
+          window.location.href = "/api/login";
+        }, 500);
+        return;
+      }
+      toast({
+        title: "Error",
+        description: "Failed to delete court. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleCommissionUpdate = (courtId: string) => {
     const rate = parseFloat(commissionValues[courtId] || "0");
     if (rate < 0 || rate > 100) {
@@ -82,6 +129,28 @@ export default function AdminCourtsManager() {
       return;
     }
     commissionMutation.mutate({ courtId, commissionRate: rate });
+  };
+
+  const handleDeleteCourt = (court: CourtData) => {
+    setCourtToDelete(court);
+    setDeleteConfirmationStep(1);
+    setShowDeleteModal(true);
+  };
+
+  const proceedToSecondConfirmation = () => {
+    setDeleteConfirmationStep(2);
+  };
+
+  const confirmDelete = () => {
+    if (courtToDelete) {
+      deleteMutation.mutate(courtToDelete.id);
+    }
+  };
+
+  const cancelDelete = () => {
+    setShowDeleteModal(false);
+    setCourtToDelete(null);
+    setDeleteConfirmationStep(1);
   };
 
   const handleEditCommission = (courtId: string, currentRate: string) => {
@@ -238,6 +307,14 @@ export default function AdminCourtsManager() {
                 >
                   <Edit3 className="h-3 w-3" />
                 </Button>
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  onClick={() => handleDeleteCourt(court)}
+                  data-testid={`button-delete-${court.id}`}
+                >
+                  <Trash2 className="h-3 w-3" />
+                </Button>
               </div>
             )}
           </div>
@@ -295,6 +372,86 @@ export default function AdminCourtsManager() {
           </div>
         </TabsContent>
       </Tabs>
+
+      {/* Delete Confirmation Modal */}
+      <Dialog open={showDeleteModal} onOpenChange={setShowDeleteModal}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-red-600">
+              {deleteConfirmationStep === 1 ? "Delete Court?" : "Final Confirmation"}
+            </DialogTitle>
+          </DialogHeader>
+          
+          {deleteConfirmationStep === 1 ? (
+            <div className="space-y-4">
+              <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+                <p className="text-sm text-red-800">
+                  <strong>Warning:</strong> You are about to permanently delete the court "{courtToDelete?.name}".
+                </p>
+                <div className="mt-2 text-sm text-red-700">
+                  <p>• All bookings for this court will be deleted</p>
+                  <p>• All equipment associated with this court will be removed</p>
+                  <p>• This action cannot be undone</p>
+                </div>
+              </div>
+              
+              <div className="flex space-x-3">
+                <Button
+                  onClick={proceedToSecondConfirmation}
+                  variant="destructive"
+                  className="flex-1"
+                  data-testid="button-proceed-delete"
+                >
+                  I Understand, Continue
+                </Button>
+                <Button
+                  onClick={cancelDelete}
+                  variant="outline"
+                  className="flex-1"
+                  data-testid="button-cancel-delete"
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="p-4 bg-red-100 border-2 border-red-300 rounded-lg">
+                <p className="text-sm font-semibold text-red-900 mb-2">
+                  Final confirmation required to delete:
+                </p>
+                <p className="text-red-800 font-bold">"{courtToDelete?.name}"</p>
+                <p className="text-sm text-red-700 mt-2">
+                  Location: {courtToDelete?.city}, {courtToDelete?.area}
+                </p>
+                <p className="text-sm text-red-700">
+                  Sports: {courtToDelete?.availableSports.join(", ")}
+                </p>
+              </div>
+              
+              <div className="flex space-x-3">
+                <Button
+                  onClick={confirmDelete}
+                  variant="destructive"
+                  disabled={deleteMutation.isPending}
+                  className="flex-1"
+                  data-testid="button-confirm-delete"
+                >
+                  {deleteMutation.isPending ? "Deleting..." : "DELETE PERMANENTLY"}
+                </Button>
+                <Button
+                  onClick={cancelDelete}
+                  variant="outline"
+                  className="flex-1"
+                  data-testid="button-final-cancel"
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

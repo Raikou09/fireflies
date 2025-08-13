@@ -44,6 +44,9 @@ export default function AdminInterface() {
   const [adminNotes, setAdminNotes] = useState("");
   const [showApprovalModal, setShowApprovalModal] = useState(false);
   const [approvalAction, setApprovalAction] = useState<"approve" | "reject" | null>(null);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteConfirmationStep, setDeleteConfirmationStep] = useState<1 | 2>(1);
+  const [courtToDelete, setCourtToDelete] = useState<string | null>(null);
 
   const { data: pendingCourts, isLoading } = useQuery({
     queryKey: ["/api/admin/pending-courts"],
@@ -120,6 +123,43 @@ export default function AdminInterface() {
     },
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: async (courtId: string) => {
+      await apiRequest(`/api/admin/courts/${courtId}`, "DELETE");
+    },
+    onSuccess: () => {
+      toast({
+        title: "Court Deleted",
+        description: "The court has been permanently deleted from the system.",
+        variant: "destructive",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/pending-courts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/courts/all"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/courts"] });
+      setShowDeleteModal(false);
+      setCourtToDelete(null);
+      setDeleteConfirmationStep(1);
+    },
+    onError: (error) => {
+      if (isUnauthorizedError(error)) {
+        toast({
+          title: "Unauthorized",
+          description: "You are logged out. Logging in again...",
+          variant: "destructive",
+        });
+        setTimeout(() => {
+          window.location.href = "/api/login";
+        }, 500);
+        return;
+      }
+      toast({
+        title: "Error",
+        description: "Failed to delete court. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleApproval = (court: PendingCourt, action: "approve" | "reject") => {
     setSelectedCourt(court);
     setApprovalAction(action);
@@ -134,6 +174,28 @@ export default function AdminInterface() {
     } else {
       rejectMutation.mutate({ courtId: selectedCourt.id, adminNotes });
     }
+  };
+
+  const handleDeleteCourt = (courtId: string) => {
+    setCourtToDelete(courtId);
+    setDeleteConfirmationStep(1);
+    setShowDeleteModal(true);
+  };
+
+  const proceedToSecondConfirmation = () => {
+    setDeleteConfirmationStep(2);
+  };
+
+  const confirmDelete = () => {
+    if (courtToDelete) {
+      deleteMutation.mutate(courtToDelete);
+    }
+  };
+
+  const cancelDelete = () => {
+    setShowDeleteModal(false);
+    setCourtToDelete(null);
+    setDeleteConfirmationStep(1);
   };
 
   if (isLoading) {
