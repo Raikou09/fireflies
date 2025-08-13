@@ -20,7 +20,8 @@ import {
   Eye,
   ArrowUpRight,
   ArrowDownRight,
-  Minus
+  Minus,
+  Shield
 } from "lucide-react";
 
 interface CourtAnalyticsOverview {
@@ -99,6 +100,32 @@ export default function AdminAnalytics() {
   const { data: analyticsOverview, isLoading: isLoadingOverview } = useQuery<CourtAnalyticsOverview[]>({
     queryKey: ["/api/admin/courts/analytics/overview"],
     retry: false,
+  });
+
+  const makeAdminMutation = useMutation({
+    mutationFn: async () => {
+      return await apiRequest("/api/admin/make-me-admin", {
+        method: "POST",
+        body: JSON.stringify({}),
+        headers: { "Content-Type": "application/json" },
+      });
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "You are now an admin! You can access all features.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/courts/analytics/overview"] });
+    },
+    onError: (error: any) => {
+      console.error("Error making admin:", error);
+      toast({
+        title: "Error", 
+        description: "Failed to make you admin. Please try again.",
+        variant: "destructive",
+      });
+    },
   });
 
   const seedDataMutation = useMutation({
@@ -180,8 +207,28 @@ export default function AdminAnalytics() {
           <p className="text-gray-600">Financial insights and performance metrics for all courts</p>
         </div>
         
-        {/* Development Seed Data Button */}
+        {/* Development Admin & Seed Data Buttons */}
         <div className="flex gap-2">
+          <Button
+            onClick={() => makeAdminMutation.mutate()}
+            disabled={makeAdminMutation.isPending}
+            variant="secondary"
+            size="sm"
+            data-testid="button-make-admin"
+          >
+            {makeAdminMutation.isPending ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary mr-2"></div>
+                Making Admin...
+              </>
+            ) : (
+              <>
+                <Shield className="h-4 w-4 mr-2" />
+                Make Me Admin
+              </>
+            )}
+          </Button>
+          
           <Button
             onClick={handleSeedData}
             disabled={isSeeding || seedDataMutation.isPending}

@@ -436,10 +436,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get all courts analytics overview
   app.get("/api/admin/courts/analytics/overview", isAuthenticated, async (req: any, res) => {
     try {
-      const user = req.user as any;
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      console.log("Analytics overview - User:", user);
       
       if (!user || user.userType !== "admin") {
-        return res.status(403).json({ message: "Admin access required" });
+        console.log("Analytics overview - Access denied. User type:", user?.userType);
+        return res.status(403).json({ message: "Admin access required", userType: user?.userType });
       }
 
       const overview = await storage.getAllCourtsAnalyticsOverview();
@@ -450,25 +453,64 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Make current user admin (development only)
+  app.post("/api/admin/make-me-admin", isAuthenticated, async (req: any, res) => {
+    try {
+      if (process.env.NODE_ENV !== 'development') {
+        return res.status(403).json({ message: "Only available in development" });
+      }
+
+      const userId = req.user.claims.sub;
+      let user = await storage.getUser(userId);
+      
+      if (!user) {
+        // Create user if doesn't exist
+        const claims = req.user.claims;
+        user = await storage.upsertUser({
+          id: userId,
+          email: claims.email,
+          firstName: claims.first_name,
+          lastName: claims.last_name,
+          profileImageUrl: claims.profile_image_url,
+          userType: 'admin'
+        });
+      } else {
+        // Update existing user to admin
+        user = await storage.updateUserType(userId, 'admin');
+      }
+
+      console.log("User made admin:", user);
+      res.json({ message: "User made admin successfully", user });
+    } catch (error) {
+      console.error("Error making user admin:", error);
+      res.status(500).json({ message: "Failed to make user admin", error: error.message });
+    }
+  });
+
   // Seed dummy data endpoint (development only)
   app.post("/api/admin/seed-data", isAuthenticated, async (req: any, res) => {
     try {
-      const user = req.user as any;
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      console.log("Seed data request - User:", user);
       
       if (!user || user.userType !== "admin") {
-        return res.status(403).json({ message: "Admin access required" });
+        console.log("Seed data - Access denied. User type:", user?.userType);
+        return res.status(403).json({ message: "Admin access required", userType: user?.userType });
       }
 
       if (process.env.NODE_ENV !== 'development') {
         return res.status(403).json({ message: "Seeding only available in development" });
       }
 
+      console.log("Starting seed data process...");
       const { seedDummyData } = await import('./seedData');
       const result = await seedDummyData();
+      console.log("Seed data completed:", result);
       res.json({ message: "Dummy data seeded successfully", data: result });
     } catch (error) {
       console.error("Error seeding dummy data:", error);
-      res.status(500).json({ message: "Failed to seed dummy data" });
+      res.status(500).json({ message: "Failed to seed dummy data", error: error.message });
     }
   });
 
