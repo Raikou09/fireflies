@@ -450,6 +450,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Seed dummy data endpoint (development only)
+  app.post("/api/admin/seed-data", isAuthenticated, async (req: any, res) => {
+    try {
+      const user = req.user as any;
+      
+      if (!user || user.userType !== "admin") {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      if (process.env.NODE_ENV !== 'development') {
+        return res.status(403).json({ message: "Seeding only available in development" });
+      }
+
+      const { seedDummyData } = await import('./seedData');
+      const result = await seedDummyData();
+      res.json({ message: "Dummy data seeded successfully", data: result });
+    } catch (error) {
+      console.error("Error seeding dummy data:", error);
+      res.status(500).json({ message: "Failed to seed dummy data" });
+    }
+  });
+
   // Vendor stats with Google auth
   app.get("/api/vendor/stats", isAuthenticated, async (req: any, res) => {
     try {

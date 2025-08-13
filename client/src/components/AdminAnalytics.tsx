@@ -1,5 +1,7 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -90,11 +92,46 @@ interface CourtAnalyticsDetail {
 
 export default function AdminAnalytics() {
   const [selectedCourtId, setSelectedCourtId] = useState<string | null>(null);
+  const [isSeeding, setIsSeeding] = useState(false);
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   const { data: analyticsOverview, isLoading: isLoadingOverview } = useQuery<CourtAnalyticsOverview[]>({
     queryKey: ["/api/admin/courts/analytics/overview"],
     retry: false,
   });
+
+  const seedDataMutation = useMutation({
+    mutationFn: async () => {
+      return await apiRequest("/api/admin/seed-data", {
+        method: "POST",
+        body: JSON.stringify({}),
+        headers: { "Content-Type": "application/json" },
+      });
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Dummy data has been seeded successfully!",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/courts/analytics/overview"] });
+      setIsSeeding(false);
+    },
+    onError: (error: any) => {
+      console.error("Error seeding data:", error);
+      toast({
+        title: "Error",
+        description: "Failed to seed dummy data. Please try again.",
+        variant: "destructive",
+      });
+      setIsSeeding(false);
+    },
+  });
+
+  const handleSeedData = () => {
+    setIsSeeding(true);
+    seedDataMutation.mutate();
+  };
 
   const { data: courtDetail, isLoading: isLoadingDetail } = useQuery<CourtAnalyticsDetail>({
     queryKey: ["/api/admin/courts", selectedCourtId, "analytics"],
@@ -137,9 +174,34 @@ export default function AdminAnalytics() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold text-gray-900">Analytics Dashboard</h2>
-        <p className="text-gray-600">Financial insights and performance metrics for all courts</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">Analytics Dashboard</h2>
+          <p className="text-gray-600">Financial insights and performance metrics for all courts</p>
+        </div>
+        
+        {/* Development Seed Data Button */}
+        <div className="flex gap-2">
+          <Button
+            onClick={handleSeedData}
+            disabled={isSeeding || seedDataMutation.isPending}
+            variant="outline"
+            size="sm"
+            data-testid="button-seed-data"
+          >
+            {isSeeding || seedDataMutation.isPending ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary mr-2"></div>
+                Seeding...
+              </>
+            ) : (
+              <>
+                <Building2 className="h-4 w-4 mr-2" />
+                Add Sample Data
+              </>
+            )}
+          </Button>
+        </div>
       </div>
 
       <Tabs defaultValue="overview" className="w-full">
