@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,7 +12,7 @@ import { isUnauthorizedError } from "@/lib/authUtils";
 import { apiRequest } from "@/lib/queryClient";
 import { ObjectUploader } from "./ObjectUploader";
 import type { UploadResult } from "@uppy/core";
-import { CloudUpload, X } from "lucide-react";
+import { CloudUpload, X, Info } from "lucide-react";
 
 interface AddCourtModalProps {
   isOpen: boolean;
@@ -22,6 +22,12 @@ interface AddCourtModalProps {
 export default function AddCourtModal({ isOpen, onClose }: AddCourtModalProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  
+  // Fetch default commission rate
+  const { data: commissionData } = useQuery<{ defaultCommissionRate: number }>({
+    queryKey: ["/api/default-commission-rate"],
+    retry: false,
+  });
   
   const [formData, setFormData] = useState({
     name: "",
@@ -384,6 +390,20 @@ export default function AddCourtModal({ isOpen, onClose }: AddCourtModalProps) {
               onChange={(e) => handleInputChange("rules", e.target.value)}
             />
           </div>
+
+          {/* Commission Rate Info */}
+          {commissionData?.defaultCommissionRate && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <Info className="h-5 w-5 text-blue-600" />
+                <h4 className="font-medium text-blue-900">Platform Commission</h4>
+              </div>
+              <p className="text-sm text-blue-800">
+                CourtBook Kenya charges a <span className="font-semibold">{commissionData.defaultCommissionRate}% commission</span> on all bookings made through the platform. 
+                This helps us maintain and improve our services while keeping the platform free for vendors to use.
+              </p>
+            </div>
+          )}
 
           {/* Submit Button */}
           <div className="flex space-x-4">

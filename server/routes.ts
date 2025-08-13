@@ -120,6 +120,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get default commission rate for new courts
+  app.get("/api/default-commission-rate", async (req, res) => {
+    try {
+      // Default commission rate for new courts
+      const defaultRate = 10.00;
+      res.json({ defaultCommissionRate: defaultRate });
+    } catch (error) {
+      console.error("Error fetching default commission rate:", error);
+      res.status(500).json({ message: "Failed to fetch default commission rate" });
+    }
+  });
+
   app.post("/api/courts", isAuthenticated, async (req: any, res) => {
     try {
       const vendorId = req.user.claims.sub;
