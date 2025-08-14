@@ -2,6 +2,7 @@ import { Volleyball, ChevronDown } from "lucide-react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
+import { NotificationCenter } from "./NotificationCenter";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -68,33 +69,35 @@ export default function Navigation({ userMode, setUserMode }: NavigationProps) {
             
             {/* Authentication Section */}
             {!isLoading && (
-              isAuthenticated ? (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" className="flex items-center space-x-2">
-                      <img 
-                        src={user?.profileImageUrl || "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=32&h=32"} 
-                        alt="Profile" 
-                        className="w-8 h-8 rounded-full object-cover"
-                      />
-                      <span className="text-sm text-gray-700">{user?.firstName || 'User'}</span>
-                      <ChevronDown className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    {((user as any)?.user_type === "vendor" || (user as any)?.userType === "vendor") && (
-                      <DropdownMenuItem asChild>
-                        <Link href="/vendor/dashboard">
-                          Vendor Dashboard
-                        </Link>
+              <div className="flex items-center gap-2">
+                {isAuthenticated && <NotificationCenter />}
+                {isAuthenticated ? (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" className="flex items-center space-x-2">
+                        <img 
+                          src={user?.profileImageUrl || "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=32&h=32"} 
+                          alt="Profile" 
+                          className="w-8 h-8 rounded-full object-cover"
+                        />
+                        <span className="text-sm text-gray-700">{user?.firstName || 'User'}</span>
+                        <ChevronDown className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      {((user as any)?.user_type === "vendor" || (user as any)?.userType === "vendor") && (
+                        <DropdownMenuItem asChild>
+                          <Link href="/vendor/dashboard">
+                            Vendor Dashboard
+                          </Link>
+                        </DropdownMenuItem>
+                      )}
+                      <DropdownMenuItem onClick={() => window.location.href = "/api/logout"}>
+                        Sign Out
                       </DropdownMenuItem>
-                    )}
-                    <DropdownMenuItem onClick={() => window.location.href = "/api/logout"}>
-                      Sign Out
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              ) : (
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                ) : (
                 <div className="flex gap-2">
                   <Button 
                     onClick={() => window.location.href = "/api/auth/google"}
@@ -115,7 +118,8 @@ export default function Navigation({ userMode, setUserMode }: NavigationProps) {
                     Sign In
                   </Button>
                 </div>
-              )
+                )}
+              </div>
             )}
           </div>
         </div>
