@@ -9,6 +9,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
+import Sports_Box_logo_011 from "@assets/Sports Box logo_011.jpg";
+
 interface User {
   id: string;
   email?: string;
@@ -33,7 +35,7 @@ export default function Navigation({ userMode, setUserMode }: NavigationProps) {
           <div className="flex items-center space-x-2 md:space-x-4 flex-1 min-w-0">
             <div className="flex items-center space-x-1 md:space-x-2">
               <img 
-                src="@assets/Sports Box logo_011_1755065791927.jpg" 
+                src={Sports_Box_logo_011} 
                 alt="SportsBox Logo" 
                 className="h-6 md:h-8 w-auto flex-shrink-0"
               />
