@@ -105,5 +105,27 @@
 
   body {
     @apply font-sans antialiased bg-background text-foreground;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+/* Mobile optimizations */
+@media (max-width: 768px) {
+  /* Touch-friendly targets */
+  button, [role="button"], .btn {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  
+  /* Prevent zoom on iOS form inputs */
+  input, select, textarea {
+    font-size: 16px !important;
+  }
+  
+  /* Better scrolling on mobile */
+  .overflow-auto, .overflow-y-auto {
+    -webkit-overflow-scrolling: touch;
   }
 }

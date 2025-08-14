@@ -38,33 +38,33 @@ export default function SearchBar({ onSearch }: SearchBarProps) {
   ];
 
   return (
-    <div className="bg-white p-6 rounded-2xl shadow-xl max-w-4xl mx-auto">
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+    <div className="bg-white p-4 md:p-6 rounded-2xl shadow-xl max-w-4xl mx-auto">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-3 md:gap-4">
         <div className="relative md:col-span-1">
-          <label className="block text-sm font-medium text-gray-700 mb-2">Search</label>
+          <label className="block text-xs md:text-sm font-medium text-gray-700 mb-2">Search</label>
           <div className="relative">
-            <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
             <Input
               type="text"
               placeholder="Court name, area..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
+              className="pl-10 h-10 md:h-11"
               data-testid="input-search-query"
             />
           </div>
         </div>
         <div className="relative">
-          <label className="block text-sm font-medium text-gray-700 mb-2">Location</label>
+          <label className="block text-xs md:text-sm font-medium text-gray-700 mb-2">Location</label>
           <div className="relative">
-            <MapPin className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+            <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 z-10" />
             <Select value={location} onValueChange={setLocation}>
-              <SelectTrigger className="pl-10">
+              <SelectTrigger className="pl-10 h-10 md:h-11" data-testid="select-location">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 {cities.map((city) => (
-                  <SelectItem key={city} value={city}>
+                  <SelectItem key={city} value={city} data-testid={`option-location-${city}`}>
                     {city}
                   </SelectItem>
                 ))}
@@ -74,16 +74,16 @@ export default function SearchBar({ onSearch }: SearchBarProps) {
         </div>
         
         <div className="relative">
-          <label className="block text-sm font-medium text-gray-700 mb-2">Sport</label>
+          <label className="block text-xs md:text-sm font-medium text-gray-700 mb-2">Sport</label>
           <div className="relative">
-            <Volleyball className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+            <Volleyball className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 z-10" />
             <Select value={sport} onValueChange={setSport}>
-              <SelectTrigger className="pl-10" data-testid="select-sport">
+              <SelectTrigger className="pl-10 h-10 md:h-11" data-testid="select-sport-filter">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 {sports.map((sportOption) => (
-                  <SelectItem key={sportOption} value={sportOption}>
+                  <SelectItem key={sportOption} value={sportOption} data-testid={`option-sport-${sportOption}`}>
                     {sportOption}
                   </SelectItem>
                 ))}
@@ -94,11 +94,13 @@ export default function SearchBar({ onSearch }: SearchBarProps) {
         
         <div className="flex items-end">
           <Button 
-            className="w-full bg-primary text-white hover:bg-green-700"
+            className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold py-2 md:py-3 px-4 md:px-6 rounded-lg shadow-lg transform transition hover:scale-105 h-10 md:h-11"
             onClick={handleSearch}
+            data-testid="button-search"
           >
             <Search className="h-4 w-4 mr-2" />
-            Search Courts
+            <span className="hidden sm:inline">Find Courts</span>
+            <span className="sm:hidden">Search</span>
           </Button>
         </div>
       </div>

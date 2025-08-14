@@ -156,15 +156,19 @@ export function BookingModal({ court, isOpen, onClose }: BookingModalProps) {
 
   return (
     <Dialog open={isOpen} onOpenChange={resetModal}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <CalendarIcon className="h-5 w-5" />
+      <DialogContent className="max-w-4xl max-h-[95vh] w-[95vw] md:w-full overflow-y-auto p-4 md:p-6">
+        <DialogHeader className="space-y-2">
+          <DialogTitle className="flex items-center gap-2 text-lg md:text-xl">
+            <CalendarIcon className="h-4 w-4 md:h-5 md:w-5" />
             Book {court.name}
           </DialogTitle>
+          <div className="flex items-center gap-2 text-xs md:text-sm text-gray-600">
+            <MapPin className="h-3 w-3 md:h-4 md:w-4" />
+            {court.area}, {court.city}
+          </div>
         </DialogHeader>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
           {/* Main Booking Section */}
           <div className="lg:col-span-2 space-y-6">
             {step === 'datetime' && (
