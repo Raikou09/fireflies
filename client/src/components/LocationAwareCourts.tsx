@@ -8,6 +8,8 @@ import { Label } from '@/components/ui/label';
 import { MapPin, Navigation, Clock, Star } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { BookingModal } from './BookingModal';
+import { ReviewModal } from './ReviewModal';
+import { ReviewsList } from './ReviewsList';
 import type { CourtWithDetails } from '@shared/schema';
 
 interface LocationAwareCourtsProps {
@@ -29,6 +31,8 @@ export function LocationAwareCourts({ city, sport, searchQuery }: LocationAwareC
   const [useLocationFilter, setUseLocationFilter] = useState(false);
   const [selectedCourt, setSelectedCourt] = useState<CourtWithDetails | null>(null);
   const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
+  const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
+  const [showCourtDetails, setShowCourtDetails] = useState<string | null>(null);
 
   // Request user location
   const requestLocation = () => {
@@ -241,21 +245,58 @@ export function LocationAwareCourts({ city, sport, searchQuery }: LocationAwareC
                     </div>
                   </div>
 
-                  <Button 
-                    onClick={() => {
-                      setSelectedCourt(court);
-                      setIsBookingModalOpen(true);
-                    }}
-                    data-testid={`button-book-court-${court.id}`}
-                  >
-                    Book Now
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button 
+                      onClick={() => {
+                        setSelectedCourt(court);
+                        setIsBookingModalOpen(true);
+                      }}
+                      data-testid={`button-book-court-${court.id}`}
+                    >
+                      Book Now
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setShowCourtDetails(showCourtDetails === court.id ? null : court.id);
+                      }}
+                      data-testid={`button-reviews-${court.id}`}
+                    >
+                      <Star className="h-4 w-4 mr-1" />
+                      Reviews
+                    </Button>
+                  </div>
                 </div>
 
                 {court.description && (
                   <p className="text-gray-600 text-sm mt-4" data-testid={`text-court-description-${court.id}`}>
                     {court.description}
                   </p>
+                )}
+
+                {/* Expanded Court Details with Reviews */}
+                {showCourtDetails === court.id && (
+                  <div className="mt-4 pt-4 border-t space-y-4">
+                    <div className="flex justify-between items-center">
+                      <h4 className="font-semibold">Reviews & Ratings</h4>
+                      <Button
+                        size="sm"
+                        onClick={() => {
+                          setSelectedCourt(court);
+                          setIsReviewModalOpen(true);
+                        }}
+                        data-testid={`button-write-review-${court.id}`}
+                      >
+                        <Star className="h-4 w-4 mr-1" />
+                        Write Review
+                      </Button>
+                    </div>
+                    <ReviewsList 
+                      courtId={court.id} 
+                      showAddReviewButton={false}
+                    />
+                  </div>
                 )}
               </CardContent>
             </Card>
@@ -282,16 +323,27 @@ export function LocationAwareCourts({ city, sport, searchQuery }: LocationAwareC
         )}
       </div>
 
-      {/* Booking Modal */}
+      {/* Modals */}
       {selectedCourt && (
-        <BookingModal
-          court={selectedCourt}
-          isOpen={isBookingModalOpen}
-          onClose={() => {
-            setIsBookingModalOpen(false);
-            setSelectedCourt(null);
-          }}
-        />
+        <>
+          <BookingModal
+            court={selectedCourt}
+            isOpen={isBookingModalOpen}
+            onClose={() => {
+              setIsBookingModalOpen(false);
+              setSelectedCourt(null);
+            }}
+          />
+          
+          <ReviewModal
+            court={selectedCourt}
+            isOpen={isReviewModalOpen}
+            onClose={() => {
+              setIsReviewModalOpen(false);
+              setSelectedCourt(null);
+            }}
+          />
+        </>
       )}
     </div>
   );

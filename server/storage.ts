@@ -3,6 +3,7 @@ import {
   courts,
   equipment,
   bookings,
+  reviews,
   type User,
   type UpsertUser,
   type Court,
@@ -11,8 +12,11 @@ import {
   type InsertEquipment,
   type Booking,
   type InsertBooking,
+  type Review,
+  type InsertReview,
   type CourtWithDetails,
   type BookingWithDetails,
+  type ReviewWithDetails,
 } from "@shared/schema";
 import { db, pool } from "./db";
 import { eq, and, desc, sql, gte, lte } from "drizzle-orm";
@@ -52,6 +56,13 @@ export interface IStorage {
   getBookingsByCourtAndDate(courtId: string, date: string): Promise<Booking[]>;
   getBookingById(id: string): Promise<BookingWithDetails | undefined>;
   updateBookingStatus(id: string, status: string): Promise<Booking | undefined>;
+
+  // Review operations
+  createReview(review: InsertReview): Promise<Review>;
+  getReviewsByCourt(courtId: string): Promise<ReviewWithDetails[]>;
+  getReviewsByCustomer(customerId: string): Promise<ReviewWithDetails[]>;
+  updateReviewHelpfulness(reviewId: string, increment: boolean): Promise<Review | undefined>;
+  reportReview(reviewId: string): Promise<Review | undefined>;
 
   // Analytics
   getVendorStats(vendorId: string): Promise<{
@@ -417,13 +428,105 @@ export class DatabaseStorage implements IStorage {
     };
   }
 
-  async updateBookingStatus(id: string, status: "active" | "completed" | "cancelled"): Promise<Booking | undefined> {
+  async updateBookingStatus(id: string, status: "confirmed" | "completed" | "cancelled"): Promise<Booking | undefined> {
     const [updatedBooking] = await db
       .update(bookings)
       .set({ status, updatedAt: new Date() })
       .where(eq(bookings.id, id))
       .returning();
     return updatedBooking;
+  }
+
+  // Review operations
+  async createReview(reviewData: InsertReview): Promise<Review> {
+    const [newReview] = await db
+      .insert(reviews)
+      .values(reviewData)
+      .returning();
+    
+    // Update court rating after new review
+    await this.updateCourtRating(reviewData.courtId);
+    
+    return newReview;
+  }
+
+  async getReviewsByCourt(courtId: string): Promise<ReviewWithDetails[]> {
+    const results = await db
+      .select()
+      .from(reviews)
+      .leftJoin(users, eq(reviews.customerId, users.id))
+      .leftJoin(bookings, eq(reviews.bookingId, bookings.id))
+      .where(and(eq(reviews.courtId, courtId), eq(reviews.isVisible, true)))
+      .orderBy(desc(reviews.createdAt));
+
+    return results.map(row => ({
+      ...row.reviews!,
+      customer: row.users!,
+      booking: row.bookings || undefined,
+    }));
+  }
+
+  async getReviewsByCustomer(customerId: string): Promise<ReviewWithDetails[]> {
+    const results = await db
+      .select()
+      .from(reviews)
+      .leftJoin(users, eq(reviews.customerId, users.id))
+      .leftJoin(courts, eq(reviews.courtId, courts.id))
+      .leftJoin(bookings, eq(reviews.bookingId, bookings.id))
+      .where(eq(reviews.customerId, customerId))
+      .orderBy(desc(reviews.createdAt));
+
+    return results.map(row => ({
+      ...row.reviews!,
+      customer: row.users!,
+      court: row.courts || undefined,
+      booking: row.bookings || undefined,
+    }));
+  }
+
+  async updateReviewHelpfulness(reviewId: string, increment: boolean): Promise<Review | undefined> {
+    const [updatedReview] = await db
+      .update(reviews)
+      .set({ 
+        helpfulVotes: increment 
+          ? sql`${reviews.helpfulVotes} + 1`
+          : sql`${reviews.helpfulVotes} - 1`
+      })
+      .where(eq(reviews.id, reviewId))
+      .returning();
+    return updatedReview;
+  }
+
+  async reportReview(reviewId: string): Promise<Review | undefined> {
+    const [updatedReview] = await db
+      .update(reviews)
+      .set({ 
+        reportCount: sql`${reviews.reportCount} + 1`,
+        // Hide review if it gets 5+ reports
+        isVisible: sql`CASE WHEN ${reviews.reportCount} >= 4 THEN false ELSE ${reviews.isVisible} END`
+      })
+      .where(eq(reviews.id, reviewId))
+      .returning();
+    return updatedReview;
+  }
+
+  // Helper method to update court rating based on reviews
+  private async updateCourtRating(courtId: string): Promise<void> {
+    const [{ avg: averageRating, count: totalReviews }] = await db
+      .select({ 
+        avg: sql<number>`coalesce(avg(${reviews.rating}), 0)`,
+        count: sql<number>`count(*)`
+      })
+      .from(reviews)
+      .where(and(eq(reviews.courtId, courtId), eq(reviews.isVisible, true)));
+
+    await db
+      .update(courts)
+      .set({ 
+        rating: averageRating.toFixed(2),
+        totalBookings: Number(totalReviews) // Using this field to store review count for now
+      })
+      .where(eq(courts.id, courtId));
   }
 
   // Analytics

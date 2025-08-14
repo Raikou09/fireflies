@@ -148,7 +148,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         bookingDate: new Date(date),
         startTime: timeSlot,
         endTime: `${parseInt(timeSlot.split(':')[0]) + duration}:00`,
-        totalAmount,
+        totalAmount: totalAmount.toString(),
         status: "confirmed",
       });
 
@@ -156,6 +156,75 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error creating booking:", error);
       res.status(500).json({ message: "Failed to create booking" });
+    }
+  });
+
+  // Review routes
+  app.post("/api/reviews", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+
+      const reviewData = { ...req.body, customerId: userId };
+      const review = await storage.createReview(reviewData);
+      res.status(201).json(review);
+    } catch (error) {
+      console.error("Error creating review:", error);
+      res.status(500).json({ message: "Failed to create review" });
+    }
+  });
+
+  app.get("/api/reviews/:courtId", async (req, res) => {
+    try {
+      const reviews = await storage.getReviewsByCourt(req.params.courtId);
+      res.json(reviews);
+    } catch (error) {
+      console.error("Error fetching reviews:", error);
+      res.status(500).json({ message: "Failed to fetch reviews" });
+    }
+  });
+
+  app.get("/api/customer/reviews", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+
+      const reviews = await storage.getReviewsByCustomer(userId);
+      res.json(reviews);
+    } catch (error) {
+      console.error("Error fetching customer reviews:", error);
+      res.status(500).json({ message: "Failed to fetch reviews" });
+    }
+  });
+
+  app.post("/api/reviews/:reviewId/helpful", isAuthenticated, async (req, res) => {
+    try {
+      const { increment } = req.body;
+      const review = await storage.updateReviewHelpfulness(req.params.reviewId, increment);
+      if (!review) {
+        return res.status(404).json({ message: "Review not found" });
+      }
+      res.json(review);
+    } catch (error) {
+      console.error("Error updating review helpfulness:", error);
+      res.status(500).json({ message: "Failed to update review" });
+    }
+  });
+
+  app.post("/api/reviews/:reviewId/report", isAuthenticated, async (req, res) => {
+    try {
+      const review = await storage.reportReview(req.params.reviewId);
+      if (!review) {
+        return res.status(404).json({ message: "Review not found" });
+      }
+      res.json({ message: "Review reported successfully" });
+    } catch (error) {
+      console.error("Error reporting review:", error);
+      res.status(500).json({ message: "Failed to report review" });
     }
   });
 
@@ -291,7 +360,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const customerId = req.user.claims.sub;
       const bookingData = insertBookingSchema.parse(req.body);
-      const booking = await storage.createBooking(customerId, bookingData);
+      const booking = await storage.createBooking({ ...bookingData, customerId });
       
       // Here you would integrate with M-Pesa API and send SMS/Email
       // For now, we'll just return success

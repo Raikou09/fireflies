@@ -93,10 +93,32 @@ export const bookings = pgTable("bookings", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+export const reviews = pgTable("reviews", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  courtId: varchar("court_id").notNull().references(() => courts.id, { onDelete: "cascade" }),
+  customerId: varchar("customer_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  bookingId: varchar("booking_id").references(() => bookings.id, { onDelete: "set null" }),
+  rating: integer("rating").notNull(), // 1-5 stars
+  title: varchar("title", { length: 100 }),
+  comment: text("comment"),
+  courtCleanliness: integer("court_cleanliness"), // 1-5 rating for cleanliness
+  facilitiesQuality: integer("facilities_quality"), // 1-5 rating for facilities
+  staffService: integer("staff_service"), // 1-5 rating for staff service
+  valueForMoney: integer("value_for_money"), // 1-5 rating for value
+  wouldRecommend: boolean("would_recommend").default(true),
+  isVerifiedBooking: boolean("is_verified_booking").default(false), // true if reviewer actually booked the court
+  helpfulVotes: integer("helpful_votes").default(0),
+  reportCount: integer("report_count").default(0),
+  isVisible: boolean("is_visible").default(true), // for moderation
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Relations
 export const userRelations = relations(users, ({ many }) => ({
   courts: many(courts),
   bookings: many(bookings),
+  reviews: many(reviews),
 }));
 
 export const courtRelations = relations(courts, ({ one, many }) => ({
@@ -106,6 +128,7 @@ export const courtRelations = relations(courts, ({ one, many }) => ({
   }),
   equipment: many(equipment),
   bookings: many(bookings),
+  reviews: many(reviews),
 }));
 
 export const equipmentRelations = relations(equipment, ({ one }) => ({
@@ -115,7 +138,7 @@ export const equipmentRelations = relations(equipment, ({ one }) => ({
   }),
 }));
 
-export const bookingRelations = relations(bookings, ({ one }) => ({
+export const bookingRelations = relations(bookings, ({ one, many }) => ({
   customer: one(users, {
     fields: [bookings.customerId],
     references: [users.id],
@@ -123,6 +146,22 @@ export const bookingRelations = relations(bookings, ({ one }) => ({
   court: one(courts, {
     fields: [bookings.courtId],
     references: [courts.id],
+  }),
+  reviews: many(reviews),
+}));
+
+export const reviewRelations = relations(reviews, ({ one }) => ({
+  court: one(courts, {
+    fields: [reviews.courtId],
+    references: [courts.id],
+  }),
+  customer: one(users, {
+    fields: [reviews.customerId],
+    references: [users.id],
+  }),
+  booking: one(bookings, {
+    fields: [reviews.bookingId],
+    references: [bookings.id],
   }),
 }));
 
@@ -155,6 +194,15 @@ export const insertBookingSchema = createInsertSchema(bookings).omit({
   updatedAt: true,
 });
 
+export const insertReviewSchema = createInsertSchema(reviews).omit({
+  id: true,
+  helpfulVotes: true,
+  reportCount: true,
+  isVisible: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 // Types
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
@@ -164,6 +212,8 @@ export type InsertEquipment = z.infer<typeof insertEquipmentSchema>;
 export type Equipment = typeof equipment.$inferSelect;
 export type InsertBooking = z.infer<typeof insertBookingSchema>;
 export type Booking = typeof bookings.$inferSelect;
+export type InsertReview = z.infer<typeof insertReviewSchema>;
+export type Review = typeof reviews.$inferSelect;
 
 // Extended types with relations
 export type CourtWithDetails = Court & {
@@ -175,4 +225,10 @@ export type CourtWithDetails = Court & {
 export type BookingWithDetails = Booking & {
   court: Court;
   customer: User;
+};
+
+export type ReviewWithDetails = Review & {
+  customer: User;
+  court?: Court;
+  booking?: Booking;
 };
