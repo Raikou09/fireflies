@@ -1159,6 +1159,24 @@ export class DatabaseStorage implements IStorage {
       .set(preferences)
       .where(eq(userNotificationPreferences.userId, userId));
   }
+
+  // Court reviews operations
+  async getCourtReviews(courtId: string): Promise<ReviewWithDetails[]> {
+    const results = await db
+      .select()
+      .from(reviews)
+      .innerJoin(users, eq(reviews.customerId, users.id))
+      .where(and(
+        eq(reviews.courtId, courtId),
+        eq(reviews.isVisible, true)
+      ))
+      .orderBy(desc(reviews.createdAt));
+
+    return results.map(result => ({
+      ...result.reviews,
+      customer: result.users
+    }));
+  }
 }
 
 export const storage = new DatabaseStorage();

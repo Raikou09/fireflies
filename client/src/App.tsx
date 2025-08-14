@@ -9,6 +9,7 @@ import Landing from "@/pages/Landing";
 import Home from "@/pages/Home";
 import Admin from "@/pages/Admin";
 import VendorDashboard from "@/pages/VendorDashboard";
+import CourtDetails from "@/pages/CourtDetails";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -22,6 +23,7 @@ function Router() {
       
       {/* Public Routes - No Authentication Required */}
       <Route path="/" component={Home} />
+      <Route path="/court/:id" component={CourtDetails} />
       <Route path="/admin" component={Admin} />
       
       <Route component={NotFound} />

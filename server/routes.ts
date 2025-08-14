@@ -178,6 +178,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get court reviews with customer details
+  app.get("/api/courts/:id/reviews", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const reviews = await storage.getCourtReviews(id);
+      res.json(reviews);
+    } catch (error) {
+      console.error("Error fetching court reviews:", error);
+      res.status(500).json({ message: "Failed to fetch court reviews" });
+    }
+  });
+
   app.get("/api/reviews/:courtId", async (req, res) => {
     try {
       const reviews = await storage.getReviewsByCourt(req.params.courtId);

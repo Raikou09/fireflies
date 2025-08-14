@@ -1,9 +1,11 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { Link } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Star, Clock, MapPin, Filter, Map } from "lucide-react";
-import BookingModal from "./BookingModal";
+import { Badge } from "@/components/ui/badge";
+import { Star, Clock, MapPin, Filter, Map, Eye } from "lucide-react";
+import { BookingModal } from "./BookingModal";
 import type { CourtWithDetails } from "@shared/schema";
 
 interface CourtsGridProps {
@@ -78,17 +80,25 @@ export default function CourtsGrid({ filters }: CourtsGridProps) {
               {courts.map((court: CourtWithDetails) => (
                 <Card 
                   key={court.id} 
-                  className="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow cursor-pointer"
-                  onClick={() => handleBookCourt(court)}
+                  className="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow"
                 >
-                  <img 
-                    src={court.imageUrl || "https://images.unsplash.com/photo-1546519638-68e109498ffc?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=400&h=250"} 
-                    alt={court.name}
-                    className="w-full h-48 object-cover"
-                  />
+                  <Link href={`/court/${court.id}`}>
+                    <div className="cursor-pointer">
+                      <img 
+                        src={court.imageUrl || "https://images.unsplash.com/photo-1546519638-68e109498ffc?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=400&h=250"} 
+                        alt={court.name}
+                        className="w-full h-48 object-cover"
+                        data-testid={`court-image-${court.id}`}
+                      />
+                    </div>
+                  </Link>
                   <CardContent className="p-6">
                     <div className="flex items-center justify-between mb-2">
-                      <h3 className="text-lg font-semibold text-gray-900">{court.name}</h3>
+                      <Link href={`/court/${court.id}`}>
+                        <h3 className="text-lg font-semibold text-gray-900 hover:text-primary cursor-pointer" data-testid={`court-name-${court.id}`}>
+                          {court.name}
+                        </h3>
+                      </Link>
                       <span className="flex items-center text-yellow-500">
                         <Star className="h-4 w-4" />
                         <span className="ml-1 text-sm font-medium">{court.rating || "4.5"}</span>
@@ -114,20 +124,30 @@ export default function CourtsGrid({ filters }: CourtsGridProps) {
                         {court.openingTime} - {court.closingTime}
                       </span>
                     </div>
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between gap-2">
                       <div>
                         <span className="text-lg font-bold text-gray-900">KES {court.hourlyRate}</span>
                         <span className="text-sm text-gray-500">/hour</span>
                       </div>
-                      <Button 
-                        className="bg-primary text-white hover:bg-green-700"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleBookCourt(court);
-                        }}
-                      >
-                        Book Now
-                      </Button>
+                      <div className="flex gap-2">
+                        <Link href={`/court/${court.id}`}>
+                          <Button variant="outline" size="sm" data-testid={`button-view-details-${court.id}`}>
+                            <Eye className="h-4 w-4 mr-1" />
+                            Details
+                          </Button>
+                        </Link>
+                        <Button 
+                          className="bg-primary text-white hover:bg-green-700"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleBookCourt(court);
+                          }}
+                          data-testid={`button-book-now-${court.id}`}
+                        >
+                          Book
+                        </Button>
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
@@ -137,14 +157,16 @@ export default function CourtsGrid({ filters }: CourtsGridProps) {
         </div>
       </section>
 
-      <BookingModal
-        court={selectedCourt}
-        isOpen={isBookingModalOpen}
-        onClose={() => {
-          setIsBookingModalOpen(false);
-          setSelectedCourt(null);
-        }}
-      />
+      {selectedCourt && (
+        <BookingModal
+          court={selectedCourt}
+          isOpen={isBookingModalOpen}
+          onClose={() => {
+            setIsBookingModalOpen(false);
+            setSelectedCourt(null);
+          }}
+        />
+      )}
     </>
   );
 }
