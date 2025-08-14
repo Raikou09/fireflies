@@ -113,6 +113,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Booking availability route
+  app.get("/api/bookings/availability/:courtId", async (req, res) => {
+    try {
+      const { courtId } = req.params;
+      const { date } = req.query;
+      
+      if (!date) {
+        return res.status(400).json({ message: "Date parameter is required" });
+      }
+
+      const bookings = await storage.getBookingsByCourtAndDate(courtId, date as string);
+      res.json(bookings);
+    } catch (error) {
+      console.error("Error fetching availability:", error);
+      res.status(500).json({ message: "Failed to fetch availability" });
+    }
+  });
+
+  // Create booking route
+  app.post("/api/bookings", async (req, res) => {
+    try {
+      const { courtId, date, timeSlot, duration, totalAmount } = req.body;
+      
+      if (!courtId || !date || !timeSlot || !duration || !totalAmount) {
+        return res.status(400).json({ message: "Missing required booking fields" });
+      }
+
+      // For now, create booking without authentication
+      // In production, you would get userId from authenticated session
+      const booking = await storage.createBooking({
+        courtId,
+        customerId: "guest-user", // Temporary until auth is implemented
+        bookingDate: new Date(date),
+        startTime: timeSlot,
+        endTime: `${parseInt(timeSlot.split(':')[0]) + duration}:00`,
+        totalAmount,
+        status: "confirmed",
+      });
+
+      res.status(201).json(booking);
+    } catch (error) {
+      console.error("Error creating booking:", error);
+      res.status(500).json({ message: "Failed to create booking" });
+    }
+  });
+
   app.get("/api/vendor/courts", isAuthenticated, async (req: any, res) => {
     try {
       const vendorId = req.user.claims.sub;

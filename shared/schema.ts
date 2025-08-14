@@ -77,17 +77,18 @@ export const bookings = pgTable("bookings", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   customerId: varchar("customer_id").notNull().references(() => users.id),
   courtId: varchar("court_id").notNull().references(() => courts.id),
-  selectedSport: varchar("selected_sport").notNull(), // The specific sport chosen for this booking
-  bookingDate: varchar("booking_date").notNull(),
-  timeSlot: varchar("time_slot").notNull(),
+  selectedSport: varchar("selected_sport").default("General"), // The specific sport chosen for this booking
+  bookingDate: timestamp("booking_date").notNull(),
+  startTime: varchar("start_time").notNull(), // e.g., "14:00"
+  endTime: varchar("end_time").notNull(), // e.g., "16:00"
   duration: integer("duration").default(1), // hours
   totalAmount: decimal("total_amount", { precision: 10, scale: 2 }).notNull(),
   equipmentIds: text("equipment_ids").array(),
-  customerPhone: varchar("customer_phone").notNull(),
-  customerEmail: varchar("customer_email").notNull(),
-  paymentMethod: varchar("payment_method", { enum: ["mpesa", "card"] }).notNull(),
+  customerPhone: varchar("customer_phone"),
+  customerEmail: varchar("customer_email"),
+  paymentMethod: varchar("payment_method", { enum: ["mpesa", "card"] }).default("mpesa"),
   paymentStatus: varchar("payment_status", { enum: ["pending", "completed", "failed"] }).default("pending"),
-  status: varchar("status", { enum: ["active", "completed", "cancelled"] }).default("active"),
+  status: varchar("status", { enum: ["confirmed", "completed", "cancelled"] }).default("confirmed"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

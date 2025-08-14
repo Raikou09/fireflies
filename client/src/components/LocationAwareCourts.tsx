@@ -7,6 +7,7 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { MapPin, Navigation, Clock, Star } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
+import { BookingModal } from './BookingModal';
 import type { CourtWithDetails } from '@shared/schema';
 
 interface LocationAwareCourtsProps {
@@ -26,6 +27,8 @@ export function LocationAwareCourts({ city, sport, searchQuery }: LocationAwareC
   const [maxDistance, setMaxDistance] = useState([10]);
   const [sortByDistance, setSortByDistance] = useState(false);
   const [useLocationFilter, setUseLocationFilter] = useState(false);
+  const [selectedCourt, setSelectedCourt] = useState<CourtWithDetails | null>(null);
+  const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
 
   // Request user location
   const requestLocation = () => {
@@ -238,7 +241,13 @@ export function LocationAwareCourts({ city, sport, searchQuery }: LocationAwareC
                     </div>
                   </div>
 
-                  <Button data-testid={`button-book-court-${court.id}`}>
+                  <Button 
+                    onClick={() => {
+                      setSelectedCourt(court);
+                      setIsBookingModalOpen(true);
+                    }}
+                    data-testid={`button-book-court-${court.id}`}
+                  >
                     Book Now
                   </Button>
                 </div>
@@ -272,6 +281,18 @@ export function LocationAwareCourts({ city, sport, searchQuery }: LocationAwareC
           </div>
         )}
       </div>
+
+      {/* Booking Modal */}
+      {selectedCourt && (
+        <BookingModal
+          court={selectedCourt}
+          isOpen={isBookingModalOpen}
+          onClose={() => {
+            setIsBookingModalOpen(false);
+            setSelectedCourt(null);
+          }}
+        />
+      )}
     </div>
   );
 }

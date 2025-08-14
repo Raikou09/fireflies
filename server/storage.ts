@@ -46,9 +46,10 @@ export interface IStorage {
   deleteEquipment(id: string): Promise<boolean>;
 
   // Booking operations
-  createBooking(customerId: string, booking: InsertBooking): Promise<Booking>;
+  createBooking(booking: InsertBooking): Promise<Booking>;
   getBookingsByCustomer(customerId: string): Promise<BookingWithDetails[]>;
   getBookingsByVendor(vendorId: string): Promise<BookingWithDetails[]>;
+  getBookingsByCourtAndDate(courtId: string, date: string): Promise<Booking[]>;
   getBookingById(id: string): Promise<BookingWithDetails | undefined>;
   updateBookingStatus(id: string, status: string): Promise<Booking | undefined>;
 
@@ -342,10 +343,10 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Booking operations
-  async createBooking(customerId: string, booking: InsertBooking): Promise<Booking> {
+  async createBooking(booking: InsertBooking): Promise<Booking> {
     const [newBooking] = await db
       .insert(bookings)
-      .values({ ...booking, customerId })
+      .values(booking)
       .returning();
     return newBooking;
   }
@@ -380,6 +381,23 @@ export class DatabaseStorage implements IStorage {
       court: row.courts!,
       customer: row.users!,
     }));
+  }
+
+  async getBookingsByCourtAndDate(courtId: string, date: string): Promise<Booking[]> {
+    const bookingDate = new Date(date);
+    const nextDay = new Date(bookingDate);
+    nextDay.setDate(nextDay.getDate() + 1);
+    
+    return await db
+      .select()
+      .from(bookings)
+      .where(
+        and(
+          eq(bookings.courtId, courtId),
+          gte(bookings.bookingDate, bookingDate),
+          lte(bookings.bookingDate, nextDay)
+        )
+      );
   }
 
   async getBookingById(id: string): Promise<BookingWithDetails | undefined> {

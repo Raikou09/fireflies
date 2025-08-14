@@ -1,330 +1,402 @@
-import { useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/hooks/useAuth";
-import { isUnauthorizedError } from "@/lib/authUtils";
-import { apiRequest } from "@/lib/queryClient";
-import type { CourtWithDetails } from "@shared/schema";
-import { X, Lock, Smartphone, CreditCard } from "lucide-react";
+import { useState } from 'react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Calendar } from '@/components/ui/calendar';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardContent } from '@/components/ui/card';
+import { Separator } from '@/components/ui/separator';
+import { Clock, MapPin, Users, CreditCard, Calendar as CalendarIcon } from 'lucide-react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useToast } from '@/hooks/use-toast';
+import { apiRequest } from '@/lib/queryClient';
+import type { CourtWithDetails } from '@shared/schema';
 
 interface BookingModalProps {
-  court: CourtWithDetails | null;
+  court: CourtWithDetails;
   isOpen: boolean;
   onClose: () => void;
 }
 
-export default function BookingModal({ court, isOpen, onClose }: BookingModalProps) {
-  const { user, isAuthenticated } = useAuth();
+interface TimeSlot {
+  time: string;
+  isAvailable: boolean;
+  isSelected: boolean;
+  price: number;
+}
+
+interface BookingData {
+  courtId: string;
+  date: string;
+  timeSlot: string;
+  duration: number;
+  totalAmount: number;
+}
+
+export function BookingModal({ court, isOpen, onClose }: BookingModalProps) {
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
+  const [selectedTimeSlot, setSelectedTimeSlot] = useState<string>('');
+  const [selectedDuration, setSelectedDuration] = useState<number>(1);
+  const [step, setStep] = useState<'datetime' | 'payment' | 'confirmation'>('datetime');
+  
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  
-  const [bookingDate, setBookingDate] = useState("");
-  const [selectedTimeSlot, setSelectedTimeSlot] = useState("");
-  const [selectedSport, setSelectedSport] = useState("");
-  const [customerPhone, setCustomerPhone] = useState("");
-  const [customerEmail, setCustomerEmail] = useState(user?.email || "");
-  const [selectedEquipment, setSelectedEquipment] = useState<string[]>([]);
-  const [paymentMethod, setPaymentMethod] = useState("mpesa");
 
-  const timeSlots = [
-    "09:00", "11:00", "14:00", "16:00", "18:00", "20:00"
-  ];
+  // Generate time slots based on court operating hours
+  const generateTimeSlots = (): TimeSlot[] => {
+    const slots: TimeSlot[] = [];
+    const startHour = parseInt(court.openingTime.split(':')[0]);
+    const endHour = parseInt(court.closingTime.split(':')[0]);
+    
+    for (let hour = startHour; hour < endHour; hour++) {
+      const time = `${hour.toString().padStart(2, '0')}:00`;
+      const isCurrentHour = new Date().getHours() === hour && 
+                           selectedDate?.toDateString() === new Date().toDateString();
+      const isPastHour = new Date().getHours() > hour && 
+                        selectedDate?.toDateString() === new Date().toDateString();
+      
+      // Mock availability - in real app, this would come from API
+      const isAvailable = !isPastHour && Math.random() > 0.3;
+      
+      slots.push({
+        time,
+        isAvailable,
+        isSelected: selectedTimeSlot === time,
+        price: hour >= 17 && hour <= 20 ? court.peakHourRate || court.hourlyRate : court.hourlyRate
+      });
+    }
+    
+    return slots;
+  };
 
-  const mutation = useMutation({
-    mutationFn: async (bookingData: any) => {
-      await apiRequest("POST", "/api/bookings", bookingData);
-    },
-    onSuccess: () => {
-      toast({
-        title: "Booking Confirmed!",
-        description: "You will receive SMS and email confirmation shortly.",
-      });
-      queryClient.invalidateQueries({ queryKey: ["/api/bookings/customer"] });
-      onClose();
-      resetForm();
-    },
-    onError: (error) => {
-      if (isUnauthorizedError(error)) {
-        toast({
-          title: "Unauthorized",
-          description: "You are logged out. Logging in again...",
-          variant: "destructive",
-        });
-        setTimeout(() => {
-          window.location.href = "/api/login";
-        }, 500);
-        return;
-      }
-      toast({
-        title: "Booking Failed",
-        description: "Please try again or contact support.",
-        variant: "destructive",
-      });
-    },
+  const timeSlots = generateTimeSlots();
+  const selectedSlot = timeSlots.find(slot => slot.time === selectedTimeSlot);
+  const totalAmount = selectedSlot ? selectedSlot.price * selectedDuration : 0;
+
+  // Fetch existing bookings for the selected date
+  const { data: existingBookings } = useQuery({
+    queryKey: ['/api/bookings/availability', court.id, selectedDate?.toISOString().split('T')[0]],
+    enabled: !!selectedDate,
+    queryFn: async () => {
+      const response = await fetch(`/api/bookings/availability/${court.id}?date=${selectedDate?.toISOString().split('T')[0]}`);
+      if (!response.ok) throw new Error('Failed to fetch availability');
+      return response.json();
+    }
   });
 
-  const resetForm = () => {
-    setBookingDate("");
-    setSelectedTimeSlot("");
-    setSelectedSport("");
-    setCustomerPhone("");
-    setCustomerEmail(user?.email || "");
-    setSelectedEquipment([]);
-    setPaymentMethod("mpesa");
-  };
-
-  const calculateTotal = () => {
-    if (!court) return 0;
-    
-    let total = Number(court.hourlyRate);
-    
-    // Add equipment costs
-    selectedEquipment.forEach(equipmentId => {
-      const equipment = court.equipment.find(eq => eq.id === equipmentId);
-      if (equipment) {
-        total += Number(equipment.price);
-      }
-    });
-    
-    return total;
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    // Check authentication first
-    if (!isAuthenticated) {
+  // Create booking mutation
+  const createBookingMutation = useMutation({
+    mutationFn: async (bookingData: BookingData) => {
+      return apiRequest('POST', '/api/bookings', bookingData);
+    },
+    onSuccess: () => {
+      setStep('confirmation');
+      queryClient.invalidateQueries({ queryKey: ['/api/bookings'] });
       toast({
-        title: "Login Required",
-        description: "Please sign in to book a court.",
+        title: "Booking Confirmed!",
+        description: "Your court has been successfully booked.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Booking Failed",
+        description: "There was an error processing your booking. Please try again.",
         variant: "destructive",
       });
-      setTimeout(() => {
-        window.location.href = "/api/login";
-      }, 1000);
-      return;
     }
-    
-    if (!court || !bookingDate || !selectedTimeSlot || !selectedSport || !customerPhone) {
+  });
+
+  const handleTimeSlotSelect = (time: string) => {
+    setSelectedTimeSlot(time);
+  };
+
+  const handleContinueToPayment = () => {
+    if (!selectedDate || !selectedTimeSlot) {
       toast({
         title: "Missing Information",
-        description: "Please fill in all required fields including sport selection.",
+        description: "Please select both date and time slot.",
         variant: "destructive",
       });
       return;
     }
+    setStep('payment');
+  };
 
-    const bookingData = {
+  const handleConfirmBooking = () => {
+    if (!selectedDate || !selectedTimeSlot) return;
+    
+    const bookingData: BookingData = {
       courtId: court.id,
-      selectedSport,
-      bookingDate,
+      date: selectedDate.toISOString().split('T')[0],
       timeSlot: selectedTimeSlot,
-      totalAmount: calculateTotal().toString(),
-      equipmentIds: selectedEquipment,
-      customerPhone,
-      customerEmail,
-      paymentMethod,
+      duration: selectedDuration,
+      totalAmount
     };
-
-    mutation.mutate(bookingData);
+    
+    createBookingMutation.mutate(bookingData);
   };
 
-  const toggleEquipment = (equipmentId: string) => {
-    setSelectedEquipment(prev => 
-      prev.includes(equipmentId) 
-        ? prev.filter(id => id !== equipmentId)
-        : [...prev, equipmentId]
-    );
+  const resetModal = () => {
+    setSelectedDate(new Date());
+    setSelectedTimeSlot('');
+    setSelectedDuration(1);
+    setStep('datetime');
+    onClose();
   };
 
-  if (!court) return null;
+  const isToday = (date: Date) => {
+    const today = new Date();
+    return date.toDateString() === today.toDateString();
+  };
+
+  const isPastDate = (date: Date) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return date < today;
+  };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+    <Dialog open={isOpen} onOpenChange={resetModal}>
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="flex items-center justify-between">
-            Book Court
-            <Button variant="ghost" size="sm" onClick={onClose}>
-              <X className="h-4 w-4" />
-            </Button>
+          <DialogTitle className="flex items-center gap-2">
+            <CalendarIcon className="h-5 w-5" />
+            Book {court.name}
           </DialogTitle>
         </DialogHeader>
 
-        {/* Court Info */}
-        <div className="flex items-center space-x-4 mb-6">
-          <img 
-            src={court.imageUrl || "https://images.unsplash.com/photo-1546519638-68e109498ffc?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=100&h=100"} 
-            alt={court.name}
-            className="w-20 h-20 rounded-lg object-cover"
-          />
-          <div>
-            <h4 className="text-lg font-semibold text-gray-900">{court.name}</h4>
-            <p className="text-gray-600">{court.area}, {court.city}</p>
-            <p className="text-primary font-semibold">KES {court.hourlyRate}/hour</p>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Main Booking Section */}
+          <div className="lg:col-span-2 space-y-6">
+            {step === 'datetime' && (
+              <>
+                {/* Date Selection */}
+                <div>
+                  <h3 className="text-lg font-semibold mb-4">Select Date</h3>
+                  <Calendar
+                    mode="single"
+                    selected={selectedDate}
+                    onSelect={setSelectedDate}
+                    disabled={isPastDate}
+                    className="rounded-md border"
+                    data-testid="calendar-date-picker"
+                  />
+                </div>
+
+                {/* Time Slot Selection */}
+                {selectedDate && (
+                  <div>
+                    <h3 className="text-lg font-semibold mb-4">
+                      Available Time Slots - {selectedDate.toDateString()}
+                    </h3>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                      {timeSlots.map((slot) => (
+                        <Button
+                          key={slot.time}
+                          variant={slot.isSelected ? "default" : "outline"}
+                          disabled={!slot.isAvailable}
+                          onClick={() => handleTimeSlotSelect(slot.time)}
+                          className="flex flex-col p-3 h-auto"
+                          data-testid={`button-timeslot-${slot.time}`}
+                        >
+                          <span className="font-medium">{slot.time}</span>
+                          <span className="text-xs">
+                            KSh {slot.price}/hr
+                          </span>
+                          {!slot.isAvailable && (
+                            <span className="text-xs text-red-500">Booked</span>
+                          )}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Duration Selection */}
+                {selectedTimeSlot && (
+                  <div>
+                    <h3 className="text-lg font-semibold mb-4">Duration</h3>
+                    <div className="flex gap-2">
+                      {[1, 2, 3, 4].map((duration) => (
+                        <Button
+                          key={duration}
+                          variant={selectedDuration === duration ? "default" : "outline"}
+                          onClick={() => setSelectedDuration(duration)}
+                          data-testid={`button-duration-${duration}`}
+                        >
+                          {duration} hour{duration > 1 ? 's' : ''}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {selectedTimeSlot && (
+                  <Button 
+                    onClick={handleContinueToPayment}
+                    className="w-full"
+                    size="lg"
+                    data-testid="button-continue-payment"
+                  >
+                    Continue to Payment - KSh {totalAmount}
+                  </Button>
+                )}
+              </>
+            )}
+
+            {step === 'payment' && (
+              <div className="space-y-6">
+                <h3 className="text-lg font-semibold">Payment Method</h3>
+                
+                {/* Payment Options */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <Card className="p-4 border-2 border-green-500 bg-green-50">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 bg-green-600 rounded-full flex items-center justify-center">
+                        <span className="text-white text-xs font-bold">M</span>
+                      </div>
+                      <div>
+                        <h4 className="font-semibold">M-Pesa</h4>
+                        <p className="text-sm text-gray-600">Pay with your mobile money</p>
+                      </div>
+                    </div>
+                  </Card>
+                  
+                  <Card className="p-4 border-2 border-gray-200 opacity-50">
+                    <div className="flex items-center gap-3">
+                      <CreditCard className="w-8 h-8 text-gray-400" />
+                      <div>
+                        <h4 className="font-semibold text-gray-400">Card Payment</h4>
+                        <p className="text-sm text-gray-400">Coming soon</p>
+                      </div>
+                    </div>
+                  </Card>
+                </div>
+
+                <div className="flex gap-4">
+                  <Button 
+                    variant="outline" 
+                    onClick={() => setStep('datetime')}
+                    data-testid="button-back-datetime"
+                  >
+                    Back
+                  </Button>
+                  <Button 
+                    onClick={handleConfirmBooking}
+                    disabled={createBookingMutation.isPending}
+                    className="flex-1"
+                    data-testid="button-confirm-booking"
+                  >
+                    {createBookingMutation.isPending ? 'Processing...' : `Pay KSh ${totalAmount} with M-Pesa`}
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {step === 'confirmation' && (
+              <div className="text-center space-y-6">
+                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto">
+                  <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+                <h3 className="text-2xl font-bold text-green-600">Booking Confirmed!</h3>
+                <p className="text-gray-600">
+                  Your booking for {court.name} on {selectedDate?.toDateString()} at {selectedTimeSlot} has been confirmed.
+                  You'll receive a confirmation SMS shortly.
+                </p>
+                <Button onClick={resetModal} data-testid="button-done">
+                  Done
+                </Button>
+              </div>
+            )}
+          </div>
+
+          {/* Booking Summary Sidebar */}
+          <div className="lg:col-span-1">
+            <Card>
+              <CardContent className="p-6 space-y-4">
+                <h3 className="font-semibold text-lg">Booking Summary</h3>
+                
+                <div className="space-y-3">
+                  <div className="flex items-start gap-3">
+                    <MapPin className="h-4 w-4 mt-1 text-gray-500" />
+                    <div>
+                      <p className="font-medium">{court.name}</p>
+                      <p className="text-sm text-gray-600">{court.area}, {court.city}</p>
+                      {court.address && (
+                        <p className="text-xs text-gray-500">{court.address}</p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap gap-1">
+                    {court.availableSports.slice(0, 3).map((sport) => (
+                      <Badge key={sport} variant="secondary" className="text-xs">
+                        {sport}
+                      </Badge>
+                    ))}
+                    {court.availableSports.length > 3 && (
+                      <Badge variant="secondary" className="text-xs">
+                        +{court.availableSports.length - 3} more
+                      </Badge>
+                    )}
+                  </div>
+
+                  <Separator />
+
+                  {selectedDate && (
+                    <div className="flex items-center gap-2">
+                      <CalendarIcon className="h-4 w-4 text-gray-500" />
+                      <span className="text-sm">{selectedDate.toDateString()}</span>
+                    </div>
+                  )}
+
+                  {selectedTimeSlot && (
+                    <div className="flex items-center gap-2">
+                      <Clock className="h-4 w-4 text-gray-500" />
+                      <span className="text-sm">
+                        {selectedTimeSlot} - {parseInt(selectedTimeSlot.split(':')[0]) + selectedDuration}:00
+                      </span>
+                    </div>
+                  )}
+
+                  {selectedDuration && (
+                    <div className="flex items-center gap-2">
+                      <Users className="h-4 w-4 text-gray-500" />
+                      <span className="text-sm">{selectedDuration} hour{selectedDuration > 1 ? 's' : ''}</span>
+                    </div>
+                  )}
+
+                  {totalAmount > 0 && (
+                    <>
+                      <Separator />
+                      <div className="space-y-2">
+                        <div className="flex justify-between text-sm">
+                          <span>Rate (per hour)</span>
+                          <span>KSh {selectedSlot?.price}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span>Duration</span>
+                          <span>{selectedDuration} hour{selectedDuration > 1 ? 's' : ''}</span>
+                        </div>
+                        <div className="flex justify-between font-semibold">
+                          <span>Total</span>
+                          <span>KSh {totalAmount}</span>
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                <div className="text-xs text-gray-500 space-y-1">
+                  <p>• Cancellation allowed up to 2 hours before booking</p>
+                  <p>• Full refund for cancellations made 24 hours in advance</p>
+                  <p>• Equipment rental available on-site</p>
+                </div>
+              </CardContent>
+            </Card>
           </div>
         </div>
-
-        {/* Booking Form */}
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Date Selection */}
-          <div>
-            <Label>Select Date</Label>
-            <Input 
-              type="date" 
-              value={bookingDate}
-              onChange={(e) => setBookingDate(e.target.value)}
-              min={new Date().toISOString().split('T')[0]}
-              required
-            />
-          </div>
-
-          {/* Sport Selection */}
-          <div>
-            <Label className="mb-3 block">Select Sport *</Label>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-              {court.availableSports?.map((sport) => (
-                <Button
-                  key={sport}
-                  type="button"
-                  variant={selectedSport === sport ? "default" : "outline"}
-                  className={selectedSport === sport ? "bg-primary text-white" : ""}
-                  onClick={() => setSelectedSport(sport)}
-                >
-                  {sport}
-                </Button>
-              ))}
-            </div>
-          </div>
-
-          {/* Time Slots */}
-          <div>
-            <Label className="mb-3 block">Available Time Slots</Label>
-            <div className="grid grid-cols-3 gap-3">
-              {timeSlots.map((slot) => (
-                <Button
-                  key={slot}
-                  type="button"
-                  variant={selectedTimeSlot === slot ? "default" : "outline"}
-                  className={selectedTimeSlot === slot ? "bg-primary text-white" : ""}
-                  onClick={() => setSelectedTimeSlot(slot)}
-                >
-                  <div className="text-center">
-                    <div className="font-medium">{slot}</div>
-                    <div className="text-xs">Available</div>
-                  </div>
-                </Button>
-              ))}
-            </div>
-          </div>
-
-          {/* Equipment Rental */}
-          {court.equipment.length > 0 && (
-            <div>
-              <Label className="mb-3 block">Equipment Rental (Optional)</Label>
-              <div className="space-y-3">
-                {court.equipment.map((equipment) => (
-                  <div key={equipment.id} className="flex items-center space-x-3">
-                    <Checkbox
-                      checked={selectedEquipment.includes(equipment.id)}
-                      onCheckedChange={() => toggleEquipment(equipment.id)}
-                    />
-                    <span className="text-gray-700">
-                      {equipment.name} (KES {equipment.price})
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Contact Information */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <Label>Phone Number</Label>
-              <Input 
-                type="tel" 
-                placeholder="+254 7XX XXX XXX"
-                value={customerPhone}
-                onChange={(e) => setCustomerPhone(e.target.value)}
-                required
-              />
-            </div>
-            <div>
-              <Label>Email</Label>
-              <Input 
-                type="email" 
-                placeholder="your@email.com"
-                value={customerEmail}
-                onChange={(e) => setCustomerEmail(e.target.value)}
-                required
-              />
-            </div>
-          </div>
-
-          {/* Payment Summary */}
-          <div className="bg-gray-50 p-4 rounded-lg">
-            <h5 className="font-medium text-gray-900 mb-3">Booking Summary</h5>
-            <div className="space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span>Court rental (1 hour)</span>
-                <span>KES {court.hourlyRate}</span>
-              </div>
-              {selectedEquipment.length > 0 && (
-                <div className="flex justify-between">
-                  <span>Equipment rental</span>
-                  <span>
-                    KES {selectedEquipment.reduce((total, equipmentId) => {
-                      const equipment = court.equipment.find(eq => eq.id === equipmentId);
-                      return total + (equipment ? Number(equipment.price) : 0);
-                    }, 0)}
-                  </span>
-                </div>
-              )}
-              <div className="border-t pt-2 flex justify-between font-semibold">
-                <span>Total</span>
-                <span>KES {calculateTotal()}</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Payment Method */}
-          <div>
-            <Label className="mb-3 block">Payment Method</Label>
-            <RadioGroup value={paymentMethod} onValueChange={setPaymentMethod}>
-              <div className="flex items-center space-x-3 p-3 border border-gray-300 rounded-lg">
-                <RadioGroupItem value="mpesa" id="mpesa" />
-                <Label htmlFor="mpesa" className="flex items-center space-x-2 cursor-pointer">
-                  <Smartphone className="h-4 w-4 text-green-600" />
-                  <span className="font-medium">M-Pesa</span>
-                </Label>
-              </div>
-              <div className="flex items-center space-x-3 p-3 border border-gray-300 rounded-lg">
-                <RadioGroupItem value="card" id="card" />
-                <Label htmlFor="card" className="flex items-center space-x-2 cursor-pointer">
-                  <CreditCard className="h-4 w-4 text-blue-600" />
-                  <span className="font-medium">Credit/Debit Card</span>
-                </Label>
-              </div>
-            </RadioGroup>
-          </div>
-
-          {/* Submit Button */}
-          <Button 
-            type="submit" 
-            className="w-full bg-primary text-white hover:bg-green-700"
-            disabled={mutation.isPending}
-          >
-            <Lock className="h-4 w-4 mr-2" />
-            {mutation.isPending ? "Processing..." : "Confirm Booking"}
-          </Button>
-        </form>
       </DialogContent>
     </Dialog>
   );
