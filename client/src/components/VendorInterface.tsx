@@ -9,6 +9,7 @@ import { useAuth } from "@/hooks/useAuth";
 export default function VendorInterface() {
   const { user, isAuthenticated, isLoading } = useAuth();
   const [isAddCourtModalOpen, setIsAddCourtModalOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<"dashboard" | "bookings" | "analytics">("dashboard");
 
   const { data: stats } = useQuery<{
     totalCourts: number;
@@ -156,11 +157,21 @@ export default function VendorInterface() {
                   <Plus className="h-6 w-6 mr-3" />
                   <span className="font-medium">Add New Court</span>
                 </Button>
-                <Button variant="outline" className="h-16">
+                <Button 
+                  variant="outline" 
+                  className="h-16"
+                  onClick={() => setActiveTab("bookings")}
+                  data-testid="button-view-bookings"
+                >
                   <Calendar className="h-6 w-6 mr-3" />
                   <span className="font-medium">View Bookings</span>
                 </Button>
-                <Button variant="outline" className="h-16">
+                <Button 
+                  variant="outline" 
+                  className="h-16"
+                  onClick={() => setActiveTab("analytics")}
+                  data-testid="button-analytics"
+                >
                   <BarChart3 className="h-6 w-6 mr-3" />
                   <span className="font-medium">Analytics</span>
                 </Button>
@@ -168,20 +179,51 @@ export default function VendorInterface() {
             </CardContent>
           </Card>
 
-          {/* Courts Management */}
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle>Your Courts</CardTitle>
-                <Button 
-                  className="bg-primary text-white hover:bg-green-700"
-                  onClick={() => setIsAddCourtModalOpen(true)}
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Court
-                </Button>
-              </div>
-            </CardHeader>
+          {/* Tab Navigation */}
+          <div className="flex space-x-4 mb-6">
+            <Button
+              variant={activeTab === "dashboard" ? "default" : "outline"}
+              onClick={() => setActiveTab("dashboard")}
+              className={activeTab === "dashboard" ? "bg-primary" : ""}
+              data-testid="tab-dashboard"
+            >
+              Dashboard
+            </Button>
+            <Button
+              variant={activeTab === "bookings" ? "default" : "outline"}
+              onClick={() => setActiveTab("bookings")}
+              className={activeTab === "bookings" ? "bg-primary" : ""}
+              data-testid="tab-bookings"
+            >
+              Bookings
+            </Button>
+            <Button
+              variant={activeTab === "analytics" ? "default" : "outline"}
+              onClick={() => setActiveTab("analytics")}
+              className={activeTab === "analytics" ? "bg-primary" : ""}
+              data-testid="tab-analytics"
+            >
+              Analytics
+            </Button>
+          </div>
+
+          {/* Dashboard Tab Content */}
+          {activeTab === "dashboard" && (
+            <>
+              {/* Courts Management */}
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <CardTitle>Your Courts</CardTitle>
+                    <Button 
+                      className="bg-primary text-white hover:bg-green-700"
+                      onClick={() => setIsAddCourtModalOpen(true)}
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Court
+                    </Button>
+                  </div>
+                </CardHeader>
             <CardContent>
               {courts.length === 0 ? (
                 <div className="text-center py-12">
@@ -241,7 +283,45 @@ export default function VendorInterface() {
                 </div>
               )}
             </CardContent>
-          </Card>
+              </Card>
+            </>
+          )}
+
+          {/* Bookings Tab Content */}
+          {activeTab === "bookings" && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Your Court Bookings</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-center py-12">
+                  <Calendar className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+                  <p className="text-gray-500 text-lg mb-4">No bookings yet</p>
+                  <p className="text-gray-400 text-sm">
+                    Bookings for your courts will appear here once customers start making reservations.
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Analytics Tab Content */}
+          {activeTab === "analytics" && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Analytics & Performance</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-center py-12">
+                  <BarChart3 className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+                  <p className="text-gray-500 text-lg mb-4">Analytics coming soon</p>
+                  <p className="text-gray-400 text-sm">
+                    Detailed analytics about your court performance, revenue, and customer insights will be available here.
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
       </section>
 
