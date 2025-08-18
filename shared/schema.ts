@@ -69,8 +69,15 @@ export const equipment = pgTable("equipment", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   courtId: varchar("court_id").notNull().references(() => courts.id),
   name: varchar("name").notNull(),
-  price: decimal("price", { precision: 10, scale: 2 }).notNull(),
+  description: text("description"),
+  category: varchar("category").notNull(), // e.g., "balls", "rackets", "protective_gear", "accessories"
+  pricePerHour: decimal("price_per_hour", { precision: 10, scale: 2 }).notNull(),
+  pricePerDay: decimal("price_per_day", { precision: 10, scale: 2 }),
+  quantityAvailable: integer("quantity_available").notNull().default(1),
   isAvailable: boolean("is_available").default(true),
+  imageUrl: varchar("image_url"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 export const bookings = pgTable("bookings", {
@@ -82,8 +89,10 @@ export const bookings = pgTable("bookings", {
   startTime: varchar("start_time").notNull(), // e.g., "14:00"
   endTime: varchar("end_time").notNull(), // e.g., "16:00"
   duration: integer("duration").default(1), // hours
+  courtAmount: decimal("court_amount", { precision: 10, scale: 2 }).notNull(),
+  equipmentAmount: decimal("equipment_amount", { precision: 10, scale: 2 }).default("0.00"),
   totalAmount: decimal("total_amount", { precision: 10, scale: 2 }).notNull(),
-  equipmentIds: text("equipment_ids").array(),
+  equipmentRentals: jsonb("equipment_rentals"), // Array of {equipmentId, quantity, duration, price}
   customerPhone: varchar("customer_phone"),
   customerEmail: varchar("customer_email"),
   paymentMethod: varchar("payment_method", { enum: ["mpesa", "card"] }).default("mpesa"),
@@ -223,6 +232,8 @@ export const insertCourtSchema = createInsertSchema(courts).omit({
 
 export const insertEquipmentSchema = createInsertSchema(equipment).omit({
   id: true,
+  createdAt: true,
+  updatedAt: true,
 });
 
 export const insertBookingSchema = createInsertSchema(bookings).omit({

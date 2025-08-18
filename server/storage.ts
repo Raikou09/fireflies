@@ -48,13 +48,16 @@ export interface IStorage {
   getCourtsByVendor(vendorId: string): Promise<CourtWithDetails[]>;
   createCourt(vendorId: string, court: InsertCourt): Promise<Court>;
   updateCourt(id: string, vendorId: string, court: Partial<InsertCourt>): Promise<Court | undefined>;
+  updateCourtDetails(id: string, vendorId: string, updates: Partial<InsertCourt>): Promise<Court | undefined>;
   deleteCourt(id: string, vendorId: string): Promise<boolean>;
 
   // Equipment operations
   getEquipmentByCourt(courtId: string): Promise<Equipment[]>;
+  getAvailableEquipmentByCourt(courtId: string): Promise<Equipment[]>;
   createEquipment(equipment: InsertEquipment): Promise<Equipment>;
   updateEquipment(id: string, equipment: Partial<InsertEquipment>): Promise<Equipment | undefined>;
   deleteEquipment(id: string): Promise<boolean>;
+  checkEquipmentAvailability(equipmentId: string, quantity: number, startTime: Date, endTime: Date): Promise<boolean>;
 
   // Booking operations
   createBooking(booking: InsertBooking): Promise<Booking>;
@@ -330,6 +333,21 @@ export class DatabaseStorage implements IStorage {
     return updatedCourt;
   }
 
+  async updateCourtDetails(id: string, vendorId: string, updates: Partial<InsertCourt>): Promise<Court | undefined> {
+    // When vendors update court details, it needs re-approval
+    const [updatedCourt] = await db
+      .update(courts)
+      .set({ 
+        ...updates, 
+        approvalStatus: "pending",
+        adminNotes: "Court details updated by vendor - pending re-approval",
+        updatedAt: new Date() 
+      })
+      .where(and(eq(courts.id, id), eq(courts.vendorId, vendorId)))
+      .returning();
+    return updatedCourt;
+  }
+
   async deleteCourt(id: string, vendorId: string): Promise<boolean> {
     const result = await db
       .delete(courts)
@@ -342,13 +360,26 @@ export class DatabaseStorage implements IStorage {
     return await db
       .select()
       .from(equipment)
-      .where(eq(equipment.courtId, courtId));
+      .where(eq(equipment.courtId, courtId))
+      .orderBy(equipment.category, equipment.name);
+  }
+
+  async getAvailableEquipmentByCourt(courtId: string): Promise<Equipment[]> {
+    return await db
+      .select()
+      .from(equipment)
+      .where(and(eq(equipment.courtId, courtId), eq(equipment.isAvailable, true)))
+      .orderBy(equipment.category, equipment.name);
   }
 
   async createEquipment(equipmentData: InsertEquipment): Promise<Equipment> {
     const [newEquipment] = await db
       .insert(equipment)
-      .values(equipmentData)
+      .values({
+        ...equipmentData,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      })
       .returning();
     return newEquipment;
   }
@@ -356,7 +387,7 @@ export class DatabaseStorage implements IStorage {
   async updateEquipment(id: string, equipmentData: Partial<InsertEquipment>): Promise<Equipment | undefined> {
     const [updatedEquipment] = await db
       .update(equipment)
-      .set(equipmentData)
+      .set({ ...equipmentData, updatedAt: new Date() })
       .where(eq(equipment.id, id))
       .returning();
     return updatedEquipment;
@@ -367,6 +398,22 @@ export class DatabaseStorage implements IStorage {
       .delete(equipment)
       .where(eq(equipment.id, id));
     return (result.rowCount || 0) > 0;
+  }
+
+  async checkEquipmentAvailability(equipmentId: string, quantity: number, startTime: Date, endTime: Date): Promise<boolean> {
+    // Get equipment info
+    const [equipmentInfo] = await db.select().from(equipment).where(eq(equipment.id, equipmentId));
+    if (!equipmentInfo || !equipmentInfo.isAvailable) {
+      return false;
+    }
+
+    // Check if requested quantity is available
+    if (quantity > (equipmentInfo.quantityAvailable || 1)) {
+      return false;
+    }
+
+    // For now, return true - will implement detailed availability checking later
+    return true;
   }
 
   // Booking operations

@@ -289,6 +289,136 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Equipment rental routes
+  app.get("/api/courts/:id/equipment/available", async (req, res) => {
+    try {
+      const equipment = await storage.getAvailableEquipmentByCourt(req.params.id);
+      res.json(equipment);
+    } catch (error) {
+      console.error("Error fetching available equipment:", error);
+      res.status(500).json({ message: "Failed to fetch available equipment" });
+    }
+  });
+
+  app.post("/api/equipment", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+
+      // Verify user owns the court
+      const court = await storage.getCourtById(req.body.courtId);
+      if (!court || court.vendorId !== userId) {
+        return res.status(403).json({ message: "Access denied. You can only add equipment to your own courts." });
+      }
+
+      const equipment = await storage.createEquipment(req.body);
+      res.status(201).json(equipment);
+    } catch (error) {
+      console.error("Error creating equipment:", error);
+      res.status(500).json({ message: "Failed to create equipment" });
+    }
+  });
+
+  app.put("/api/equipment/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+
+      // Get equipment and verify ownership through court
+      const equipmentList = await storage.getEquipmentByCourt(req.body.courtId || "");
+      const existingEquipment = equipmentList.find(e => e.id === req.params.id);
+      
+      if (!existingEquipment) {
+        return res.status(404).json({ message: "Equipment not found" });
+      }
+
+      const court = await storage.getCourtById(existingEquipment.courtId);
+      if (!court || court.vendorId !== userId) {
+        return res.status(403).json({ message: "Access denied. You can only update your own equipment." });
+      }
+
+      const updatedEquipment = await storage.updateEquipment(req.params.id, req.body);
+      res.json(updatedEquipment);
+    } catch (error) {
+      console.error("Error updating equipment:", error);
+      res.status(500).json({ message: "Failed to update equipment" });
+    }
+  });
+
+  app.delete("/api/equipment/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+
+      // We need to get all equipment and find the one to verify ownership
+      const allCourts = await storage.getCourtsByVendor(userId);
+      let equipmentToDelete: any = null;
+      
+      for (const court of allCourts) {
+        const courtEquipment = await storage.getEquipmentByCourt(court.id);
+        equipmentToDelete = courtEquipment.find(e => e.id === req.params.id);
+        if (equipmentToDelete) break;
+      }
+
+      if (!equipmentToDelete) {
+        return res.status(404).json({ message: "Equipment not found or access denied" });
+      }
+
+      const deleted = await storage.deleteEquipment(req.params.id);
+      if (deleted) {
+        res.json({ success: true });
+      } else {
+        res.status(404).json({ message: "Equipment not found" });
+      }
+    } catch (error) {
+      console.error("Error deleting equipment:", error);
+      res.status(500).json({ message: "Failed to delete equipment" });
+    }
+  });
+
+  // Vendor court update routes (requires re-approval)
+  app.put("/api/vendor/courts/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+
+      const user = await storage.getUser(userId);
+      if (!user || user.userType !== "vendor") {
+        return res.status(403).json({ message: "Access denied. Vendor account required." });
+      }
+
+      const updatedCourt = await storage.updateCourtDetails(req.params.id, userId, req.body);
+      if (!updatedCourt) {
+        return res.status(404).json({ message: "Court not found or access denied" });
+      }
+
+      // Notify admin about court update requiring approval
+      await storage.createNotification({
+        userId: "admin", // This should be actual admin user ID
+        type: "court_update_pending",
+        title: "Court Update Pending Approval",
+        message: `Vendor has updated court details for "${updatedCourt.name}". Approval required.`,
+        data: { courtId: updatedCourt.id, vendorId: userId }
+      });
+
+      res.json({ 
+        ...updatedCourt, 
+        message: "Court details updated successfully. Your changes are pending admin approval." 
+      });
+    } catch (error) {
+      console.error("Error updating court:", error);
+      res.status(500).json({ message: "Failed to update court" });
+    }
+  });
+
   app.post("/api/reviews/:reviewId/helpful", isAuthenticated, async (req, res) => {
     try {
       const { increment } = req.body;

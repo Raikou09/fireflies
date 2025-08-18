@@ -24,11 +24,16 @@ import {
   MapPin,
   LogOut,
   AlertCircle,
-  ArrowLeft
+  ArrowLeft,
+  Package,
+  Edit
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
+import EquipmentManager from "@/components/EquipmentManager";
+import VendorCourtUpdateModal from "@/components/VendorCourtUpdateModal";
+import type { CourtWithDetails } from "@shared/schema";
 
 interface VendorStats {
   totalCourts: number;
@@ -66,6 +71,8 @@ export default function VendorDashboard() {
   const { toast } = useToast();
   const [isVendor, setIsVendor] = useState(false);
   const [vendorCheckLoading, setVendorCheckLoading] = useState(true);
+  const [selectedCourtForEquipment, setSelectedCourtForEquipment] = useState<string | null>(null);
+  const [courtToUpdate, setCourtToUpdate] = useState<CourtWithDetails | null>(null);
 
   // Check if current user is a vendor
   useEffect(() => {
@@ -277,8 +284,10 @@ export default function VendorDashboard() {
 
         {/* Detailed Analytics */}
         <Tabs defaultValue="courts" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-6">
             <TabsTrigger value="courts">Court Analytics</TabsTrigger>
+            <TabsTrigger value="manage">Manage Courts</TabsTrigger>
+            <TabsTrigger value="equipment">Equipment</TabsTrigger>
             <TabsTrigger value="cities">City Performance</TabsTrigger>
             <TabsTrigger value="bookings">View Bookings</TabsTrigger>
             <TabsTrigger value="overview">Business Overview</TabsTrigger>
@@ -349,10 +358,197 @@ export default function VendorDashboard() {
                         </div>
                       </div>
                     </div>
+                    
+                    {/* Court Management Actions */}
+                    <div className="flex gap-2 pt-4 border-t">
+                      <Button
+                        onClick={() => setSelectedCourtForEquipment(court.courtId)}
+                        variant="outline"
+                        size="sm"
+                        className="flex items-center gap-2"
+                        data-testid={`manage-equipment-${court.courtId}`}
+                      >
+                        <Package className="h-4 w-4" />
+                        Manage Equipment
+                      </Button>
+                      <Button
+                        onClick={() => {
+                          const courtDetails = vendorCourts.find((c: any) => c.id === court.courtId);
+                          setCourtToUpdate(courtDetails);
+                        }}
+                        variant="outline"
+                        size="sm"
+                        className="flex items-center gap-2"
+                        data-testid={`update-court-${court.courtId}`}
+                      >
+                        <Edit className="h-4 w-4" />
+                        Update Court
+                      </Button>
+                    </div>
                   </CardContent>
                 </Card>
               ))}
             </div>
+          </TabsContent>
+
+          {/* Manage Courts Tab */}
+          <TabsContent value="manage" className="space-y-6">
+            <div className="grid gap-6">
+              {vendorCourts.map((court: any) => (
+                <Card key={court.id}>
+                  <CardHeader>
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <CardTitle className="text-xl">{court.name}</CardTitle>
+                        <p className="text-gray-600 flex items-center mt-1">
+                          <MapPin className="h-4 w-4 mr-1" />
+                          {court.area}, {court.city}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge 
+                          className={
+                            court.approvalStatus === "approved" 
+                              ? "bg-green-100 text-green-800" 
+                              : court.approvalStatus === "pending"
+                              ? "bg-yellow-100 text-yellow-800"
+                              : "bg-red-100 text-red-800"
+                          }
+                        >
+                          {court.approvalStatus.charAt(0).toUpperCase() + court.approvalStatus.slice(1)}
+                        </Badge>
+                        <Badge className={court.isActive ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800"}>
+                          {court.isActive ? "Active" : "Inactive"}
+                        </Badge>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                      <div className="text-sm">
+                        <span className="font-medium text-gray-600">Hourly Rate:</span>
+                        <p className="text-lg font-semibold text-primary">KES {court.hourlyRate}</p>
+                      </div>
+                      <div className="text-sm">
+                        <span className="font-medium text-gray-600">Opening Hours:</span>
+                        <p>{court.openingTime} - {court.closingTime}</p>
+                      </div>
+                      <div className="text-sm">
+                        <span className="font-medium text-gray-600">Sports:</span>
+                        <p>{court.availableSports?.join(", ") || "Not specified"}</p>
+                      </div>
+                    </div>
+                    
+                    {court.approvalStatus === "pending" && (
+                      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
+                        <p className="text-sm text-yellow-800">
+                          <Clock className="h-4 w-4 inline mr-1" />
+                          Court updates are pending admin approval. Your current details remain active until approved.
+                        </p>
+                      </div>
+                    )}
+                    
+                    <div className="flex gap-2">
+                      <Button
+                        onClick={() => setCourtToUpdate(court)}
+                        variant="outline"
+                        size="sm"
+                        className="flex items-center gap-2"
+                        data-testid={`update-court-details-${court.id}`}
+                      >
+                        <Edit className="h-4 w-4" />
+                        Update Details
+                      </Button>
+                      <Button
+                        onClick={() => setSelectedCourtForEquipment(court.id)}
+                        variant="outline"
+                        size="sm"
+                        className="flex items-center gap-2"
+                        data-testid={`manage-court-equipment-${court.id}`}
+                      >
+                        <Package className="h-4 w-4" />
+                        Manage Equipment
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+              
+              {vendorCourts.length === 0 && (
+                <Card>
+                  <CardContent className="text-center py-12">
+                    <Building2 className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">No courts yet</h3>
+                    <p className="text-gray-600 mb-6">
+                      Add your first court to start accepting bookings from customers.
+                    </p>
+                    <Button className="bg-primary hover:bg-green-700">
+                      Add Your First Court
+                    </Button>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          </TabsContent>
+
+          {/* Equipment Management Tab */}
+          <TabsContent value="equipment" className="space-y-6">
+            {selectedCourtForEquipment ? (
+              <div>
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-lg font-semibold">Equipment Management</h3>
+                  <Button
+                    onClick={() => setSelectedCourtForEquipment(null)}
+                    variant="outline"
+                    size="sm"
+                    data-testid="back-to-court-selection"
+                  >
+                    ← Back to Court Selection
+                  </Button>
+                </div>
+                <EquipmentManager
+                  courtId={selectedCourtForEquipment}
+                  courtName={vendorCourts.find((c: any) => c.id === selectedCourtForEquipment)?.name || "Court"}
+                />
+              </div>
+            ) : (
+              <div>
+                <h3 className="text-lg font-semibold mb-6">Select a Court to Manage Equipment</h3>
+                <div className="grid gap-4">
+                  {vendorCourts.map((court: any) => (
+                    <Card key={court.id} className="cursor-pointer hover:shadow-md transition-shadow">
+                      <CardContent 
+                        className="p-4"
+                        onClick={() => setSelectedCourtForEquipment(court.id)}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <h4 className="font-semibold">{court.name}</h4>
+                            <p className="text-sm text-gray-600">{court.area}, {court.city}</p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Package className="h-5 w-5 text-primary" />
+                            <span className="text-sm text-gray-600">Manage Equipment</span>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                  
+                  {vendorCourts.length === 0 && (
+                    <Card>
+                      <CardContent className="text-center py-12">
+                        <Package className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+                        <h3 className="text-lg font-semibold text-gray-900 mb-2">No courts available</h3>
+                        <p className="text-gray-600">
+                          Add courts first to manage equipment for them.
+                        </p>
+                      </CardContent>
+                    </Card>
+                  )}
+                </div>
+              </div>
+            )}
           </TabsContent>
 
           {/* City Analytics Tab */}
@@ -513,6 +709,13 @@ export default function VendorDashboard() {
           </TabsContent>
         </Tabs>
       </div>
+      
+      {/* Modals */}
+      <VendorCourtUpdateModal
+        court={courtToUpdate}
+        isOpen={!!courtToUpdate}
+        onClose={() => setCourtToUpdate(null)}
+      />
     </div>
   );
 }

@@ -24,9 +24,11 @@ import {
   ArrowLeft,
   Heart,
   Share2,
-  MessageSquare
+  MessageSquare,
+  Package
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
+import EquipmentRentalModal from '@/components/EquipmentRentalModal';
 
 interface Court {
   id: string;
@@ -87,6 +89,8 @@ export default function CourtDetails() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [selectedImage, setSelectedImage] = useState(0);
+  const [isEquipmentModalOpen, setIsEquipmentModalOpen] = useState(false);
+  const [selectedEquipment, setSelectedEquipment] = useState<Array<{equipmentId: string, quantity: number, pricePerHour: number, name: string}>>([]);
 
   const courtId = params?.id;
 
@@ -457,6 +461,37 @@ export default function CourtDetails() {
 
                 <Separator />
 
+                {/* Equipment Rental Section */}
+                {court.equipment && court.equipment.length > 0 && (
+                  <div className="space-y-3">
+                    <h4 className="font-semibold text-gray-900 dark:text-gray-100">Available Equipment</h4>
+                    <div className="space-y-2">
+                      {court.equipment.slice(0, 3).map((item) => (
+                        <div key={item.id} className="flex items-center justify-between text-sm">
+                          <span>{item.name}</span>
+                          <span className="text-primary font-medium">
+                            {item.hourlyRate ? `KSh ${item.hourlyRate}/hr` : 'Included'}
+                          </span>
+                        </div>
+                      ))}
+                      {court.equipment.length > 3 && (
+                        <p className="text-xs text-gray-500">+{court.equipment.length - 3} more items</p>
+                      )}
+                    </div>
+                    <Button
+                      variant="outline"
+                      className="w-full"
+                      onClick={() => setIsEquipmentModalOpen(true)}
+                      data-testid="button-rent-equipment"
+                    >
+                      <Package className="mr-2" size={16} />
+                      Rent Equipment
+                    </Button>
+                  </div>
+                )}
+
+                <Separator />
+
                 {/* Booking Buttons */}
                 <div className="space-y-3">
                   <Button 
@@ -507,6 +542,16 @@ export default function CourtDetails() {
           </div>
         </div>
       </div>
+      
+      {/* Equipment Rental Modal */}
+      <EquipmentRentalModal
+        isOpen={isEquipmentModalOpen}
+        onClose={() => setIsEquipmentModalOpen(false)}
+        courtId={courtId}
+        equipmentList={court?.equipment || []}
+        selectedEquipment={selectedEquipment}
+        onEquipmentChange={setSelectedEquipment}
+      />
     </div>
   );
 }
