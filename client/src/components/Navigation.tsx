@@ -85,6 +85,16 @@ export default function Navigation({ userMode, setUserMode }: NavigationProps) {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
+                      <DropdownMenuItem asChild>
+                        <Link href="/profile" data-testid="link-profile">
+                          My Profile
+                        </Link>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem asChild>
+                        <Link href="/booking-history" data-testid="link-booking-history">
+                          Booking History
+                        </Link>
+                      </DropdownMenuItem>
                       {((user as any)?.user_type === "vendor" || (user as any)?.userType === "vendor") && (
                         <DropdownMenuItem asChild>
                           <Link href="/vendor/dashboard">

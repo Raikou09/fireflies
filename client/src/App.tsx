@@ -10,6 +10,8 @@ import Home from "@/pages/Home";
 import Admin from "@/pages/Admin";
 import VendorDashboard from "@/pages/VendorDashboard";
 import CourtDetails from "@/pages/CourtDetails";
+import BookingHistory from "@/pages/BookingHistory";
+import UserProfile from "@/pages/UserProfile";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -24,6 +26,8 @@ function Router() {
       {/* Public Routes - No Authentication Required */}
       <Route path="/" component={Home} />
       <Route path="/court/:id" component={CourtDetails} />
+      <Route path="/booking-history" component={BookingHistory} />
+      <Route path="/profile" component={UserProfile} />
       <Route path="/admin" component={Admin} />
       
       <Route component={NotFound} />

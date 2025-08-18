@@ -215,6 +215,80 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Booking history and user profile routes
+  app.get("/api/customer/bookings", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+
+      const bookings = await storage.getBookingsByCustomer(userId);
+      res.json(bookings);
+    } catch (error) {
+      console.error("Error fetching customer bookings:", error);
+      res.status(500).json({ message: "Failed to fetch booking history" });
+    }
+  });
+
+  app.get("/api/customer/profile", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // Get additional profile data
+      const bookings = await storage.getBookingsByCustomer(userId);
+      const reviews = await storage.getReviewsByCustomer(userId);
+      
+      const profile = {
+        ...user,
+        totalBookings: bookings.length,
+        totalReviews: reviews.length,
+        recentBookings: bookings.slice(0, 5), // Last 5 bookings
+        memberSince: user.createdAt
+      };
+
+      res.json(profile);
+    } catch (error) {
+      console.error("Error fetching customer profile:", error);
+      res.status(500).json({ message: "Failed to fetch profile" });
+    }
+  });
+
+  app.put("/api/customer/profile", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+
+      const { firstName, lastName, profileImageUrl } = req.body;
+      const updateData: any = {};
+      
+      if (firstName !== undefined) updateData.firstName = firstName;
+      if (lastName !== undefined) updateData.lastName = lastName;
+      if (profileImageUrl !== undefined) updateData.profileImageUrl = profileImageUrl;
+
+      // Update the user profile
+      const updatedUser = await storage.updateUserProfile(userId, updateData);
+      if (!updatedUser) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      res.json(updatedUser);
+    } catch (error) {
+      console.error("Error updating customer profile:", error);
+      res.status(500).json({ message: "Failed to update profile" });
+    }
+  });
+
   app.post("/api/reviews/:reviewId/helpful", isAuthenticated, async (req, res) => {
     try {
       const { increment } = req.body;
