@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { 
   Card, 
@@ -76,6 +76,11 @@ export default function VendorDashboard() {
   const [selectedCourtForEquipment, setSelectedCourtForEquipment] = useState<string | null>(null);
   const [courtToUpdate, setCourtToUpdate] = useState<CourtWithDetails | null>(null);
   const [showAddCourtModal, setShowAddCourtModal] = useState(false);
+
+  // Debug courtToUpdate state changes
+  React.useEffect(() => {
+    console.log('courtToUpdate state changed:', courtToUpdate);
+  }, [courtToUpdate]);
 
   // Check if current user is a vendor
   useEffect(() => {
@@ -454,21 +459,24 @@ export default function VendorDashboard() {
                     )}
                     
                     <div className="flex gap-2">
-                      <Button
-                        onClick={() => {
+                      <button
+                        onClick={(e) => {
+                          console.log('BUTTON CLICK EVENT FIRED!');
+                          e.preventDefault();
+                          e.stopPropagation();
                           console.log('Button clicked - Updating court:', court);
                           console.log('Current courtToUpdate state:', courtToUpdate);
+                          console.log('Button event triggered successfully');
                           setCourtToUpdate(court);
                           console.log('Set courtToUpdate to:', court);
+                          window.alert('Button clicked! Check console');
                         }}
-                        variant="outline"
-                        size="sm"
-                        className="flex items-center gap-2"
-                        data-testid={`update-court-details-${court.id}`}
+                        className="inline-flex items-center justify-center whitespace-nowrap rounded-md border border-input bg-background px-3 py-2 text-sm font-medium ring-offset-background transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
+                        type="button"
                       >
-                        <Edit className="h-4 w-4" />
+                        <Edit className="h-4 w-4 mr-2" />
                         Update Details
-                      </Button>
+                      </button>
                       <Button
                         onClick={() => setSelectedCourtForEquipment(court.id)}
                         variant="outline"
@@ -747,7 +755,10 @@ export default function VendorDashboard() {
       <VendorCourtUpdateModal
         court={courtToUpdate}
         isOpen={!!courtToUpdate}
-        onClose={() => setCourtToUpdate(null)}
+        onClose={() => {
+          console.log('Closing modal, setting courtToUpdate to null');
+          setCourtToUpdate(null);
+        }}
       />
       
       <AddCourtModal

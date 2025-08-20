@@ -126,12 +126,18 @@ export default function VendorCourtUpdateModal({ court, isOpen, onClose }: Vendo
     updateCourtMutation.mutate(formData);
   };
 
+  console.log('VendorCourtUpdateModal - Props received:', { 
+    courtExists: !!court, 
+    courtName: court?.name || 'No name',
+    isOpen 
+  });
+  
   if (!court) {
     console.log('VendorCourtUpdateModal - No court data, returning null');
     return null;
   }
 
-  console.log('VendorCourtUpdateModal - Rendering with court:', court.name);
+  console.log('VendorCourtUpdateModal - Rendering modal for:', court.name, 'isOpen:', isOpen);
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
