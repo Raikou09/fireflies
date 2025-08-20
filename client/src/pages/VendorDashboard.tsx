@@ -455,7 +455,10 @@ export default function VendorDashboard() {
                     
                     <div className="flex gap-2">
                       <Button
-                        onClick={() => setCourtToUpdate(court)}
+                        onClick={() => {
+                          console.log('Updating court:', court);
+                          setCourtToUpdate(court);
+                        }}
                         variant="outline"
                         size="sm"
                         className="flex items-center gap-2"

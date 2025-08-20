@@ -36,7 +36,9 @@ export default function VendorCourtUpdateModal({ court, isOpen, onClose }: Vendo
   });
 
   React.useEffect(() => {
+    console.log('VendorCourtUpdateModal - Court data:', court);
     if (court) {
+      console.log('Setting form data:', court);
       setFormData({
         name: court.name,
         description: court.description || "",
@@ -109,10 +111,16 @@ export default function VendorCourtUpdateModal({ court, isOpen, onClose }: Vendo
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    console.log('Submitting form data:', formData);
     updateCourtMutation.mutate(formData);
   };
 
-  if (!court) return null;
+  if (!court) {
+    console.log('VendorCourtUpdateModal - No court data, returning null');
+    return null;
+  }
+
+  console.log('VendorCourtUpdateModal - Rendering with court:', court.name);
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
