@@ -57,14 +57,24 @@ export default function VendorCourtUpdateModal({ court, isOpen, onClose }: Vendo
 
   const updateCourtMutation = useMutation({
     mutationFn: async (data: any) => {
+      console.log('Mutation - Updating court with data:', data, 'Court ID:', court?.id);
       const response = await apiRequest(`/api/vendor/courts/${court?.id}`, "PUT", {
         ...data,
         hourlyRate: parseFloat(data.hourlyRate),
         peakHourRate: data.peakHourRate ? parseFloat(data.peakHourRate) : null,
       });
-      return response.json();
+      console.log('Mutation - API response status:', response.status);
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('Mutation - API error:', errorData);
+        throw new Error(errorData.message || 'Failed to update court');
+      }
+      const result = await response.json();
+      console.log('Mutation - Success result:', result);
+      return result;
     },
     onSuccess: (data) => {
+      console.log('Mutation - Success callback with data:', data);
       queryClient.invalidateQueries({ queryKey: ["/api/vendor/courts"] });
       queryClient.invalidateQueries({ queryKey: [`/api/courts/${court?.id}`] });
       queryClient.invalidateQueries({ queryKey: ["/api/vendor/stats"] });
@@ -74,10 +84,11 @@ export default function VendorCourtUpdateModal({ court, isOpen, onClose }: Vendo
         description: data.message || "Your court details have been updated and are pending admin approval.",
       });
     },
-    onError: () => {
+    onError: (error: any) => {
+      console.error('Mutation - Error callback:', error);
       toast({
         title: "Update Failed",
-        description: "Failed to update court details. Please try again.",
+        description: error.message || "Failed to update court details. Please try again.",
         variant: "destructive",
       });
     },

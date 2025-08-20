@@ -456,8 +456,10 @@ export default function VendorDashboard() {
                     <div className="flex gap-2">
                       <Button
                         onClick={() => {
-                          console.log('Updating court:', court);
+                          console.log('Button clicked - Updating court:', court);
+                          console.log('Current courtToUpdate state:', courtToUpdate);
                           setCourtToUpdate(court);
+                          console.log('Set courtToUpdate to:', court);
                         }}
                         variant="outline"
                         size="sm"

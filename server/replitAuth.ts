@@ -129,29 +129,39 @@ export async function setupAuth(app: Express) {
 }
 
 export const isAuthenticated: RequestHandler = async (req, res, next) => {
+  console.log('Authentication check - isAuthenticated:', req.isAuthenticated());
   const user = req.user as any;
+  console.log('Authentication check - user exists:', !!user);
 
-  if (!req.isAuthenticated() || !user.expires_at) {
+  if (!req.isAuthenticated() || !user?.expires_at) {
+    console.log('Authentication check - FAILED: Not authenticated or no expiry');
     return res.status(401).json({ message: "Unauthorized" });
   }
 
   const now = Math.floor(Date.now() / 1000);
+  console.log('Authentication check - Current time vs expires_at:', now, user.expires_at);
+  
   if (now <= user.expires_at) {
+    console.log('Authentication check - SUCCESS: Token still valid');
     return next();
   }
 
   const refreshToken = user.refresh_token;
   if (!refreshToken) {
+    console.log('Authentication check - FAILED: No refresh token');
     res.status(401).json({ message: "Unauthorized" });
     return;
   }
 
+  console.log('Authentication check - Attempting token refresh');
   try {
     const config = await getOidcConfig();
     const tokenResponse = await client.refreshTokenGrant(config, refreshToken);
     updateUserSession(user, tokenResponse);
+    console.log('Authentication check - SUCCESS: Token refreshed');
     return next();
   } catch (error) {
+    console.log('Authentication check - FAILED: Token refresh failed', error);
     res.status(401).json({ message: "Unauthorized" });
     return;
   }

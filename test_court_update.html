@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Court Update Test</title>
+</head>
+<body>
+    <h1>Court Update Authentication Test</h1>
+    <button onclick="testAuth()">Test Authentication</button>
+    <button onclick="testVendorCourts()">Test Vendor Courts</button>
+    <button onclick="testCourtUpdate()">Test Court Update</button>
+    <div id="result"></div>
+
+    <script>
+        async function testAuth() {
+            try {
+                const response = await fetch('/api/auth/user', {
+                    credentials: 'include'
+                });
+                const result = await response.json();
+                document.getElementById('result').innerHTML = `<pre>Auth Test: ${JSON.stringify(result, null, 2)}</pre>`;
+            } catch (error) {
+                document.getElementById('result').innerHTML = `<pre>Auth Error: ${error.message}</pre>`;
+            }
+        }
+
+        async function testVendorCourts() {
+            try {
+                const response = await fetch('/api/vendor/courts', {
+                    credentials: 'include'
+                });
+                const result = await response.json();
+                document.getElementById('result').innerHTML = `<pre>Vendor Courts: ${JSON.stringify(result, null, 2)}</pre>`;
+            } catch (error) {
+                document.getElementById('result').innerHTML = `<pre>Vendor Courts Error: ${error.message}</pre>`;
+            }
+        }
+
+        async function testCourtUpdate() {
+            try {
+                // First get courts
+                const courtsResponse = await fetch('/api/vendor/courts', {
+                    credentials: 'include'
+                });
+                const courts = await courtsResponse.json();
+                
+                if (courts.length > 0) {
+                    const courtId = courts[0].id;
+                    const updateData = {
+                        name: courts[0].name + " (Updated)",
+                        description: "Test update from browser"
+                    };
+                    
+                    const updateResponse = await fetch(`/api/vendor/courts/${courtId}`, {
+                        method: 'PUT',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        credentials: 'include',
+                        body: JSON.stringify(updateData)
+                    });
+                    
+                    const result = await updateResponse.json();
+                    document.getElementById('result').innerHTML = `<pre>Court Update: ${JSON.stringify(result, null, 2)}</pre>`;
+                } else {
+                    document.getElementById('result').innerHTML = '<pre>No courts found to update</pre>';
+                }
+            } catch (error) {
+                document.getElementById('result').innerHTML = `<pre>Court Update Error: ${error.message}</pre>`;
+            }
+        }
+    </script>
+</body>
+</html>
