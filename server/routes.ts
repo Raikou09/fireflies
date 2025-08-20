@@ -17,6 +17,15 @@ import {
 import { notificationService } from "./notificationService";
 import { z } from "zod";
 
+// Admin middleware to check authentication
+const requireAdminAuth = (req: any, res: any, next: any) => {
+  if ((req.session as any)?.adminAuthenticated) {
+    next();
+  } else {
+    res.status(401).json({ message: "Admin authentication required" });
+  }
+};
+
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
   await setupAuth(app);
@@ -25,7 +34,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Auth routes
   app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user?.claims?.sub || req.user?.id;
       const user = await storage.getUser(userId);
       res.json(user);
     } catch (error) {
@@ -146,10 +155,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // In production, you would get userId from authenticated session
       const booking = await storage.createBooking({
         courtId,
-        customerId: "guest-user", // Temporary until auth is implemented
         bookingDate: new Date(date),
         startTime: timeSlot,
         endTime: `${parseInt(timeSlot.split(':')[0]) + duration}:00`,
+        courtAmount: totalAmount.toString(),
         totalAmount: totalAmount.toString(),
         status: "confirmed",
       });
@@ -164,7 +173,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Review routes
   app.post("/api/reviews", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user?.claims?.sub;
+      const userId = req.user?.claims?.sub || req.user?.id;
       if (!userId) {
         return res.status(401).json({ message: "Authentication required" });
       }
@@ -576,7 +585,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Booking routes
   app.post("/api/bookings", isAuthenticated, async (req: any, res) => {
     try {
-      const customerId = req.user.claims.sub;
+      const customerId = req.user?.claims?.sub || req.user?.id;
       const bookingData = insertBookingSchema.parse(req.body);
       const booking = await storage.createBooking({ ...bookingData, customerId });
       
@@ -594,7 +603,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/bookings/customer", isAuthenticated, async (req: any, res) => {
     try {
-      const customerId = req.user.claims.sub;
+      const customerId = req.user?.claims?.sub || req.user?.id;
       const bookings = await storage.getBookingsByCustomer(customerId);
       res.json(bookings);
     } catch (error) {
@@ -605,7 +614,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/bookings/vendor", isAuthenticated, async (req: any, res) => {
     try {
-      const vendorId = req.user.claims.sub;
+      const vendorId = req.user?.claims?.sub || req.user?.id;
       const bookings = await storage.getBookingsByVendor(vendorId);
       res.json(bookings);
     } catch (error) {
@@ -648,6 +657,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Simple admin credentials check (you can enhance this with proper hashing)
       if (username === "admin" && password === "admin123") {
+        // Set admin session
+        (req.session as any).adminAuthenticated = true;
+        (req.session as any).adminId = "admin";
         res.json({ success: true, message: "Admin authenticated" });
       } else {
         res.status(401).json({ message: "Invalid credentials" });
@@ -658,10 +670,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Admin routes
+  // Admin authentication check
+  app.get("/api/admin/auth", (req: any, res) => {
+    if ((req.session as any)?.adminAuthenticated) {
+      res.json({ authenticated: true, adminId: (req.session as any).adminId });
+    } else {
+      res.status(401).json({ authenticated: false, message: "Not authenticated" });
+    }
+  });
+
+  // Admin logout
+  app.post("/api/admin/logout", (req: any, res) => {
+    if (req.session) {
+      (req.session as any).adminAuthenticated = false;
+      (req.session as any).adminId = null;
+    }
+    res.json({ success: true, message: "Admin logged out" });
+  });
+
+  // Admin routes (protected with middleware)
   
   // Get all courts data for admin (with detailed information)
-  app.get("/api/admin/courts/all", async (req: any, res) => {
+  app.get("/api/admin/courts/all", requireAdminAuth, async (req: any, res) => {
     try {
       const courts = await storage.getAllCourtsWithDetails();
       res.json(courts);
@@ -672,7 +702,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Set commission rate for a specific court
-  app.put("/api/admin/courts/:id/commission", async (req: any, res) => {
+  app.put("/api/admin/courts/:id/commission", requireAdminAuth, async (req: any, res) => {
     try {
       const { commissionRate } = req.body;
       if (!commissionRate || isNaN(parseFloat(commissionRate))) {
@@ -690,7 +720,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/admin/pending-courts", async (req: any, res) => {
+  app.get("/api/admin/pending-courts", requireAdminAuth, async (req: any, res) => {
     try {
       const pendingCourts = await storage.getPendingCourts();
       res.json(pendingCourts);
@@ -700,7 +730,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/admin/courts/:id/approve", async (req: any, res) => {
+  app.put("/api/admin/courts/:id/approve", requireAdminAuth, async (req: any, res) => {
     try {
       const { adminNotes } = req.body;
       const court = await storage.approveCourt(req.params.id, adminNotes);
@@ -714,7 +744,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/admin/courts/:id/reject", async (req: any, res) => {
+  app.put("/api/admin/courts/:id/reject", requireAdminAuth, async (req: any, res) => {
     try {
       const { adminNotes } = req.body;
       const court = await storage.rejectCourt(req.params.id, adminNotes);
@@ -864,7 +894,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Vendor analytics - detailed court analytics with Google auth
   app.get("/api/vendor/analytics/courts", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user?.claims?.sub || req.user?.id;
       const user = await storage.getUser(userId);
       
       if (!user || user.userType !== "vendor") {
@@ -882,7 +912,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Vendor analytics - city performance with Google auth
   app.get("/api/vendor/analytics/cities", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user?.claims?.sub || req.user?.id;
       const user = await storage.getUser(userId);
       
       if (!user || user.userType !== "vendor") {
@@ -900,7 +930,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Notification API routes
   app.get("/api/notifications", isAuthenticated, async (req, res) => {
     try {
-      const userId = req.user?.claims?.sub;
+      const userId = req.user?.claims?.sub || req.user?.id;
       if (!userId) {
         return res.status(401).json({ message: "User not authenticated" });
       }
@@ -918,7 +948,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/notifications/count", isAuthenticated, async (req, res) => {
     try {
-      const userId = req.user?.claims?.sub;
+      const userId = req.user?.claims?.sub || req.user?.id;
       if (!userId) {
         return res.status(401).json({ message: "User not authenticated" });
       }
@@ -933,7 +963,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/notifications/:notificationId/read", isAuthenticated, async (req, res) => {
     try {
-      const userId = req.user?.claims?.sub;
+      const userId = req.user?.claims?.sub || req.user?.id;
       if (!userId) {
         return res.status(401).json({ message: "User not authenticated" });
       }
@@ -949,7 +979,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/notifications/mark-all-read", isAuthenticated, async (req, res) => {
     try {
-      const userId = req.user?.claims?.sub;
+      const userId = req.user?.claims?.sub || req.user?.id;
       if (!userId) {
         return res.status(401).json({ message: "User not authenticated" });
       }
@@ -964,7 +994,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete("/api/notifications/:notificationId", isAuthenticated, async (req, res) => {
     try {
-      const userId = req.user?.claims?.sub;
+      const userId = req.user?.claims?.sub || req.user?.id;
       if (!userId) {
         return res.status(401).json({ message: "User not authenticated" });
       }
@@ -981,7 +1011,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Notification preferences routes
   app.get("/api/notification-preferences", isAuthenticated, async (req, res) => {
     try {
-      const userId = req.user?.claims?.sub;
+      const userId = req.user?.claims?.sub || req.user?.id;
       if (!userId) {
         return res.status(401).json({ message: "User not authenticated" });
       }
@@ -1008,7 +1038,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.put("/api/notification-preferences", isAuthenticated, async (req, res) => {
     try {
-      const userId = req.user?.claims?.sub;
+      const userId = req.user?.claims?.sub || req.user?.id;
       if (!userId) {
         return res.status(401).json({ message: "User not authenticated" });
       }
