@@ -12,7 +12,7 @@ import { isUnauthorizedError } from "@/lib/authUtils";
 import { apiRequest } from "@/lib/queryClient";
 import { ObjectUploader } from "./ObjectUploader";
 import type { UploadResult } from "@uppy/core";
-import { CloudUpload, X, Info } from "lucide-react";
+import { CloudUpload, X, Info, Package, Plus, Trash2 } from "lucide-react";
 
 interface AddCourtModalProps {
   isOpen: boolean;
@@ -47,6 +47,16 @@ export default function AddCourtModal({ isOpen, onClose }: AddCourtModalProps) {
     "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"
   ]);
   const [imageUrl, setImageUrl] = useState("");
+  
+  // Equipment setup state
+  const [includeEquipment, setIncludeEquipment] = useState(false);
+  const [equipmentItems, setEquipmentItems] = useState<Array<{
+    name: string;
+    category: string;
+    pricePerHour: string;
+    quantityAvailable: number;
+    description: string;
+  }>>([]);
 
   const mutation = useMutation({
     mutationFn: async (courtData: any) => {
@@ -58,13 +68,21 @@ export default function AddCourtModal({ isOpen, onClose }: AddCourtModalProps) {
       return response.json();
     },
     onSuccess: (court) => {
+      // Create equipment if specified
+      if (includeEquipment && equipmentItems.length > 0) {
+        createEquipmentForCourt(court.id);
+      }
+      
       // If there's an image, update the court with the image
       if (imageUrl) {
         setCourtImage(court.id);
       } else {
+        const hasEquipment = includeEquipment && equipmentItems.length > 0;
         toast({
           title: "Court Created Successfully!",
-          description: "Your court has been submitted for admin approval. Don't forget to add equipment for rental to maximize your earnings!",
+          description: hasEquipment 
+            ? "Your court and equipment have been submitted for admin approval!" 
+            : "Your court has been submitted for admin approval. Add equipment later to boost revenue!",
         });
         queryClient.invalidateQueries({ queryKey: ["/api/vendor/courts"] });
         queryClient.invalidateQueries({ queryKey: ["/api/vendor/stats"] });
@@ -97,9 +115,12 @@ export default function AddCourtModal({ isOpen, onClose }: AddCourtModalProps) {
       await apiRequest(`/api/courts/${courtId}/image`, "PUT", { imageURL });
     },
     onSuccess: () => {
+      const hasEquipment = includeEquipment && equipmentItems.length > 0;
       toast({
         title: "Court Created Successfully!",
-        description: "Your court with image has been submitted for approval. Add equipment rental options in the Equipment tab to boost revenue!",
+        description: hasEquipment 
+          ? "Your court with image and equipment have been submitted for approval!" 
+          : "Your court with image has been submitted for approval. Add equipment later to boost revenue!",
       });
       queryClient.invalidateQueries({ queryKey: ["/api/vendor/courts"] });
       queryClient.invalidateQueries({ queryKey: ["/api/vendor/stats"] });
@@ -138,6 +159,8 @@ export default function AddCourtModal({ isOpen, onClose }: AddCourtModalProps) {
     setSelectedSports([]);
     setAvailableDays(["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]);
     setImageUrl("");
+    setIncludeEquipment(false);
+    setEquipmentItems([]);
   };
 
   const handleInputChange = (field: string, value: string) => {
@@ -158,6 +181,50 @@ export default function AddCourtModal({ isOpen, onClose }: AddCourtModalProps) {
         ? prev.filter(s => s !== sport)
         : [...prev, sport]
     );
+  };
+
+  // Equipment management functions
+  const addEquipmentItem = () => {
+    setEquipmentItems(prev => [...prev, {
+      name: "",
+      category: "",
+      pricePerHour: "",
+      quantityAvailable: 1,
+      description: ""
+    }]);
+  };
+
+  const removeEquipmentItem = (index: number) => {
+    setEquipmentItems(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const updateEquipmentItem = (index: number, field: string, value: any) => {
+    setEquipmentItems(prev => prev.map((item, i) => 
+      i === index ? { ...item, [field]: value } : item
+    ));
+  };
+
+  // Create equipment for the court
+  const createEquipmentForCourt = async (courtId: string) => {
+    const validEquipmentItems = equipmentItems.filter(item => 
+      item.name && item.category && item.pricePerHour
+    );
+
+    for (const item of validEquipmentItems) {
+      try {
+        await apiRequest("/api/equipment", "POST", {
+          courtId,
+          name: item.name,
+          category: item.category,
+          pricePerHour: parseFloat(item.pricePerHour),
+          quantityAvailable: item.quantityAvailable,
+          description: item.description,
+          isAvailable: true
+        });
+      } catch (error) {
+        console.error("Error creating equipment:", error);
+      }
+    }
   };
 
   const sportsOptions = [
@@ -389,6 +456,113 @@ export default function AddCourtModal({ isOpen, onClose }: AddCourtModalProps) {
               value={formData.rules}
               onChange={(e) => handleInputChange("rules", e.target.value)}
             />
+          </div>
+
+          {/* Equipment Rental Setup */}
+          <div className="border border-gray-200 rounded-lg p-6 bg-gray-50">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <Package className="h-5 w-5 text-primary" />
+                <Label className="text-base font-semibold">Equipment Rental Setup (Optional)</Label>
+              </div>
+              <Checkbox
+                checked={includeEquipment}
+                onCheckedChange={setIncludeEquipment}
+                id="include-equipment"
+              />
+            </div>
+            
+            <p className="text-sm text-gray-600 mb-4">
+              Boost your revenue by 30-50% by offering equipment rentals. Add items like balls, rackets, and protective gear.
+            </p>
+
+            {includeEquipment && (
+              <div className="space-y-4">
+                {equipmentItems.map((item, index) => (
+                  <div key={index} className="bg-white border border-gray-200 rounded-lg p-4">
+                    <div className="flex justify-between items-start mb-3">
+                      <h4 className="font-medium">Equipment Item {index + 1}</h4>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => removeEquipmentItem(index)}
+                        className="text-red-600 hover:text-red-800"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <Label className="text-sm">Equipment Name</Label>
+                        <Input
+                          placeholder="e.g., Basketball, Tennis Racket"
+                          value={item.name}
+                          onChange={(e) => updateEquipmentItem(index, 'name', e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-sm">Category</Label>
+                        <Select 
+                          value={item.category} 
+                          onValueChange={(value) => updateEquipmentItem(index, 'category', value)}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select category" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="balls">Balls</SelectItem>
+                            <SelectItem value="rackets">Rackets</SelectItem>
+                            <SelectItem value="protective_gear">Protective Gear</SelectItem>
+                            <SelectItem value="nets">Nets</SelectItem>
+                            <SelectItem value="shoes">Shoes</SelectItem>
+                            <SelectItem value="clothing">Clothing</SelectItem>
+                            <SelectItem value="other">Other</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label className="text-sm">Price per Hour (KSh)</Label>
+                        <Input
+                          type="number"
+                          placeholder="50"
+                          value={item.pricePerHour}
+                          onChange={(e) => updateEquipmentItem(index, 'pricePerHour', e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-sm">Quantity Available</Label>
+                        <Input
+                          type="number"
+                          placeholder="5"
+                          value={item.quantityAvailable}
+                          onChange={(e) => updateEquipmentItem(index, 'quantityAvailable', parseInt(e.target.value) || 1)}
+                        />
+                      </div>
+                      <div className="md:col-span-2">
+                        <Label className="text-sm">Description</Label>
+                        <Input
+                          placeholder="Professional quality equipment..."
+                          value={item.description}
+                          onChange={(e) => updateEquipmentItem(index, 'description', e.target.value)}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={addEquipmentItem}
+                  className="w-full flex items-center gap-2"
+                >
+                  <Plus className="h-4 w-4" />
+                  Add Equipment Item
+                </Button>
+              </div>
+            )}
           </div>
 
           {/* Commission Rate Info */}
