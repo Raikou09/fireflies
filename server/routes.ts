@@ -660,6 +660,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Set admin session
         (req.session as any).adminAuthenticated = true;
         (req.session as any).adminId = "admin";
+        
         res.json({ success: true, message: "Admin authenticated" });
       } else {
         res.status(401).json({ message: "Invalid credentials" });
