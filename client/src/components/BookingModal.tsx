@@ -5,11 +5,12 @@ import { Calendar } from '@/components/ui/calendar';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { Clock, MapPin, Users, CreditCard, Calendar as CalendarIcon } from 'lucide-react';
+import { Clock, MapPin, Users, CreditCard, Calendar as CalendarIcon, Package } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest } from '@/lib/queryClient';
 import type { CourtWithDetails } from '@shared/schema';
+import EquipmentRentalModal from './EquipmentRentalModal';
 
 interface BookingModalProps {
   court: CourtWithDetails;
@@ -37,6 +38,8 @@ export function BookingModal({ court, isOpen, onClose }: BookingModalProps) {
   const [selectedTimeSlot, setSelectedTimeSlot] = useState<string>('');
   const [selectedDuration, setSelectedDuration] = useState<number>(1);
   const [step, setStep] = useState<'datetime' | 'payment' | 'confirmation'>('datetime');
+  const [selectedEquipment, setSelectedEquipment] = useState<Array<{equipmentId: string, quantity: number, pricePerHour: number, name: string}>>([]);
+  const [showEquipmentModal, setShowEquipmentModal] = useState(false);
   
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -70,7 +73,12 @@ export function BookingModal({ court, isOpen, onClose }: BookingModalProps) {
 
   const timeSlots = generateTimeSlots();
   const selectedSlot = timeSlots.find(slot => slot.time === selectedTimeSlot);
-  const totalAmount = selectedSlot ? selectedSlot.price * selectedDuration : 0;
+  
+  // Calculate total amount including equipment
+  const courtCost = selectedSlot ? selectedSlot.price * selectedDuration : 0;
+  const equipmentCost = selectedEquipment.reduce((total, item) => 
+    total + (item.pricePerHour * item.quantity * selectedDuration), 0);
+  const totalAmount = courtCost + equipmentCost;
 
   // Fetch existing bookings for the selected date
   const { data: existingBookings } = useQuery({
@@ -139,6 +147,7 @@ export function BookingModal({ court, isOpen, onClose }: BookingModalProps) {
     setSelectedDate(new Date());
     setSelectedTimeSlot('');
     setSelectedDuration(1);
+    setSelectedEquipment([]);
     setStep('datetime');
     onClose();
   };
@@ -231,6 +240,44 @@ export function BookingModal({ court, isOpen, onClose }: BookingModalProps) {
                         </Button>
                       ))}
                     </div>
+                  </div>
+                )}
+
+                {/* Equipment Rental Section */}
+                {selectedTimeSlot && (
+                  <div>
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-lg font-semibold">Equipment Rental</h3>
+                      <Button
+                        onClick={() => setShowEquipmentModal(true)}
+                        variant="outline"
+                        size="sm"
+                        className="flex items-center gap-2"
+                        data-testid="button-select-equipment"
+                      >
+                        <Package className="h-4 w-4" />
+                        {selectedEquipment.length > 0 ? 'Update Equipment' : 'Add Equipment'}
+                      </Button>
+                    </div>
+                    
+                    {selectedEquipment.length > 0 ? (
+                      <div className="bg-gray-50 rounded-lg p-4 space-y-2">
+                        <p className="text-sm font-medium text-gray-700">Selected Equipment:</p>
+                        {selectedEquipment.map((item, index) => (
+                          <div key={index} className="flex justify-between items-center text-sm">
+                            <span>{item.name} x{item.quantity}</span>
+                            <span className="font-medium">KSh {item.pricePerHour * item.quantity * selectedDuration}</span>
+                          </div>
+                        ))}
+                        <Separator className="my-2" />
+                        <div className="flex justify-between items-center text-sm font-medium">
+                          <span>Equipment Total:</span>
+                          <span>KSh {equipmentCost}</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-gray-600">No equipment selected. Click "Add Equipment" to browse available items.</p>
+                    )}
                   </div>
                 )}
 
@@ -383,6 +430,17 @@ export function BookingModal({ court, isOpen, onClose }: BookingModalProps) {
                           <span>Duration</span>
                           <span>{selectedDuration} hour{selectedDuration > 1 ? 's' : ''}</span>
                         </div>
+                        <div className="flex justify-between text-sm">
+                          <span>Court Cost</span>
+                          <span>KSh {courtCost}</span>
+                        </div>
+                        {equipmentCost > 0 && (
+                          <div className="flex justify-between text-sm">
+                            <span>Equipment Cost</span>
+                            <span>KSh {equipmentCost}</span>
+                          </div>
+                        )}
+                        <Separator />
                         <div className="flex justify-between font-semibold">
                           <span>Total</span>
                           <span>KSh {totalAmount}</span>
@@ -395,13 +453,24 @@ export function BookingModal({ court, isOpen, onClose }: BookingModalProps) {
                 <div className="text-xs text-gray-500 space-y-1">
                   <p>• Cancellation allowed up to 2 hours before booking</p>
                   <p>• Full refund for cancellations made 24 hours in advance</p>
-                  <p>• Equipment rental available on-site</p>
+                  <p>• Professional equipment rental available</p>
                 </div>
               </CardContent>
             </Card>
           </div>
         </div>
       </DialogContent>
+      
+      {/* Equipment Rental Modal */}
+      <EquipmentRentalModal
+        isOpen={showEquipmentModal}
+        onClose={() => setShowEquipmentModal(false)}
+        courtId={court.id}
+        onEquipmentSelected={(equipment) => {
+          setSelectedEquipment(equipment);
+          setShowEquipmentModal(false);
+        }}
+      />
     </Dialog>
   );
 }
