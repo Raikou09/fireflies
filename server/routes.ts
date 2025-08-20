@@ -394,7 +394,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Vendor court update routes (requires re-approval)
   app.put("/api/vendor/courts/:id", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user?.claims?.sub;
+      const userId = req.user?.claims?.sub || req.user?.id;
       if (!userId) {
         return res.status(401).json({ message: "Authentication required" });
       }
@@ -457,8 +457,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/vendor/courts", isAuthenticated, async (req: any, res) => {
     try {
-      const vendorId = req.user.claims.sub;
-      const courts = await storage.getCourtsByVendor(vendorId);
+      const userId = req.user?.claims?.sub || req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+
+      const user = await storage.getUser(userId);
+      if (!user || user.userType !== "vendor") {
+        return res.status(403).json({ message: "Access denied. Vendor account required." });
+      }
+
+      const courts = await storage.getCourtsByVendor(userId);
       res.json(courts);
     } catch (error) {
       console.error("Error fetching vendor courts:", error);
@@ -878,7 +887,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Check if current user is vendor
   app.get("/api/vendor/check", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user?.claims?.sub || req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+
       const user = await storage.getUser(userId);
       
       const isVendor = user?.userType === "vendor";
