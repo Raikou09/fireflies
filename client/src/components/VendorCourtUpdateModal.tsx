@@ -55,19 +55,21 @@ export default function VendorCourtUpdateModal({ court, isOpen, onClose }: Vendo
 
   const updateCourtMutation = useMutation({
     mutationFn: async (data: any) => {
-      return apiRequest("PUT", `/api/vendor/courts/${court?.id}`, {
+      const response = await apiRequest(`/api/vendor/courts/${court?.id}`, "PUT", {
         ...data,
         hourlyRate: parseFloat(data.hourlyRate),
         peakHourRate: data.peakHourRate ? parseFloat(data.peakHourRate) : null,
       });
+      return response.json();
     },
-    onSuccess: (response) => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/vendor/courts"] });
       queryClient.invalidateQueries({ queryKey: [`/api/courts/${court?.id}`] });
+      queryClient.invalidateQueries({ queryKey: ["/api/vendor/stats"] });
       onClose();
       toast({
-        title: "Court Updated",
-        description: response.message || "Your court details have been updated and are pending admin approval.",
+        title: "Court Updated Successfully",
+        description: data.message || "Your court details have been updated and are pending admin approval.",
       });
     },
     onError: () => {

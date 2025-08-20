@@ -26,13 +26,15 @@ import {
   AlertCircle,
   ArrowLeft,
   Package,
-  Edit
+  Edit,
+  Clock
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
 import EquipmentManager from "@/components/EquipmentManager";
 import VendorCourtUpdateModal from "@/components/VendorCourtUpdateModal";
+import AddCourtModal from "@/components/AddCourtModal";
 import type { CourtWithDetails } from "@shared/schema";
 
 interface VendorStats {
@@ -73,6 +75,7 @@ export default function VendorDashboard() {
   const [vendorCheckLoading, setVendorCheckLoading] = useState(true);
   const [selectedCourtForEquipment, setSelectedCourtForEquipment] = useState<string | null>(null);
   const [courtToUpdate, setCourtToUpdate] = useState<CourtWithDetails | null>(null);
+  const [showAddCourtModal, setShowAddCourtModal] = useState(false);
 
   // Check if current user is a vendor
   useEffect(() => {
@@ -116,7 +119,7 @@ export default function VendorDashboard() {
   });
 
   // Fetch vendor courts
-  const { data: vendorCourts = [] } = useQuery({
+  const { data: vendorCourts = [] } = useQuery<CourtWithDetails[]>({
     queryKey: ['/api/vendor/courts'],
     enabled: isAuthenticated && isVendor,
   });
@@ -373,8 +376,10 @@ export default function VendorDashboard() {
                       </Button>
                       <Button
                         onClick={() => {
-                          const courtDetails = vendorCourts.find((c: any) => c.id === court.courtId);
-                          setCourtToUpdate(courtDetails);
+                          const courtDetails = vendorCourts.find((c) => c.id === court.courtId);
+                          if (courtDetails) {
+                            setCourtToUpdate(courtDetails);
+                          }
                         }}
                         variant="outline"
                         size="sm"
@@ -738,6 +743,11 @@ export default function VendorDashboard() {
         court={courtToUpdate}
         isOpen={!!courtToUpdate}
         onClose={() => setCourtToUpdate(null)}
+      />
+      
+      <AddCourtModal
+        isOpen={showAddCourtModal}
+        onClose={() => setShowAddCourtModal(false)}
       />
     </div>
   );
