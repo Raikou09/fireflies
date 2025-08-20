@@ -480,9 +480,12 @@ export default function VendorDashboard() {
                     <Building2 className="h-12 w-12 text-gray-300 mx-auto mb-4" />
                     <h3 className="text-lg font-semibold text-gray-900 mb-2">No courts yet</h3>
                     <p className="text-gray-600 mb-6">
-                      Add your first court to start accepting bookings from customers.
+                      Add your first court to start accepting bookings from customers. After creating a court, you can add equipment for rental.
                     </p>
-                    <Button className="bg-primary hover:bg-green-700">
+                    <Button 
+                      onClick={() => setShowAddCourtModal(true)}
+                      className="bg-primary hover:bg-green-700"
+                    >
                       Add Your First Court
                     </Button>
                   </CardContent>
@@ -493,6 +496,26 @@ export default function VendorDashboard() {
 
           {/* Equipment Management Tab */}
           <TabsContent value="equipment" className="space-y-6">
+            {/* Equipment Management Guide */}
+            <Card className="bg-blue-50 border-blue-200">
+              <CardContent className="p-6">
+                <div className="flex items-start gap-4">
+                  <Package className="h-8 w-8 text-blue-600 mt-1" />
+                  <div>
+                    <h3 className="text-lg font-semibold text-blue-900 mb-2">Equipment Rental Opportunities</h3>
+                    <p className="text-blue-800 mb-3">
+                      Boost your revenue by 30-50% by offering equipment rentals! Customers love the convenience of renting balls, rackets, and protective gear directly at your courts.
+                    </p>
+                    <div className="text-sm text-blue-700">
+                      <p>• Set hourly rental rates for maximum profit</p>
+                      <p>• Track inventory and availability automatically</p>
+                      <p>• Equipment costs are added seamlessly to customer bookings</p>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            
             {selectedCourtForEquipment ? (
               <div>
                 <div className="flex items-center justify-between mb-6">
