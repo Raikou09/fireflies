@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Modal Test</title>
+</head>
+<body>
+    <h1>Direct Modal Test</h1>
+    <button onclick="openModal()" style="padding: 10px; background: blue; color: white;">Test Modal Open</button>
+    <div id="modalState">Modal State: closed</div>
+    
+    <script>
+        let modalOpen = false;
+        
+        function openModal() {
+            console.log('Direct button clicked!');
+            modalOpen = !modalOpen;
+            document.getElementById('modalState').textContent = 'Modal State: ' + (modalOpen ? 'open' : 'closed');
+            console.log('Modal state changed to:', modalOpen);
+        }
+        
+        // Test if React is causing issues
+        window.addEventListener('load', function() {
+            console.log('Page loaded, testing modal functionality');
+        });
+    </script>
+</body>
+</html>

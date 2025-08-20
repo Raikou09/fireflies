@@ -433,7 +433,7 @@ export default function VendorDashboard() {
                       </div>
                     </div>
                   </CardHeader>
-                  <CardContent>
+                  <CardContent style={{ position: 'relative', zIndex: 1 }}>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                       <div className="text-sm">
                         <span className="font-medium text-gray-600">Hourly Rate:</span>
@@ -460,25 +460,28 @@ export default function VendorDashboard() {
                     
                     <div className="flex gap-2">
                       <button
-                        onClick={(e) => {
-                          console.log('BUTTON CLICK EVENT FIRED!');
-                          e.preventDefault();
-                          e.stopPropagation();
-                          console.log('Button clicked - Updating court:', court);
-                          console.log('Current courtToUpdate state:', courtToUpdate);
-                          console.log('Button event triggered successfully');
+                        onClick={() => {
+                          alert('BUTTON WORKING!');
+                          console.log('DIRECT CLICK - Court:', court);
                           setCourtToUpdate(court);
-                          console.log('Set courtToUpdate to:', court);
-                          window.alert('Button clicked! Check console');
                         }}
-                        className="inline-flex items-center justify-center whitespace-nowrap rounded-md border border-input bg-background px-3 py-2 text-sm font-medium ring-offset-background transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
-                        type="button"
+                        style={{
+                          padding: '8px 16px',
+                          backgroundColor: '#007bff',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '4px',
+                          cursor: 'pointer',
+                          fontSize: '14px'
+                        }}
                       >
-                        <Edit className="h-4 w-4 mr-2" />
-                        Update Details
+                        🔧 Update Details - FIXED
                       </button>
                       <Button
-                        onClick={() => setSelectedCourtForEquipment(court.id)}
+                        onClick={() => {
+                          alert('Equipment button works!');
+                          setSelectedCourtForEquipment(court.id);
+                        }}
                         variant="outline"
                         size="sm"
                         className="flex items-center gap-2"
@@ -749,6 +752,21 @@ export default function VendorDashboard() {
             </div>
           </TabsContent>
         </Tabs>
+      </div>
+      
+      {/* Debug Info */}
+      <div style={{ 
+        position: 'fixed', 
+        top: '10px', 
+        right: '10px', 
+        backgroundColor: 'yellow', 
+        padding: '5px', 
+        fontSize: '12px',
+        zIndex: 10000 
+      }}>
+        Modal State: {courtToUpdate ? 'OPEN' : 'CLOSED'}
+        <br />
+        Court: {courtToUpdate?.name || 'None'}
       </div>
       
       {/* Modals */}
