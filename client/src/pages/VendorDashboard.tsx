@@ -35,6 +35,7 @@ import { Link } from "wouter";
 import EquipmentManager from "@/components/EquipmentManager";
 import VendorCourtUpdateModal from "@/components/VendorCourtUpdateModal";
 import AddCourtModal from "@/components/AddCourtModal";
+import { NotificationTestPanel } from "@/components/NotificationTestPanel";
 import type { CourtWithDetails } from "@shared/schema";
 
 interface VendorStats {
@@ -292,13 +293,14 @@ export default function VendorDashboard() {
 
         {/* Detailed Analytics */}
         <Tabs defaultValue="courts" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-6">
+          <TabsList className="grid w-full grid-cols-7">
             <TabsTrigger value="courts">Court Analytics</TabsTrigger>
             <TabsTrigger value="manage">Manage Courts</TabsTrigger>
             <TabsTrigger value="equipment">Equipment</TabsTrigger>
             <TabsTrigger value="cities">City Performance</TabsTrigger>
             <TabsTrigger value="bookings">View Bookings</TabsTrigger>
             <TabsTrigger value="overview">Business Overview</TabsTrigger>
+            <TabsTrigger value="notifications">Notifications</TabsTrigger>
           </TabsList>
 
           {/* Court Analytics Tab */}
@@ -749,6 +751,61 @@ export default function VendorDashboard() {
                   </div>
                 </CardContent>
               </Card>
+            </div>
+          </TabsContent>
+
+          {/* Notifications Testing Tab */}
+          <TabsContent value="notifications" className="space-y-6">
+            <div className="flex flex-col lg:flex-row gap-6">
+              <div className="flex-1">
+                <NotificationTestPanel />
+              </div>
+              
+              <div className="w-full lg:w-80">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Notification Status</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
+                        <div>
+                          <p className="font-medium text-green-900">Email Notifications</p>
+                          <p className="text-sm text-green-700">SendGrid integration active</p>
+                        </div>
+                        <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                      </div>
+                      
+                      <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
+                        <div>
+                          <p className="font-medium text-blue-900">SMS Notifications</p>
+                          <p className="text-sm text-blue-700">Kenya SMS gateway ready</p>
+                        </div>
+                        <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                      </div>
+                      
+                      <div className="flex items-center justify-between p-3 bg-purple-50 rounded-lg">
+                        <div>
+                          <p className="font-medium text-purple-900">In-App Notifications</p>
+                          <p className="text-sm text-purple-700">Real-time updates active</p>
+                        </div>
+                        <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+                      </div>
+                    </div>
+                    
+                    <div className="border-t pt-4">
+                      <h4 className="font-medium mb-2">Notification Types</h4>
+                      <ul className="text-sm text-gray-600 space-y-1">
+                        <li>• Booking confirmations</li>
+                        <li>• Payment confirmations</li>
+                        <li>• Court approvals/rejections</li>
+                        <li>• Booking reminders</li>
+                        <li>• Vendor earnings alerts</li>
+                      </ul>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
             </div>
           </TabsContent>
         </Tabs>

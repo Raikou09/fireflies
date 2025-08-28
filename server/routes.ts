@@ -15,6 +15,9 @@ import {
   insertUserNotificationPreferencesSchema,
 } from "@shared/schema";
 import { notificationService } from "./notificationService";
+import { EnhancedNotificationService } from "./enhancedNotificationService";
+import { EmailService } from "./emailService";
+import { SMSService } from "./smsService";
 import { z } from "zod";
 
 // Admin middleware to check authentication
@@ -603,8 +606,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const bookingData = insertBookingSchema.parse(req.body);
       const booking = await storage.createBooking({ ...bookingData, customerId });
       
-      // Here you would integrate with M-Pesa API and send SMS/Email
-      // For now, we'll just return success
+      // Get customer and court details for notifications
+      const customer = await storage.getUser(customerId);
+      const court = await storage.getCourtById(bookingData.courtId);
+      
+      if (customer && court) {
+        // Send comprehensive booking confirmation notifications
+        try {
+          await EnhancedNotificationService.sendBookingConfirmation({
+            bookingId: booking.id,
+            customerId: customer.id,
+            customerEmail: customer.email,
+            customerPhone: customer.phoneNumber || undefined,
+            customerName: `${customer.firstName} ${customer.lastName}`,
+            courtName: court.name,
+            bookingDate: new Date(bookingData.bookingDate).toLocaleDateString('en-KE'),
+            startTime: bookingData.startTime,
+            endTime: bookingData.endTime,
+            totalAmount: bookingData.totalAmount,
+            equipmentRented: bookingData.equipmentIds || []
+          });
+
+          // Send vendor earnings notification
+          const vendor = await storage.getUser(court.vendorId);
+          if (vendor) {
+            const commissionRate = 0.15; // 15% commission
+            const totalAmount = parseFloat(bookingData.totalAmount);
+            const commission = totalAmount * commissionRate;
+            const earnings = totalAmount - commission;
+
+            await EnhancedNotificationService.sendVendorEarningsNotification({
+              vendorId: vendor.id,
+              vendorEmail: vendor.email,
+              vendorName: `${vendor.firstName} ${vendor.lastName}`,
+              courtName: court.name,
+              bookingDate: new Date(bookingData.bookingDate).toLocaleDateString('en-KE'),
+              customerName: `${customer.firstName} ${customer.lastName}`,
+              earnings: earnings.toFixed(2),
+              commission: commission.toFixed(2),
+              bookingId: booking.id
+            });
+          }
+        } catch (notificationError) {
+          console.error('Error sending booking notifications:', notificationError);
+          // Don't fail the booking if notifications fail
+        }
+      }
+      
       res.status(201).json(booking);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -752,6 +800,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!court) {
         return res.status(404).json({ message: "Court not found" });
       }
+
+      // Send court approval notification
+      try {
+        const vendor = await storage.getUser(court.vendorId);
+        if (vendor) {
+          await EnhancedNotificationService.sendCourtApprovalNotification({
+            vendorId: vendor.id,
+            vendorEmail: vendor.email,
+            vendorPhone: vendor.phoneNumber || undefined,
+            vendorName: `${vendor.firstName} ${vendor.lastName}`,
+            courtName: court.name,
+            approved: true
+          });
+        }
+      } catch (notificationError) {
+        console.error('Error sending court approval notification:', notificationError);
+      }
+
       res.json(court);
     } catch (error) {
       console.error("Error approving court:", error);
@@ -766,6 +832,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!court) {
         return res.status(404).json({ message: "Court not found" });
       }
+
+      // Send court rejection notification
+      try {
+        const vendor = await storage.getUser(court.vendorId);
+        if (vendor) {
+          await EnhancedNotificationService.sendCourtApprovalNotification({
+            vendorId: vendor.id,
+            vendorEmail: vendor.email,
+            vendorPhone: vendor.phoneNumber || undefined,
+            vendorName: `${vendor.firstName} ${vendor.lastName}`,
+            courtName: court.name,
+            approved: false,
+            rejectionReason: adminNotes || 'Please review and update your court information.'
+          });
+        }
+      } catch (notificationError) {
+        console.error('Error sending court rejection notification:', notificationError);
+      }
+
       res.json(court);
     } catch (error) {
       console.error("Error rejecting court:", error);
@@ -1069,6 +1154,69 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error updating notification preferences:", error);
       res.status(500).json({ message: "Failed to update notification preferences" });
+    }
+  });
+
+  // Notification testing endpoints
+  app.post("/api/test/notifications", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub || req.user?.id;
+      const user = await storage.getUser(userId);
+      
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const { type } = req.body;
+
+      switch (type) {
+        case 'booking_confirmation':
+          await EnhancedNotificationService.sendBookingConfirmation({
+            bookingId: 'TEST-BOOKING-123',
+            customerId: user.id,
+            customerEmail: user.email,
+            customerPhone: user.phoneNumber || undefined,
+            customerName: `${user.firstName} ${user.lastName}`,
+            courtName: 'Test Basketball Court',
+            bookingDate: new Date().toLocaleDateString('en-KE'),
+            startTime: '10:00 AM',
+            endTime: '11:00 AM',
+            totalAmount: '2500',
+            equipmentRented: ['Basketball', 'Court Shoes']
+          });
+          break;
+
+        case 'email_test':
+          await EmailService.sendEmail({
+            to: user.email,
+            subject: 'SportsBox Kenya - Email Test Successful!',
+            html: `
+              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                <div style="background: #16a34a; color: white; padding: 20px; text-align: center;">
+                  <h1>SportsBox Kenya</h1>
+                  <h2>Email System Working!</h2>
+                </div>
+                <div style="padding: 20px;">
+                  <p>Hello ${user.firstName}!</p>
+                  <p>Your SportsBox Kenya email notifications are working perfectly.</p>
+                </div>
+              </div>
+            `
+          });
+          break;
+
+        default:
+          return res.status(400).json({ message: 'Invalid notification type' });
+      }
+
+      res.json({ 
+        success: true, 
+        message: `Test ${type} notification sent successfully!`,
+        recipient: user.email
+      });
+    } catch (error) {
+      console.error('Error sending test notification:', error);
+      res.status(500).json({ message: 'Failed to send test notification' });
     }
   });
 

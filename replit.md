@@ -4,7 +4,7 @@
 
 SportsBox is a full-stack web application that connects sports court owners (vendors) with customers looking to book sports facilities across Kenya. The platform focuses on major cities like Nairobi, Mombasa, and Kisumu, providing an easy-to-use booking system with secure M-Pesa payment integration and location-based court discovery.
 
-The application features dual interfaces - one for customers to search and book courts with location-aware filtering, and another for vendors to manage their facilities and bookings. Built with modern web technologies, it provides real-time booking management, file uploads for court images, comprehensive analytics for vendors, and geolocation-based court discovery for enhanced user experience.
+The application features dual interfaces - one for customers to search and book courts with location-aware filtering, and another for vendors to manage their facilities and bookings. Built with modern web technologies, it provides real-time booking management, file uploads for court images, comprehensive analytics for vendors, geolocation-based court discovery, and a complete SMS/email notification system for enhanced user experience.
 
 ## User Preferences
 
@@ -71,14 +71,24 @@ Preferred communication style: Simple, everyday language.
   - City-based browsing (Nairobi, Mombasa, Kisumu, Nakuru, Eldoret)
 - **Booking System**: Time slot management with real-time availability
 - **Payment Integration**: M-Pesa payment method integration
+- **Comprehensive Notification System**: Multi-channel SMS and email notifications
+  - SendGrid email integration with professional templates
+  - SMS service for Kenyan phone numbers (+254 format)
+  - Booking confirmations with equipment rental details
+  - Payment confirmations with M-Pesa transaction details
+  - Court approval/rejection notifications for vendors
+  - Booking reminders sent day before appointments
+  - Vendor earnings notifications for new bookings
+  - Notification testing interface for system verification
 - **Vendor Dashboard**: Comprehensive business analytics accessible via Google authentication
   - Revenue tracking per court and city
   - Booking analytics and popular sports insights
   - Recent booking history and customer information  
   - Multi-city performance comparison
+  - Notification testing and system status monitoring
   - Accessible via user dropdown menu for vendor accounts
 - **Admin Panel**: Manual court approval system for quality control and platform management
-- **Real-time Updates**: Live booking status and notifications
+- **Real-time Updates**: Live booking status and multi-channel notifications
 
 ### Development Environment
 - **Development Server**: Vite dev server with HMR (Hot Module Replacement)
