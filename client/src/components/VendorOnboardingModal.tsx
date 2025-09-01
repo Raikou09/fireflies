@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { vendorOnboardingSchema, type VendorOnboarding } from "@shared/schema";
@@ -30,6 +30,8 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Upload, FileText, CheckCircle } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 
 interface VendorOnboardingModalProps {
   isOpen: boolean;
@@ -39,6 +41,8 @@ interface VendorOnboardingModalProps {
 export default function VendorOnboardingModal({ isOpen, onClose }: VendorOnboardingModalProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [uploadingDoc, setUploadingDoc] = useState<string | null>(null);
+  const [uploadedDocs, setUploadedDocs] = useState<{[key: string]: string}>({});
 
   const form = useForm<VendorOnboarding>({
     resolver: zodResolver(vendorOnboardingSchema),
@@ -53,6 +57,9 @@ export default function VendorOnboardingModal({ isOpen, onClose }: VendorOnboard
       bankAccountName: "",
       mpesaNumber: "",
       paymentPreference: "bank",
+      nationalIdDocument: "",
+      bankStatement: "",
+      businessLicense: "",
     },
   });
 
@@ -83,6 +90,124 @@ export default function VendorOnboardingModal({ isOpen, onClose }: VendorOnboard
   });
 
   const paymentPreference = form.watch("paymentPreference");
+
+  // Document upload function
+  const uploadDocument = async (file: File, documentType: string) => {
+    try {
+      setUploadingDoc(documentType);
+      
+      // Get upload URL
+      const uploadResponse = await apiRequest("POST", "/api/objects/upload");
+      if (!uploadResponse.ok) {
+        throw new Error("Failed to get upload URL");
+      }
+      const { uploadURL } = await uploadResponse.json();
+      
+      // Upload file
+      const formData = new FormData();
+      formData.append("file", file);
+      
+      const uploadFileResponse = await fetch(uploadURL, {
+        method: "POST",
+        body: formData,
+      });
+      
+      if (!uploadFileResponse.ok) {
+        throw new Error("Failed to upload file");
+      }
+      
+      const fileUrl = uploadURL.split('?')[0]; // Get the base URL without query params
+      
+      // Update form and state
+      form.setValue(documentType as keyof VendorOnboarding, fileUrl);
+      setUploadedDocs(prev => ({ ...prev, [documentType]: file.name }));
+      
+      toast({
+        title: "Document Uploaded",
+        description: `${file.name} has been uploaded successfully.`,
+      });
+    } catch (error) {
+      toast({
+        title: "Upload Error",
+        description: "Failed to upload document. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setUploadingDoc(null);
+    }
+  };
+
+  const DocumentUpload = ({ 
+    documentType, 
+    label, 
+    required = false,
+    description 
+  }: { 
+    documentType: string; 
+    label: string; 
+    required?: boolean;
+    description: string;
+  }) => {
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    
+    return (
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <FormLabel className="text-sm font-medium">
+            {label} {required && <span className="text-red-500">*</span>}
+          </FormLabel>
+          {uploadedDocs[documentType] && (
+            <Badge variant="outline" className="text-green-600">
+              <CheckCircle className="h-3 w-3 mr-1" />
+              Uploaded
+            </Badge>
+          )}
+        </div>
+        <p className="text-xs text-gray-500">{description}</p>
+        <div 
+          className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center cursor-pointer hover:border-blue-400 transition-colors"
+          onClick={() => fileInputRef.current?.click()}
+        >
+          {uploadingDoc === documentType ? (
+            <div className="flex items-center justify-center space-x-2">
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+              <span className="text-sm text-gray-600">Uploading...</span>
+            </div>
+          ) : uploadedDocs[documentType] ? (
+            <div className="flex items-center justify-center space-x-2 text-green-600">
+              <FileText className="h-4 w-4" />
+              <span className="text-sm">{uploadedDocs[documentType]}</span>
+            </div>
+          ) : (
+            <div className="flex items-center justify-center space-x-2 text-gray-500">
+              <Upload className="h-4 w-4" />
+              <span className="text-sm">Click to upload {label.toLowerCase()}</span>
+            </div>
+          )}
+        </div>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".pdf,.jpg,.jpeg,.png"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) {
+              if (file.size > 5 * 1024 * 1024) { // 5MB limit
+                toast({
+                  title: "File Too Large",
+                  description: "Please select a file smaller than 5MB.",
+                  variant: "destructive",
+                });
+                return;
+              }
+              uploadDocument(file, documentType);
+            }
+          }}
+          className="hidden"
+        />
+      </div>
+    );
+  };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -305,6 +430,38 @@ export default function VendorOnboardingModal({ isOpen, onClose }: VendorOnboard
                     )}
                   />
                 )}
+              </CardContent>
+            </Card>
+
+            {/* Document Verification Section */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Document Verification</CardTitle>
+                <p className="text-sm text-gray-600">Upload the required documents for verification. All documents must be clear and readable.</p>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <DocumentUpload
+                  documentType="nationalIdDocument"
+                  label="National ID"
+                  required={true}
+                  description="Upload a clear photo or scan of your National ID (both sides if needed). Accepted formats: PDF, JPG, PNG (Max 5MB)"
+                />
+                
+                {(paymentPreference === "bank" || paymentPreference === "both") && (
+                  <DocumentUpload
+                    documentType="bankStatement"
+                    label="Bank Statement"
+                    required={true}
+                    description="Upload a recent bank statement (not older than 3 months) showing your account details. Accepted formats: PDF, JPG, PNG (Max 5MB)"
+                  />
+                )}
+                
+                <DocumentUpload
+                  documentType="businessLicense"
+                  label="Business License"
+                  required={false}
+                  description="Upload your business registration certificate or trading license (optional but recommended). Accepted formats: PDF, JPG, PNG (Max 5MB)"
+                />
               </CardContent>
             </Card>
 

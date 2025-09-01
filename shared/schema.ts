@@ -48,6 +48,11 @@ export const users = pgTable("users", {
   vendorVerificationStatus: varchar("vendor_verification_status", { enum: ["pending", "verified", "rejected"] }).default("pending"),
   vendorDocuments: text("vendor_documents").array(), // Array of document URLs
   
+  // Individual document fields for verification
+  nationalIdDocument: varchar("national_id_document"), // National ID document URL
+  bankStatement: varchar("bank_statement"), // Bank statement document URL
+  businessLicense: varchar("business_license"), // Business license document URL
+  
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -279,25 +284,29 @@ export const insertUserNotificationPreferencesSchema = createInsertSchema(userNo
 
 // Vendor onboarding schema
 export const vendorOnboardingSchema = z.object({
-  phoneNumber: z.string().min(1, "Phone number is required"),
-  businessName: z.string().min(1, "Business name is required"),
-  businessAddress: z.string().min(1, "Business address is required"),
-  kraPin: z.string().min(1, "KRA PIN is required"),
-  nationalId: z.string().min(1, "National ID is required"),
+  phoneNumber: z.string().min(10, "Phone number must be at least 10 digits"),
+  businessName: z.string().min(2, "Business name must be at least 2 characters"),
+  businessAddress: z.string().min(10, "Business address must be at least 10 characters"),
+  kraPin: z.string().min(11, "KRA PIN must be 11 characters").max(11, "KRA PIN must be 11 characters"),
+  nationalId: z.string().min(7, "National ID must be at least 7 characters").max(8, "National ID must be at most 8 characters"),
   bankName: z.string().optional(),
   bankAccountNumber: z.string().optional(),
   bankAccountName: z.string().optional(),
   mpesaNumber: z.string().optional(),
   paymentPreference: z.enum(["bank", "mpesa", "both"]),
+  // Document URLs for verification
+  nationalIdDocument: z.string().min(1, "National ID document is required"),
+  bankStatement: z.string().optional(),
+  businessLicense: z.string().optional(),
 }).refine(
   (data) => {
     if (data.paymentPreference === "bank" || data.paymentPreference === "both") {
-      return data.bankName && data.bankAccountNumber && data.bankAccountName;
+      return data.bankName && data.bankAccountNumber && data.bankAccountName && data.bankStatement;
     }
     return true;
   },
   {
-    message: "Bank details are required when bank payment is selected",
+    message: "Bank details and bank statement are required when bank payment is selected",
     path: ["bankName"],
   }
 ).refine(

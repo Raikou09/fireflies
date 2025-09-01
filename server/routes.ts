@@ -98,10 +98,74 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const canCreate = user.userType === "vendor" && user.vendorVerificationStatus === "verified";
-      res.json({ canCreate, user });
+      
+      // Provide detailed verification status
+      const verificationDetails = {
+        canCreate,
+        userType: user.userType,
+        verificationStatus: user.vendorVerificationStatus,
+        hasNationalId: !!user.nationalIdDocument,
+        hasBankStatement: !!user.bankStatement,
+        hasBusinessLicense: !!user.businessLicense,
+        hasRequiredDocuments: !!user.nationalIdDocument && 
+          (user.paymentPreference !== "bank" && user.paymentPreference !== "both" || !!user.bankStatement)
+      };
+      
+      res.json({ ...verificationDetails, user });
     } catch (error) {
       console.error("Error checking vendor status:", error);
       res.status(500).json({ message: "Failed to check vendor status" });
+    }
+  });
+
+  // Enhanced vendor verification status check
+  app.get('/api/vendor/verification-status', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub || req.user?.id;
+      const user = await storage.getUser(userId);
+      
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      if (user.userType !== "vendor") {
+        return res.status(403).json({ message: "Access denied. Vendor account required." });
+      }
+
+      const missingRequirements = [];
+      
+      // Check document requirements
+      if (!user.nationalIdDocument) {
+        missingRequirements.push("National ID document");
+      }
+      
+      if ((user.paymentPreference === "bank" || user.paymentPreference === "both") && !user.bankStatement) {
+        missingRequirements.push("Bank statement");
+      }
+      
+      // Check basic info requirements
+      if (!user.phoneNumber) missingRequirements.push("Phone number");
+      if (!user.businessName) missingRequirements.push("Business name");
+      if (!user.businessAddress) missingRequirements.push("Business address");
+      if (!user.kraPin) missingRequirements.push("KRA PIN");
+      if (!user.nationalId) missingRequirements.push("National ID number");
+
+      const verificationStatus = {
+        status: user.vendorVerificationStatus,
+        canCreateCourts: user.vendorVerificationStatus === "verified",
+        isComplete: missingRequirements.length === 0,
+        missingRequirements,
+        documentsUploaded: {
+          nationalId: !!user.nationalIdDocument,
+          bankStatement: !!user.bankStatement,
+          businessLicense: !!user.businessLicense
+        }
+      };
+
+      res.json(verificationStatus);
+    } catch (error) {
+      console.error("Error checking verification status:", error);
+      res.status(500).json({ message: "Failed to check verification status" });
     }
   });
 
@@ -554,6 +618,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const vendorId = req.user?.claims?.sub || req.user?.id;
       if (!vendorId) {
         return res.status(401).json({ message: "Authentication required" });
+      }
+      
+      // Check vendor verification status before allowing court creation
+      const vendor = await storage.getUser(vendorId);
+      if (!vendor) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      if (vendor.userType !== "vendor") {
+        return res.status(403).json({ 
+          message: "Access denied. Only verified vendors can create courts.",
+          code: "NOT_VENDOR"
+        });
+      }
+      
+      if (vendor.vendorVerificationStatus !== "verified") {
+        const statusMessages = {
+          pending: "Your vendor application is still under review. You cannot create courts until verified.",
+          rejected: "Your vendor application was rejected. Please contact support for assistance."
+        };
+        
+        return res.status(403).json({ 
+          message: statusMessages[vendor.vendorVerificationStatus as keyof typeof statusMessages] || "Vendor verification required.",
+          code: "NOT_VERIFIED",
+          verificationStatus: vendor.vendorVerificationStatus
+        });
+      }
+      
+      // Additional document verification check
+      const missingDocs = [];
+      if (!vendor.nationalIdDocument) missingDocs.push("National ID");
+      if ((vendor.paymentPreference === "bank" || vendor.paymentPreference === "both") && !vendor.bankStatement) {
+        missingDocs.push("Bank statement");
+      }
+      
+      if (missingDocs.length > 0) {
+        return res.status(403).json({
+          message: `Missing required documents: ${missingDocs.join(", ")}. Please complete your verification.`,
+          code: "MISSING_DOCUMENTS",
+          missingDocuments: missingDocs
+        });
       }
       
       console.log('Creating court with data:', req.body);
