@@ -237,7 +237,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Document upload endpoint specifically for vendor onboarding
   app.post("/api/vendor/upload-document", isAuthenticated, async (req, res) => {
     try {
-      const userId = req.user?.claims?.sub || req.user?.id;
+      const userId = (req.user as any)?.id || (req.user as any)?.claims?.sub;
       console.log('Document upload request from user:', userId);
       
       const { fileName, fileType, fileSize } = req.body;
@@ -249,9 +249,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const objectStorageService = new ObjectStorageService();
       const uploadURL = await objectStorageService.getObjectEntityUploadURL();
       
-      // Extract the object path from the upload URL to create our serving URL
-      const objectPath = uploadURL.split('/').slice(-2).join('/'); // gets "uploads/uuid"
-      const documentUrl = `/objects/${objectPath}`;
+      // Extract the object ID from the upload URL to create our serving URL
+      // The upload URL format is: https://storage.googleapis.com/bucket-name/uploads/uuid?signature...
+      const urlParts = uploadURL.split('/');
+      const objectId = urlParts[urlParts.length - 1].split('?')[0]; // Get the UUID without query params
+      const documentUrl = `/objects/uploads/${objectId}`;
       
       console.log('Generated upload URL:', uploadURL);
       console.log('Document URL for serving:', documentUrl);
