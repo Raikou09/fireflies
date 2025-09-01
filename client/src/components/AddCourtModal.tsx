@@ -11,6 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { apiRequest } from "@/lib/queryClient";
 import { ObjectUploader } from "./ObjectUploader";
+import { LocationPicker } from "./LocationPicker";
 import type { UploadResult } from "@uppy/core";
 import { CloudUpload, X, Info, Package, Plus, Trash2 } from "lucide-react";
 
@@ -33,12 +34,22 @@ export default function AddCourtModal({ isOpen, onClose }: AddCourtModalProps) {
     name: "",
     city: "",
     area: "",
+    address: "",
     description: "",
     hourlyRate: "",
     peakHourRate: "",
     openingTime: "",
     closingTime: "",
     rules: "",
+  });
+
+  const [locationData, setLocationData] = useState<{
+    latitude: number | null;
+    longitude: number | null;
+    address?: string;
+  }>({
+    latitude: null,
+    longitude: null,
   });
 
   const [selectedSports, setSelectedSports] = useState<string[]>([]);
@@ -63,7 +74,9 @@ export default function AddCourtModal({ isOpen, onClose }: AddCourtModalProps) {
       const response = await apiRequest("/api/courts", "POST", {
         ...courtData,
         availableDays,
-        availableSports: selectedSports
+        availableSports: selectedSports,
+        latitude: locationData.latitude,
+        longitude: locationData.longitude
       });
       return response.json();
     },
@@ -323,7 +336,7 @@ export default function AddCourtModal({ isOpen, onClose }: AddCourtModalProps) {
           </div>
 
           {/* Location */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div>
               <Label>City *</Label>
               <Select value={formData.city} onValueChange={(value) => handleInputChange("city", value)}>
@@ -346,6 +359,14 @@ export default function AddCourtModal({ isOpen, onClose }: AddCourtModalProps) {
                 value={formData.area}
                 onChange={(e) => handleInputChange("area", e.target.value)}
                 required
+              />
+            </div>
+            <div>
+              <Label>Street Address</Label>
+              <Input 
+                placeholder="Full address (auto-filled from map)"
+                value={formData.address}
+                onChange={(e) => handleInputChange("address", e.target.value)}
               />
             </div>
           </div>
@@ -578,6 +599,19 @@ export default function AddCourtModal({ isOpen, onClose }: AddCourtModalProps) {
               </p>
             </div>
           )}
+
+          {/* Location Picker */}
+          <div className="mt-6">
+            <LocationPicker
+              onLocationSelect={(lat, lng, address) => {
+                setLocationData({ latitude: lat, longitude: lng, address });
+                if (address && !formData.address) {
+                  setFormData(prev => ({ ...prev, address }));
+                }
+              }}
+              className="w-full"
+            />
+          </div>
 
           {/* Submit Button */}
           <div className="flex space-x-4">

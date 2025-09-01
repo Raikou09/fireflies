@@ -71,6 +71,12 @@ Preferred communication style: Simple, everyday language.
   - City-based browsing (Nairobi, Mombasa, Kisumu, Nakuru, Eldoret)
 - **Booking System**: Time slot management with real-time availability
 - **Payment Integration**: M-Pesa payment method integration
+- **Location Pin Functionality**: Interactive location marking system for vendors
+  - GPS-based location detection for automatic positioning
+  - Manual coordinate input for precise court location marking
+  - Location picker integrated into court creation and editing workflows
+  - Coordinate validation and address auto-completion
+  - Enhanced customer navigation and court discovery accuracy
 - **Comprehensive Notification System**: Multi-channel SMS and email notifications
   - SendGrid email integration with professional templates
   - SMS service for Kenyan phone numbers (+254 format)
