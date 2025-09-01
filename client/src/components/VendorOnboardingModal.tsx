@@ -163,7 +163,10 @@ export default function VendorOnboardingModal({ isOpen, onClose }: VendorOnboard
         <p className="text-xs text-gray-500">{description}</p>
         <div 
           className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center cursor-pointer hover:border-blue-400 transition-colors"
-          onClick={() => fileInputRef.current?.click()}
+          onClick={() => {
+            console.log('Upload area clicked for:', documentType);
+            fileInputRef.current?.click();
+          }}
         >
           {uploadingDoc === documentType ? (
             <div className="flex items-center justify-center space-x-2">
@@ -187,9 +190,13 @@ export default function VendorOnboardingModal({ isOpen, onClose }: VendorOnboard
           type="file"
           accept=".pdf,.jpg,.jpeg,.png"
           onChange={(e) => {
+            console.log('File input changed for:', documentType);
             const file = e.target.files?.[0];
+            console.log('Selected file:', file?.name, file?.size, file?.type);
+            
             if (file) {
               if (file.size > 5 * 1024 * 1024) { // 5MB limit
+                console.log('File too large:', file.size);
                 toast({
                   title: "File Too Large",
                   description: "Please select a file smaller than 5MB.",
@@ -197,6 +204,7 @@ export default function VendorOnboardingModal({ isOpen, onClose }: VendorOnboard
                 });
                 return;
               }
+              console.log('Starting upload for file:', file.name);
               uploadDocument(file, documentType);
             }
           }}
