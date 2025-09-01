@@ -12,6 +12,9 @@ Preferred communication style: Simple, everyday language.
 
 **Court Approval Policy**: Courts must require manual admin approval (not automatic approval) for platform quality control and safety standards.
 
+**Google OAuth Configuration Required**: For Google authentication to work, the following redirect URI must be added to the Google Cloud Console OAuth configuration:
+- Redirect URI: `https://bc964598-40f9-4470-9443-7e08221485ea-00-3kfue0ojl4vna.janeway.replit.dev/api/auth/google/callback`
+
 ## System Architecture
 
 ### Frontend Architecture

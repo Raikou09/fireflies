@@ -11,13 +11,18 @@ export function setupGoogleAuth(app: Express) {
     return;
   }
 
-  console.log("Setting up Google OAuth with callback URL: /api/auth/google/callback");
+  // Construct the full callback URL using Replit's domain
+  const callbackURL = process.env.REPLIT_DEV_DOMAIN 
+    ? `https://${process.env.REPLIT_DEV_DOMAIN}/api/auth/google/callback`
+    : "/api/auth/google/callback";
+    
+  console.log("Setting up Google OAuth with callback URL:", callbackURL);
   
   // Google OAuth Strategy
   passport.use(new GoogleStrategy({
     clientID: process.env.GOOGLE_CLIENT_ID,
     clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-    callbackURL: "/api/auth/google/callback"
+    callbackURL: callbackURL
   },
   async (accessToken: string, refreshToken: string, profile: any, done: any) => {
     try {
