@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { vendorOnboardingSchema, type VendorOnboarding } from "@shared/schema";
@@ -32,7 +32,6 @@ import { useToast } from "@/hooks/use-toast";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Upload, FileText, CheckCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { ObjectUploader } from "@/components/ObjectUploader";
 
 interface VendorOnboardingModalProps {
   isOpen: boolean;
@@ -99,39 +98,64 @@ export default function VendorOnboardingModal({ isOpen, onClose }: VendorOnboard
 
   const paymentPreference = form.watch("paymentPreference");
 
-  // Document upload using ObjectUploader
-  const getUploadParameters = async () => {
-    const response = await fetch("/api/objects/upload", {
-      method: "POST",
-      credentials: "include",
-    });
-    
-    if (!response.ok) {
-      throw new Error("Failed to get upload parameters");
-    }
-    
-    const { uploadURL } = await response.json();
-    return {
-      method: "PUT" as const,
-      url: uploadURL,
-    };
-  };
-
-  const handleDocumentUploadComplete = (result: any, documentType: string, fileName: string) => {
-    if (result.successful && result.successful.length > 0) {
-      const uploadedFile = result.successful[0];
-      // Convert the upload URL to our object serving path
-      const documentUrl = `/objects/uploads/${uploadedFile.uploadURL.split('/uploads/')[1].split('?')[0]}`;
+  // Document upload function using new vendor endpoint
+  const uploadDocument = async (file: File, documentType: string) => {
+    try {
+      console.log('Starting document upload for:', documentType, 'File:', file.name);
+      
+      // Get upload parameters from the vendor-specific endpoint
+      const uploadResponse = await fetch("/api/vendor/upload-document", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          fileName: file.name,
+          fileType: file.type,
+          fileSize: file.size
+        }),
+        credentials: "include",
+      });
+      
+      if (!uploadResponse.ok) {
+        const errorData = await uploadResponse.text();
+        console.error('Failed to get upload URL:', errorData);
+        throw new Error("Failed to get upload URL");
+      }
+      
+      const { uploadURL, documentUrl } = await uploadResponse.json();
+      console.log('Got upload URL:', uploadURL);
+      console.log('Document will be served at:', documentUrl);
+      
+      // Upload the file directly to cloud storage
+      const fileUploadResponse = await fetch(uploadURL, {
+        method: "PUT",
+        body: file,
+        headers: {
+          'Content-Type': file.type,
+        },
+      });
+      
+      if (!fileUploadResponse.ok) {
+        throw new Error("Failed to upload file to storage");
+      }
       
       console.log('Document uploaded successfully, URL:', documentUrl);
       
       // Update form and state
       form.setValue(documentType as keyof VendorOnboarding, documentUrl);
-      setUploadedDocs(prev => ({ ...prev, [documentType]: fileName }));
+      setUploadedDocs(prev => ({ ...prev, [documentType]: file.name }));
       
       toast({
         title: "Document Uploaded",
-        description: `${fileName} has been uploaded successfully.`,
+        description: `${file.name} has been uploaded successfully.`,
+      });
+    } catch (error) {
+      console.error('Document upload error:', error);
+      toast({
+        title: "Upload Error",
+        description: error instanceof Error ? error.message : "Failed to upload document. Please try again.",
+        variant: "destructive",
       });
     }
   };
@@ -147,6 +171,9 @@ export default function VendorOnboardingModal({ isOpen, onClose }: VendorOnboard
     required?: boolean;
     description: string;
   }) => {
+    const [isUploading, setIsUploading] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    
     return (
       <div className="space-y-2">
         <div className="flex items-center justify-between">
@@ -162,18 +189,19 @@ export default function VendorOnboardingModal({ isOpen, onClose }: VendorOnboard
         </div>
         <p className="text-xs text-gray-500">{description}</p>
         
-        <ObjectUploader
-          maxFileSize={5 * 1024 * 1024} // 5MB limit
-          onGetUploadParameters={getUploadParameters}
-          onComplete={(result) => {
-            if (result.successful && result.successful.length > 0) {
-              const fileName = result.successful[0].name || "Document";
-              handleDocumentUploadComplete(result, documentType, fileName);
-            }
+        <div 
+          className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center cursor-pointer hover:border-blue-400 transition-colors"
+          onClick={() => {
+            console.log('Upload area clicked for:', documentType);
+            fileInputRef.current?.click();
           }}
-          buttonClassName="w-full border-2 border-dashed border-gray-300 rounded-lg p-4 hover:border-blue-400 transition-colors"
         >
-          {uploadedDocs[documentType] ? (
+          {isUploading ? (
+            <div className="flex items-center justify-center space-x-2">
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+              <span className="text-sm text-gray-600">Uploading...</span>
+            </div>
+          ) : uploadedDocs[documentType] ? (
             <div className="flex items-center justify-center space-x-2 text-green-600">
               <FileText className="h-4 w-4" />
               <span className="text-sm">{uploadedDocs[documentType]}</span>
@@ -184,7 +212,29 @@ export default function VendorOnboardingModal({ isOpen, onClose }: VendorOnboard
               <span className="text-sm">Click to upload {label.toLowerCase()}</span>
             </div>
           )}
-        </ObjectUploader>
+        </div>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".pdf,.jpg,.jpeg,.png"
+          onChange={async (e) => {
+            const file = e.target.files?.[0];
+            if (file) {
+              if (file.size > 5 * 1024 * 1024) { // 5MB limit
+                toast({
+                  title: "File Too Large",
+                  description: "Please select a file smaller than 5MB.",
+                  variant: "destructive",
+                });
+                return;
+              }
+              setIsUploading(true);
+              await uploadDocument(file, documentType);
+              setIsUploading(false);
+            }
+          }}
+          className="hidden"
+        />
       </div>
     );
   };

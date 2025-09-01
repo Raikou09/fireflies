@@ -234,6 +234,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Document upload endpoint specifically for vendor onboarding
+  app.post("/api/vendor/upload-document", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.user?.claims?.sub || req.user?.id;
+      console.log('Document upload request from user:', userId);
+      
+      const { fileName, fileType, fileSize } = req.body;
+      if (!fileName || !fileType) {
+        return res.status(400).json({ error: 'fileName and fileType are required' });
+      }
+      
+      // Generate a unique document ID and URL using object storage
+      const objectStorageService = new ObjectStorageService();
+      const uploadURL = await objectStorageService.getObjectEntityUploadURL();
+      
+      // Extract the object path from the upload URL to create our serving URL
+      const objectPath = uploadURL.split('/').slice(-2).join('/'); // gets "uploads/uuid"
+      const documentUrl = `/objects/${objectPath}`;
+      
+      console.log('Generated upload URL:', uploadURL);
+      console.log('Document URL for serving:', documentUrl);
+      
+      res.json({ 
+        uploadURL,
+        documentUrl,
+        // Return the upload URL for the frontend to upload to, and documentUrl to save in the form
+      });
+    } catch (error) {
+      console.error('Error uploading document:', error);
+      res.status(500).json({ error: 'Failed to upload document', message: (error as Error).message });
+    }
+  });
+
   app.post("/api/objects/upload", isAuthenticated, async (req, res) => {
     try {
       console.log('Upload URL request received from user:', req.user?.claims?.sub);
