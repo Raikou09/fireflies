@@ -103,11 +103,12 @@ export default function AddCourtModal({ isOpen, onClose }: AddCourtModalProps) {
         resetForm();
       }
     },
-    onError: (error) => {
+    onError: (error: any) => {
+      console.error('Court creation mutation error:', error);
       if (isUnauthorizedError(error)) {
         toast({
-          title: "Unauthorized",
-          description: "You are logged out. Logging in again...",
+          title: "Authentication Required",
+          description: "Please log in to create a court.",
           variant: "destructive",
         });
         setTimeout(() => {
@@ -116,8 +117,8 @@ export default function AddCourtModal({ isOpen, onClose }: AddCourtModalProps) {
         return;
       }
       toast({
-        title: "Error",
-        description: "Failed to create court. Please try again.",
+        title: "Court Creation Failed",
+        description: error.message || "Failed to create court. Please try again.",
         variant: "destructive",
       });
     },
@@ -162,6 +163,7 @@ export default function AddCourtModal({ isOpen, onClose }: AddCourtModalProps) {
       name: "",
       city: "",
       area: "",
+      address: "",
       description: "",
       hourlyRate: "",
       peakHourRate: "",
@@ -249,6 +251,12 @@ export default function AddCourtModal({ isOpen, onClose }: AddCourtModalProps) {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
+    console.log('Form submission started');
+    console.log('Form data:', formData);
+    console.log('Selected sports:', selectedSports);
+    console.log('Available days:', availableDays);
+    console.log('Location data:', locationData);
+    
     if (!formData.name || selectedSports.length === 0 || !formData.city || !formData.area || 
         !formData.hourlyRate || !formData.openingTime || !formData.closingTime || availableDays.length === 0) {
       toast({
@@ -259,14 +267,14 @@ export default function AddCourtModal({ isOpen, onClose }: AddCourtModalProps) {
       return;
     }
 
-    mutation.mutate({
+    const courtPayload = {
       name: formData.name,
       availableSports: selectedSports,
       city: formData.city,
       area: formData.area,
       address: formData.address || "",
-      latitude: locationData.latitude,
-      longitude: locationData.longitude,
+      latitude: locationData.latitude ? locationData.latitude.toString() : null,
+      longitude: locationData.longitude ? locationData.longitude.toString() : null,
       description: formData.description || "",
       hourlyRate: formData.hourlyRate,
       peakHourRate: formData.peakHourRate || null,
@@ -277,7 +285,10 @@ export default function AddCourtModal({ isOpen, onClose }: AddCourtModalProps) {
       rules: formData.rules || "",
       isActive: true,
       commissionRate: commissionData?.defaultCommissionRate || 15
-    });
+    };
+    
+    console.log('Final court payload:', courtPayload);
+    mutation.mutate(courtPayload);
   };
 
   const getUploadParameters = async () => {
@@ -501,7 +512,7 @@ export default function AddCourtModal({ isOpen, onClose }: AddCourtModalProps) {
               </div>
               <Checkbox
                 checked={includeEquipment}
-                onCheckedChange={setIncludeEquipment}
+                onCheckedChange={(checked) => setIncludeEquipment(checked === true)}
                 id="include-equipment"
               />
             </div>
