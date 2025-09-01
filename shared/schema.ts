@@ -33,6 +33,21 @@ export const users = pgTable("users", {
   lastName: varchar("last_name"),
   profileImageUrl: varchar("profile_image_url"),
   userType: varchar("user_type", { enum: ["customer", "vendor", "admin"] }).notNull().default("customer"),
+  
+  // Vendor-specific fields
+  phoneNumber: varchar("phone_number"),
+  businessName: varchar("business_name"),
+  businessAddress: text("business_address"),
+  kraPin: varchar("kra_pin"), // Kenya Revenue Authority PIN
+  nationalId: varchar("national_id"), // Government ID
+  bankName: varchar("bank_name"),
+  bankAccountNumber: varchar("bank_account_number"),
+  bankAccountName: varchar("bank_account_name"),
+  mpesaNumber: varchar("mpesa_number"), // Alternative payment method
+  paymentPreference: varchar("payment_preference", { enum: ["bank", "mpesa", "both"] }),
+  vendorVerificationStatus: varchar("vendor_verification_status", { enum: ["pending", "verified", "rejected"] }).default("pending"),
+  vendorDocuments: text("vendor_documents").array(), // Array of document URLs
+  
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -262,9 +277,46 @@ export const insertUserNotificationPreferencesSchema = createInsertSchema(userNo
   createdAt: true,
 });
 
+// Vendor onboarding schema
+export const vendorOnboardingSchema = z.object({
+  phoneNumber: z.string().min(1, "Phone number is required"),
+  businessName: z.string().min(1, "Business name is required"),
+  businessAddress: z.string().min(1, "Business address is required"),
+  kraPin: z.string().min(1, "KRA PIN is required"),
+  nationalId: z.string().min(1, "National ID is required"),
+  bankName: z.string().optional(),
+  bankAccountNumber: z.string().optional(),
+  bankAccountName: z.string().optional(),
+  mpesaNumber: z.string().optional(),
+  paymentPreference: z.enum(["bank", "mpesa", "both"]),
+}).refine(
+  (data) => {
+    if (data.paymentPreference === "bank" || data.paymentPreference === "both") {
+      return data.bankName && data.bankAccountNumber && data.bankAccountName;
+    }
+    return true;
+  },
+  {
+    message: "Bank details are required when bank payment is selected",
+    path: ["bankName"],
+  }
+).refine(
+  (data) => {
+    if (data.paymentPreference === "mpesa" || data.paymentPreference === "both") {
+      return data.mpesaNumber;
+    }
+    return true;
+  },
+  {
+    message: "M-Pesa number is required when M-Pesa payment is selected",
+    path: ["mpesaNumber"],
+  }
+);
+
 // Types
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
+export type VendorOnboarding = z.infer<typeof vendorOnboardingSchema>;
 export type InsertCourt = z.infer<typeof insertCourtSchema>;
 export type Court = typeof courts.$inferSelect;
 export type InsertEquipment = z.infer<typeof insertEquipmentSchema>;

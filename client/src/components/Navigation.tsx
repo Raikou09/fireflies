@@ -103,18 +103,13 @@ export default function Navigation({ userMode, setUserMode }: NavigationProps) {
                         </DropdownMenuItem>
                       )}
                       {((user as any)?.user_type !== "vendor" && (user as any)?.userType !== "vendor") && (
-                        <DropdownMenuItem onClick={async () => {
-                          try {
-                            const response = await fetch("/api/auth/become-vendor", {
-                              method: "POST"
-                            });
-                            if (response.ok) {
-                              window.location.reload();
-                            }
-                          } catch (error) {
-                            console.error("Error becoming vendor:", error);
-                          }
-                        }}>
+                        <DropdownMenuItem 
+                          onClick={() => {
+                            // This will be handled by the VendorOnboarding component
+                            const event = new CustomEvent('openVendorOnboarding');
+                            window.dispatchEvent(event);
+                          }}
+                        >
                           Become a Vendor
                         </DropdownMenuItem>
                       )}

@@ -52,8 +52,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Route to upgrade user to vendor
-  app.post('/api/auth/become-vendor', isAuthenticated, async (req: any, res) => {
+  // Vendor onboarding endpoint
+  app.post('/api/vendor/onboard', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub || req.user?.id;
       const user = await storage.getUser(userId);
@@ -62,16 +62,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "User not found" });
       }
 
-      // Update user to vendor type
+      // Validate vendor onboarding data
+      const { vendorOnboardingSchema } = await import("@shared/schema");
+      const validatedData = vendorOnboardingSchema.parse(req.body);
+
+      // Update user with vendor details and mark as pending verification
       const updatedUser = await storage.upsertUser({
         ...user,
-        userType: "vendor"
+        userType: "vendor",
+        vendorVerificationStatus: "pending",
+        ...validatedData
       });
 
       res.json(updatedUser);
     } catch (error) {
-      console.error("Error upgrading user to vendor:", error);
-      res.status(500).json({ message: "Failed to upgrade user to vendor" });
+      console.error("Error during vendor onboarding:", error);
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ 
+          message: "Invalid vendor data", 
+          errors: error.errors 
+        });
+      }
+      res.status(500).json({ message: "Failed to complete vendor onboarding" });
+    }
+  });
+
+  // Check if user can create courts (must be verified vendor)
+  app.get('/api/vendor/can-create-courts', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub || req.user?.id;
+      const user = await storage.getUser(userId);
+      
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const canCreate = user.userType === "vendor" && user.vendorVerificationStatus === "verified";
+      res.json({ canCreate, user });
+    } catch (error) {
+      console.error("Error checking vendor status:", error);
+      res.status(500).json({ message: "Failed to check vendor status" });
     }
   });
 
