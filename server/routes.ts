@@ -666,7 +666,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const customerId = req.user?.claims?.sub || req.user?.id;
       const bookingData = insertBookingSchema.parse(req.body);
-      const booking = await storage.createBooking({ ...bookingData, customerId });
+      const booking = await storage.createBooking({ 
+        ...bookingData, 
+        customerId,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      });
       
       // Get customer and court details for notifications
       const customer = await storage.getUser(customerId);

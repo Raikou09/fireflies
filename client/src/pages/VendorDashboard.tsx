@@ -24,6 +24,7 @@ import {
   MapPin,
   LogOut,
   AlertCircle,
+  AlertTriangle,
   ArrowLeft,
   Package,
   Edit,
@@ -77,7 +78,7 @@ export default function VendorDashboard() {
   // Check if user can create courts (verified vendor)
   const { data: vendorStatus } = useQuery({
     queryKey: ["/api/vendor/can-create-courts"],
-    enabled: isAuthenticated && user?.userType === "vendor",
+    enabled: isAuthenticated && ((user as any)?.userType === "vendor" || (user as any)?.user_type === "vendor"),
   });
   const [vendorCheckLoading, setVendorCheckLoading] = useState(true);
   const [selectedCourtForEquipment, setSelectedCourtForEquipment] = useState<string | null>(null);
@@ -192,7 +193,7 @@ export default function VendorDashboard() {
   }
 
   // Check vendor verification status
-  if (user?.userType === "vendor") {
+  if ((user as any)?.userType === "vendor" || (user as any)?.user_type === "vendor") {
     const verificationStatus = (user as any)?.vendorVerificationStatus;
     
     if (!verificationStatus || verificationStatus === "pending") {
