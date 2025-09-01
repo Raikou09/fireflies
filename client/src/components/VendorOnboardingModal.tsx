@@ -452,7 +452,7 @@ export default function VendorOnboardingModal({ isOpen, onClose }: VendorOnboard
                     documentType="bankStatement"
                     label="Bank Statement"
                     required={true}
-                    description="Upload a recent bank statement (not older than 3 months) showing your account details. Accepted formats: PDF, JPG, PNG (Max 5MB)"
+                    description="Upload a recent bank statement (not older than 3 months) showing your account details. Required after completing bank details above. Accepted formats: PDF, JPG, PNG (Max 5MB)"
                   />
                 )}
                 

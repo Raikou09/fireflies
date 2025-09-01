@@ -301,13 +301,26 @@ export const vendorOnboardingSchema = z.object({
 }).refine(
   (data) => {
     if (data.paymentPreference === "bank" || data.paymentPreference === "both") {
-      return data.bankName && data.bankAccountNumber && data.bankAccountName && data.bankStatement;
+      return data.bankName && data.bankAccountNumber && data.bankAccountName;
     }
     return true;
   },
   {
-    message: "Bank details and bank statement are required when bank payment is selected",
+    message: "Bank details are required when bank payment is selected",
     path: ["bankName"],
+  }
+).refine(
+  (data) => {
+    // Only validate bank statement if all other bank details are provided
+    if ((data.paymentPreference === "bank" || data.paymentPreference === "both") && 
+        data.bankName && data.bankAccountNumber && data.bankAccountName) {
+      return data.bankStatement;
+    }
+    return true;
+  },
+  {
+    message: "Bank statement is required when bank payment is selected",
+    path: ["bankStatement"],
   }
 ).refine(
   (data) => {
