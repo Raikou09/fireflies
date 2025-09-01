@@ -33,6 +33,26 @@ export const users = pgTable("users", {
   lastName: varchar("last_name"),
   profileImageUrl: varchar("profile_image_url"),
   userType: varchar("user_type", { enum: ["customer", "vendor", "admin"] }).notNull().default("customer"),
+  
+  // Vendor-specific fields
+  phoneNumber: varchar("phone_number"),
+  businessName: varchar("business_name"),
+  businessAddress: text("business_address"),
+  kraPin: varchar("kra_pin"), // Kenya Revenue Authority PIN
+  nationalId: varchar("national_id"), // Government ID
+  bankName: varchar("bank_name"),
+  bankAccountNumber: varchar("bank_account_number"),
+  bankAccountName: varchar("bank_account_name"),
+  mpesaNumber: varchar("mpesa_number"), // Alternative payment method
+  paymentPreference: varchar("payment_preference", { enum: ["bank", "mpesa", "both"] }),
+  vendorVerificationStatus: varchar("vendor_verification_status", { enum: ["pending", "verified", "rejected"] }).default("pending"),
+  vendorDocuments: text("vendor_documents").array(), // Array of document URLs
+  
+  // Individual document fields for verification
+  nationalIdDocument: varchar("national_id_document"), // National ID document URL
+  bankStatement: varchar("bank_statement"), // Bank statement document URL
+  businessLicense: varchar("business_license"), // Business license document URL
+  
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -262,9 +282,63 @@ export const insertUserNotificationPreferencesSchema = createInsertSchema(userNo
   createdAt: true,
 });
 
+// Vendor onboarding schema
+export const vendorOnboardingSchema = z.object({
+  phoneNumber: z.string().min(10, "Phone number must be at least 10 digits"),
+  businessName: z.string().min(2, "Business name must be at least 2 characters"),
+  businessAddress: z.string().min(10, "Business address must be at least 10 characters"),
+  kraPin: z.string().min(11, "KRA PIN must be 11 characters").max(11, "KRA PIN must be 11 characters"),
+  nationalId: z.string().min(7, "National ID must be at least 7 characters").max(8, "National ID must be at most 8 characters"),
+  bankName: z.string().optional(),
+  bankAccountNumber: z.string().optional(),
+  bankAccountName: z.string().optional(),
+  mpesaNumber: z.string().optional(),
+  paymentPreference: z.enum(["bank", "mpesa", "both"]),
+  // Document URLs for verification
+  nationalIdDocument: z.string().min(1, "National ID document is required"),
+  bankStatement: z.string().optional(),
+  businessLicense: z.string().optional(),
+}).refine(
+  (data) => {
+    if (data.paymentPreference === "bank" || data.paymentPreference === "both") {
+      return data.bankName && data.bankAccountNumber && data.bankAccountName;
+    }
+    return true;
+  },
+  {
+    message: "Bank details are required when bank payment is selected",
+    path: ["bankName"],
+  }
+).refine(
+  (data) => {
+    // Only validate bank statement if all other bank details are provided
+    if ((data.paymentPreference === "bank" || data.paymentPreference === "both") && 
+        data.bankName && data.bankAccountNumber && data.bankAccountName) {
+      return data.bankStatement;
+    }
+    return true;
+  },
+  {
+    message: "Bank statement is required when bank payment is selected",
+    path: ["bankStatement"],
+  }
+).refine(
+  (data) => {
+    if (data.paymentPreference === "mpesa" || data.paymentPreference === "both") {
+      return data.mpesaNumber;
+    }
+    return true;
+  },
+  {
+    message: "M-Pesa number is required when M-Pesa payment is selected",
+    path: ["mpesaNumber"],
+  }
+);
+
 // Types
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
+export type VendorOnboarding = z.infer<typeof vendorOnboardingSchema>;
 export type InsertCourt = z.infer<typeof insertCourtSchema>;
 export type Court = typeof courts.$inferSelect;
 export type InsertEquipment = z.infer<typeof insertEquipmentSchema>;

@@ -106,6 +106,8 @@ export interface IStorage {
 
   // Admin operations
   getPendingCourts(): Promise<CourtWithDetails[]>;
+  getPendingVendors(): Promise<User[]>;
+  updateVendorStatus(vendorId: string, status: "pending" | "verified" | "rejected"): Promise<User | null>;
   getAllCourtsWithDetails(): Promise<CourtWithDetails[]>;
   setCourtCommission(id: string, commissionRate: number): Promise<Court | undefined>;
   approveCourt(courtId: string, adminNotes?: string): Promise<Court | undefined>;
@@ -213,22 +215,22 @@ export class DatabaseStorage implements IStorage {
               parseFloat(court.latitude),
               parseFloat(court.longitude)
             )
-          : null
+          : undefined
       }));
 
       // Filter by max distance if specified
       if (filters.maxDistance) {
         courtsArray = courtsArray.filter(court => 
-          court.distance !== null && court.distance <= filters.maxDistance!
+          court.distance !== undefined && court.distance <= filters.maxDistance!
         );
       }
 
       // Sort by distance if requested
       if (filters.sortByDistance) {
         courtsArray.sort((a, b) => {
-          if (a.distance === null && b.distance === null) return 0;
-          if (a.distance === null) return 1;
-          if (b.distance === null) return -1;
+          if (a.distance === undefined && b.distance === undefined) return 0;
+          if (a.distance === undefined) return 1;
+          if (b.distance === undefined) return -1;
           return a.distance - b.distance;
         });
       }
@@ -420,7 +422,11 @@ export class DatabaseStorage implements IStorage {
   async createBooking(booking: InsertBooking): Promise<Booking> {
     const [newBooking] = await db
       .insert(bookings)
-      .values(booking)
+      .values({
+        ...booking,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      })
       .returning();
     return newBooking;
   }
@@ -615,7 +621,7 @@ export class DatabaseStorage implements IStorage {
       .where(
         and(
           eq(courts.vendorId, vendorId),
-          eq(bookings.status, "active"),
+          eq(bookings.status, "confirmed"),
           sql`${bookings.createdAt} >= ${startOfMonth}`,
           sql`${bookings.createdAt} <= ${endOfMonth}`
         )
@@ -707,14 +713,14 @@ export class DatabaseStorage implements IStorage {
         revenue: Number(revenue) || 0,
         averageRating: Number(court.rating) || 0,
         popularSports: popularSports.map(s => ({
-          sport: s.sport,
+          sport: s.sport || "General",
           bookings: Number(s.bookings) || 0
         })),
         recentBookings: recentBookings.map(b => ({
-          date: b.date,
-          sport: b.sport,
+          date: b.date?.toISOString() || new Date().toISOString(),
+          sport: b.sport || "General",
           revenue: Number(b.revenue) || 0,
-          customerPhone: b.customerPhone
+          customerPhone: b.customerPhone || ""
         }))
       });
     }
@@ -781,7 +787,7 @@ export class DatabaseStorage implements IStorage {
         totalBookings: Number(totalBookings) || 0,
         revenue: Number(revenue) || 0,
         popularSports: popularSports.map(s => ({
-          sport: s.sport,
+          sport: s.sport || "General",
           bookings: Number(s.bookings) || 0
         }))
       });
@@ -821,6 +827,32 @@ export class DatabaseStorage implements IStorage {
     }
 
     return Array.from(courtMap.values());
+  }
+
+  async getPendingVendors(): Promise<User[]> {
+    const results = await db
+      .select()
+      .from(users)
+      .where(and(
+        eq(users.userType, "vendor"),
+        eq(users.vendorVerificationStatus, "pending")
+      ))
+      .orderBy(desc(users.createdAt));
+
+    return results;
+  }
+
+  async updateVendorStatus(vendorId: string, status: "pending" | "verified" | "rejected"): Promise<User | null> {
+    const results = await db
+      .update(users)
+      .set({ 
+        vendorVerificationStatus: status,
+        updatedAt: new Date()
+      })
+      .where(eq(users.id, vendorId))
+      .returning();
+
+    return results[0] || null;
   }
 
   async approveCourt(courtId: string, adminNotes?: string): Promise<Court | undefined> {

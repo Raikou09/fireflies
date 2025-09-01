@@ -11,6 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { apiRequest } from "@/lib/queryClient";
 import { ObjectUploader } from "./ObjectUploader";
+import { LocationPicker } from "./LocationPicker";
 import type { UploadResult } from "@uppy/core";
 import { CloudUpload, X, Info, Package, Plus, Trash2 } from "lucide-react";
 
@@ -33,12 +34,22 @@ export default function AddCourtModal({ isOpen, onClose }: AddCourtModalProps) {
     name: "",
     city: "",
     area: "",
+    address: "",
     description: "",
     hourlyRate: "",
     peakHourRate: "",
     openingTime: "",
     closingTime: "",
     rules: "",
+  });
+
+  const [locationData, setLocationData] = useState<{
+    latitude: number | null;
+    longitude: number | null;
+    address?: string;
+  }>({
+    latitude: null,
+    longitude: null,
   });
 
   const [selectedSports, setSelectedSports] = useState<string[]>([]);
@@ -60,11 +71,13 @@ export default function AddCourtModal({ isOpen, onClose }: AddCourtModalProps) {
 
   const mutation = useMutation({
     mutationFn: async (courtData: any) => {
-      const response = await apiRequest("/api/courts", "POST", {
-        ...courtData,
-        availableDays,
-        availableSports: selectedSports
-      });
+      console.log('Sending court data:', courtData);
+      const response = await apiRequest("/api/courts", "POST", courtData);
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('Court creation error:', errorData);
+        throw new Error(errorData.message || 'Failed to create court');
+      }
       return response.json();
     },
     onSuccess: (court) => {
@@ -90,11 +103,12 @@ export default function AddCourtModal({ isOpen, onClose }: AddCourtModalProps) {
         resetForm();
       }
     },
-    onError: (error) => {
+    onError: (error: any) => {
+      console.error('Court creation mutation error:', error);
       if (isUnauthorizedError(error)) {
         toast({
-          title: "Unauthorized",
-          description: "You are logged out. Logging in again...",
+          title: "Authentication Required",
+          description: "Please log in to create a court.",
           variant: "destructive",
         });
         setTimeout(() => {
@@ -103,8 +117,8 @@ export default function AddCourtModal({ isOpen, onClose }: AddCourtModalProps) {
         return;
       }
       toast({
-        title: "Error",
-        description: "Failed to create court. Please try again.",
+        title: "Court Creation Failed",
+        description: error.message || "Failed to create court. Please try again.",
         variant: "destructive",
       });
     },
@@ -149,6 +163,7 @@ export default function AddCourtModal({ isOpen, onClose }: AddCourtModalProps) {
       name: "",
       city: "",
       area: "",
+      address: "",
       description: "",
       hourlyRate: "",
       peakHourRate: "",
@@ -236,6 +251,12 @@ export default function AddCourtModal({ isOpen, onClose }: AddCourtModalProps) {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
+    console.log('Form submission started');
+    console.log('Form data:', formData);
+    console.log('Selected sports:', selectedSports);
+    console.log('Available days:', availableDays);
+    console.log('Location data:', locationData);
+    
     if (!formData.name || selectedSports.length === 0 || !formData.city || !formData.area || 
         !formData.hourlyRate || !formData.openingTime || !formData.closingTime || availableDays.length === 0) {
       toast({
@@ -246,12 +267,28 @@ export default function AddCourtModal({ isOpen, onClose }: AddCourtModalProps) {
       return;
     }
 
-    mutation.mutate({
-      ...formData,
+    const courtPayload = {
+      name: formData.name,
       availableSports: selectedSports,
+      city: formData.city,
+      area: formData.area,
+      address: formData.address || "",
+      latitude: locationData.latitude ? locationData.latitude.toString() : null,
+      longitude: locationData.longitude ? locationData.longitude.toString() : null,
+      description: formData.description || "",
+      hourlyRate: formData.hourlyRate,
+      peakHourRate: formData.peakHourRate || null,
+      openingTime: formData.openingTime,
+      closingTime: formData.closingTime,
       availableDays,
-      imageUrl: imageUrl || undefined
-    });
+      imageUrl: imageUrl || null,
+      rules: formData.rules || "",
+      isActive: true,
+      commissionRate: (commissionData?.defaultCommissionRate || 15).toString()
+    };
+    
+    console.log('Final court payload:', courtPayload);
+    mutation.mutate(courtPayload);
   };
 
   const getUploadParameters = async () => {
@@ -323,7 +360,7 @@ export default function AddCourtModal({ isOpen, onClose }: AddCourtModalProps) {
           </div>
 
           {/* Location */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div>
               <Label>City *</Label>
               <Select value={formData.city} onValueChange={(value) => handleInputChange("city", value)}>
@@ -346,6 +383,14 @@ export default function AddCourtModal({ isOpen, onClose }: AddCourtModalProps) {
                 value={formData.area}
                 onChange={(e) => handleInputChange("area", e.target.value)}
                 required
+              />
+            </div>
+            <div>
+              <Label>Street Address</Label>
+              <Input 
+                placeholder="Full address (auto-filled from map)"
+                value={formData.address}
+                onChange={(e) => handleInputChange("address", e.target.value)}
               />
             </div>
           </div>
@@ -467,7 +512,7 @@ export default function AddCourtModal({ isOpen, onClose }: AddCourtModalProps) {
               </div>
               <Checkbox
                 checked={includeEquipment}
-                onCheckedChange={setIncludeEquipment}
+                onCheckedChange={(checked) => setIncludeEquipment(checked === true)}
                 id="include-equipment"
               />
             </div>
@@ -578,6 +623,19 @@ export default function AddCourtModal({ isOpen, onClose }: AddCourtModalProps) {
               </p>
             </div>
           )}
+
+          {/* Location Picker */}
+          <div className="mt-6">
+            <LocationPicker
+              onLocationSelect={(lat, lng, address) => {
+                setLocationData({ latitude: lat, longitude: lng, address });
+                if (address && !formData.address) {
+                  setFormData(prev => ({ ...prev, address }));
+                }
+              }}
+              className="w-full"
+            />
+          </div>
 
           {/* Submit Button */}
           <div className="flex space-x-4">
