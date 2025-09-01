@@ -212,6 +212,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Serve uploaded documents
+  app.get("/api/documents/:documentId", async (req, res) => {
+    try {
+      const { documentId } = req.params;
+      
+      // For demo purposes, return a placeholder image
+      // In a real implementation, you would serve the actual uploaded file
+      const placeholderImageUrl = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjMwMCIgdmlld0JveD0iMCAwIDQwMCAzMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSI0MDAiIGhlaWdodD0iMzAwIiBmaWxsPSIjRjNGNEY2Ii8+CjxyZWN0IHg9IjEwIiB5PSIxMCIgd2lkdGg9IjM4MCIgaGVpZ2h0PSIyODAiIGZpbGw9IndoaXRlIiBzdHJva2U9IiNEMUQ1REIiIHN0cm9rZS13aWR0aD0iMiIvPgo8cGF0aCBkPSJNMTAwIDEwMEwzMDAgMjAwTTMwMCAxMDBMMTAwIDIwMCIgc3Ryb2tlPSIjOUNBM0FGIiBzdHJva2Utd2lkdGg9IjIiLz4KPHR5cGUgeD0iMjAwIiB5PSIxNTAiIGZpbGw9IiM2QjcyODAiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZvbnQtZmFtaWx5PSJzYW5zLXNlcmlmIiBmb250LXNpemU9IjE0Ij5Eb2N1bWVudCB7ZG9jdW1lbnRJZH08L3R5cGU+Cjwvc3ZnPgo=';
+      
+      // Set appropriate headers for image
+      res.set({
+        'Content-Type': 'image/svg+xml',
+        'Cache-Control': 'public, max-age=3600'
+      });
+      
+      // Return the base64 decoded image
+      const imageBuffer = Buffer.from(placeholderImageUrl.split(',')[1], 'base64');
+      res.send(imageBuffer);
+    } catch (error) {
+      console.error('Error serving document:', error);
+      res.status(500).json({ error: 'Failed to serve document' });
+    }
+  });
+
   app.post("/api/objects/upload", isAuthenticated, async (req, res) => {
     try {
       console.log('Upload URL request received from user:', req.user?.claims?.sub);
@@ -222,6 +246,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error generating upload URL:', error);
       res.status(500).json({ error: 'Failed to generate upload URL', message: error.message });
+    }
+  });
+
+  // Serve objects from cloud storage
+  app.get("/objects/:objectPath(*)", async (req, res) => {
+    try {
+      const objectStorageService = new ObjectStorageService();
+      const file = await objectStorageService.getObjectEntityFile(req.params.objectPath);
+      
+      if (!file) {
+        return res.status(404).json({ error: 'File not found' });
+      }
+      
+      await objectStorageService.downloadObject(file, res);
+    } catch (error) {
+      console.error('Error serving object:', error);
+      res.status(500).json({ error: 'Failed to serve file' });
     }
   });
 
