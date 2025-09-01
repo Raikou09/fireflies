@@ -981,6 +981,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Admin routes for vendor approval management
+  app.get('/api/admin/pending-vendors', requireAdminAuth, async (req, res) => {
+    try {
+      const pendingVendors = await storage.getPendingVendors();
+      res.json(pendingVendors);
+    } catch (error) {
+      console.error("Error fetching pending vendors:", error);
+      res.status(500).json({ message: "Failed to fetch pending vendors" });
+    }
+  });
+
+  app.post('/api/admin/approve-vendor/:vendorId', requireAdminAuth, async (req, res) => {
+    try {
+      const { vendorId } = req.params;
+      const updatedVendor = await storage.updateVendorStatus(vendorId, "verified");
+      if (!updatedVendor) {
+        return res.status(404).json({ message: "Vendor not found" });
+      }
+      res.json({ message: "Vendor approved successfully", vendor: updatedVendor });
+    } catch (error) {
+      console.error("Error approving vendor:", error);
+      res.status(500).json({ message: "Failed to approve vendor" });
+    }
+  });
+
+  app.post('/api/admin/reject-vendor/:vendorId', requireAdminAuth, async (req, res) => {
+    try {
+      const { vendorId } = req.params;
+      const { reason } = req.body;
+      const updatedVendor = await storage.updateVendorStatus(vendorId, "rejected");
+      if (!updatedVendor) {
+        return res.status(404).json({ message: "Vendor not found" });
+      }
+      res.json({ message: "Vendor rejected successfully", vendor: updatedVendor });
+    } catch (error) {
+      console.error("Error rejecting vendor:", error);
+      res.status(500).json({ message: "Failed to reject vendor" });
+    }
+  });
+
   app.get("/api/admin/pending-courts", requireAdminAuth, async (req: any, res) => {
     try {
       const pendingCourts = await storage.getPendingCourts();

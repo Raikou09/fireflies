@@ -106,6 +106,8 @@ export interface IStorage {
 
   // Admin operations
   getPendingCourts(): Promise<CourtWithDetails[]>;
+  getPendingVendors(): Promise<User[]>;
+  updateVendorStatus(vendorId: string, status: "pending" | "verified" | "rejected"): Promise<User | null>;
   getAllCourtsWithDetails(): Promise<CourtWithDetails[]>;
   setCourtCommission(id: string, commissionRate: number): Promise<Court | undefined>;
   approveCourt(courtId: string, adminNotes?: string): Promise<Court | undefined>;
@@ -825,6 +827,32 @@ export class DatabaseStorage implements IStorage {
     }
 
     return Array.from(courtMap.values());
+  }
+
+  async getPendingVendors(): Promise<User[]> {
+    const results = await db
+      .select()
+      .from(users)
+      .where(and(
+        eq(users.userType, "vendor"),
+        eq(users.vendorVerificationStatus, "pending")
+      ))
+      .orderBy(desc(users.createdAt));
+
+    return results;
+  }
+
+  async updateVendorStatus(vendorId: string, status: "pending" | "verified" | "rejected"): Promise<User | null> {
+    const results = await db
+      .update(users)
+      .set({ 
+        vendorVerificationStatus: status,
+        updatedAt: new Date()
+      })
+      .where(eq(users.id, vendorId))
+      .returning();
+
+    return results[0] || null;
   }
 
   async approveCourt(courtId: string, adminNotes?: string): Promise<Court | undefined> {
