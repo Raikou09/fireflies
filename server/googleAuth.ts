@@ -11,6 +11,8 @@ export function setupGoogleAuth(app: Express) {
     return;
   }
 
+  console.log("Setting up Google OAuth with callback URL: /api/auth/google/callback");
+  
   // Google OAuth Strategy
   passport.use(new GoogleStrategy({
     clientID: process.env.GOOGLE_CLIENT_ID,
@@ -68,6 +70,8 @@ export function setupGoogleAuth(app: Express) {
       failureRedirect: "/?error=google_auth_failed" 
     }),
     (req, res) => {
+      console.log("Google OAuth callback - successful authentication");
+      console.log("User:", req.user);
       // Successful authentication, redirect to home
       res.redirect("/");
     }

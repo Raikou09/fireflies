@@ -284,7 +284,7 @@ export default function AddCourtModal({ isOpen, onClose }: AddCourtModalProps) {
       imageUrl: imageUrl || null,
       rules: formData.rules || "",
       isActive: true,
-      commissionRate: commissionData?.defaultCommissionRate || 15
+      commissionRate: (commissionData?.defaultCommissionRate || 15).toString()
     };
     
     console.log('Final court payload:', courtPayload);
