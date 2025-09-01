@@ -93,22 +93,7 @@ export function LocationPicker({
     }
   };
 
-  // Manual coordinate input for location marking
-  const handleManualCoordinates = () => {
-    const latInput = prompt('Enter Latitude (e.g., -1.2921):');
-    const lngInput = prompt('Enter Longitude (e.g., 36.8219):');
-    
-    if (latInput && lngInput) {
-      const lat = parseFloat(latInput);
-      const lng = parseFloat(lngInput);
-      
-      if (!isNaN(lat) && !isNaN(lng)) {
-        handleLocationSelect(lat, lng);
-      } else {
-        alert('Please enter valid coordinates.');
-      }
-    }
-  };
+
 
   return (
     <Card className={className}>
@@ -132,17 +117,6 @@ export function LocationPicker({
           >
             <Navigation className="h-4 w-4" />
             Use My Location
-          </Button>
-          
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={handleManualCoordinates}
-            className="flex items-center gap-2"
-          >
-            <Target className="h-4 w-4" />
-            Enter Coordinates
           </Button>
           
           {selectedLocation && (
@@ -207,9 +181,9 @@ export function LocationPicker({
             <div className="text-sm text-gray-700">
               <p className="font-medium">How to set location:</p>
               <ul className="mt-2 space-y-1 list-disc list-inside">
-                <li><strong>Use My Location:</strong> Automatically detect your current position</li>
-                <li><strong>Enter Coordinates:</strong> Manually input latitude/longitude</li>
-                <li><strong>Common Kenya coordinates:</strong> Nairobi (-1.2921, 36.8219), Mombasa (-4.0435, 39.6682)</li>
+                <li><strong>Use My Location:</strong> Automatically detect your current position using GPS</li>
+                <li>Your browser will ask for location permission</li>
+                <li>This ensures accurate positioning for customer navigation</li>
               </ul>
             </div>
           </div>
