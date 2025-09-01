@@ -71,13 +71,13 @@ export default function AddCourtModal({ isOpen, onClose }: AddCourtModalProps) {
 
   const mutation = useMutation({
     mutationFn: async (courtData: any) => {
-      const response = await apiRequest("/api/courts", "POST", {
-        ...courtData,
-        availableDays,
-        availableSports: selectedSports,
-        latitude: locationData.latitude,
-        longitude: locationData.longitude
-      });
+      console.log('Sending court data:', courtData);
+      const response = await apiRequest("/api/courts", "POST", courtData);
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('Court creation error:', errorData);
+        throw new Error(errorData.message || 'Failed to create court');
+      }
       return response.json();
     },
     onSuccess: (court) => {
@@ -260,10 +260,23 @@ export default function AddCourtModal({ isOpen, onClose }: AddCourtModalProps) {
     }
 
     mutation.mutate({
-      ...formData,
+      name: formData.name,
       availableSports: selectedSports,
+      city: formData.city,
+      area: formData.area,
+      address: formData.address || "",
+      latitude: locationData.latitude,
+      longitude: locationData.longitude,
+      description: formData.description || "",
+      hourlyRate: formData.hourlyRate,
+      peakHourRate: formData.peakHourRate || null,
+      openingTime: formData.openingTime,
+      closingTime: formData.closingTime,
       availableDays,
-      imageUrl: imageUrl || undefined
+      imageUrl: imageUrl || null,
+      rules: formData.rules || "",
+      isActive: true,
+      commissionRate: commissionData?.defaultCommissionRate || 15
     });
   };
 

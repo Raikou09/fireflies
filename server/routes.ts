@@ -497,12 +497,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/courts", isAuthenticated, async (req: any, res) => {
     try {
-      const vendorId = req.user.claims.sub;
+      const vendorId = req.user?.claims?.sub || req.user?.id;
+      if (!vendorId) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+      
+      console.log('Creating court with data:', req.body);
       const courtData = insertCourtSchema.parse(req.body);
+      console.log('Parsed court data:', courtData);
+      
       const court = await storage.createCourt(vendorId, courtData);
       res.status(201).json(court);
     } catch (error) {
       if (error instanceof z.ZodError) {
+        console.error("Zod validation errors:", error.errors);
         return res.status(400).json({ message: "Invalid court data", errors: error.errors });
       }
       console.error("Error creating court:", error);
