@@ -13,8 +13,6 @@ import CourtDetails from "@/pages/CourtDetails";
 import BookingHistory from "@/pages/BookingHistory";
 import UserProfile from "@/pages/UserProfile";
 import NotFound from "@/pages/not-found";
-import VendorOnboardingModal from "@/components/VendorOnboardingModal";
-import { useState, useEffect } from "react";
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -38,30 +36,12 @@ function Router() {
 }
 
 function App() {
-  const [isVendorOnboardingOpen, setIsVendorOnboardingOpen] = useState(false);
-
-  useEffect(() => {
-    const handleOpenVendorOnboarding = () => {
-      setIsVendorOnboardingOpen(true);
-    };
-
-    window.addEventListener('openVendorOnboarding', handleOpenVendorOnboarding);
-    
-    return () => {
-      window.removeEventListener('openVendorOnboarding', handleOpenVendorOnboarding);
-    };
-  }, []);
-
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <NotificationToast />
         <Toaster />
         <Router />
-        <VendorOnboardingModal 
-          isOpen={isVendorOnboardingOpen} 
-          onClose={() => setIsVendorOnboardingOpen(false)} 
-        />
       </TooltipProvider>
     </QueryClientProvider>
   );

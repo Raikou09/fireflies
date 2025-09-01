@@ -10,7 +10,6 @@ import { Badge } from "@/components/ui/badge";
 import { AlertTriangle, Clock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { LocationPicker } from "./LocationPicker";
 import type { CourtWithDetails } from "@shared/schema";
 
 interface VendorCourtUpdateModalProps {
@@ -36,15 +35,6 @@ export default function VendorCourtUpdateModal({ court, isOpen, onClose }: Vendo
     availableDays: [] as string[],
   });
 
-  const [locationData, setLocationData] = useState<{
-    latitude: number | null;
-    longitude: number | null;
-    address?: string;
-  }>({
-    latitude: null,
-    longitude: null,
-  });
-
   React.useEffect(() => {
     console.log('VendorCourtUpdateModal - Court data:', court);
     if (court) {
@@ -62,15 +52,6 @@ export default function VendorCourtUpdateModal({ court, isOpen, onClose }: Vendo
         availableSports: court.availableSports || [],
         availableDays: court.availableDays || [],
       });
-      
-      // Set existing location data if available
-      if (court.latitude && court.longitude) {
-        setLocationData({
-          latitude: court.latitude,
-          longitude: court.longitude,
-          address: court.address || undefined
-        });
-      }
     }
   }, [court]);
 
@@ -81,8 +62,6 @@ export default function VendorCourtUpdateModal({ court, isOpen, onClose }: Vendo
         ...data,
         hourlyRate: parseFloat(data.hourlyRate),
         peakHourRate: data.peakHourRate ? parseFloat(data.peakHourRate) : null,
-        latitude: locationData.latitude,
-        longitude: locationData.longitude,
       });
       console.log('Mutation - API response status:', response.status);
       if (!response.ok) {
@@ -328,21 +307,6 @@ export default function VendorCourtUpdateModal({ court, isOpen, onClose }: Vendo
               onChange={(e) => setFormData({ ...formData, rules: e.target.value })}
               placeholder="Any specific rules, dress code, equipment requirements, etc."
               data-testid="input-court-rules"
-            />
-          </div>
-
-          {/* Location Picker */}
-          <div className="mt-6">
-            <LocationPicker
-              onLocationSelect={(lat, lng, address) => {
-                setLocationData({ latitude: lat, longitude: lng, address });
-                if (address && !formData.address) {
-                  setFormData(prev => ({ ...prev, address }));
-                }
-              }}
-              initialLat={locationData.latitude || undefined}
-              initialLng={locationData.longitude || undefined}
-              className="w-full"
             />
           </div>
 

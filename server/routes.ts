@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
-// import { setupGoogleAuth } from "./googleAuth"; // Disabled - using Replit Auth instead
+import { setupGoogleAuth } from "./googleAuth";
 import {
   ObjectStorageService,
   ObjectNotFoundError,
@@ -30,10 +30,9 @@ const requireAdminAuth = (req: any, res: any, next: any) => {
 };
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Auth middleware - using Replit's built-in authentication
+  // Auth middleware
   await setupAuth(app);
-  // Google OAuth disabled - using Replit Auth instead
-  // setupGoogleAuth(app);
+  setupGoogleAuth(app);
 
   // Auth routes
   app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
@@ -49,123 +48,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching user:", error);
       res.status(500).json({ message: "Failed to fetch user" });
-    }
-  });
-
-  // Vendor onboarding endpoint
-  app.post('/api/vendor/onboard', isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user?.claims?.sub || req.user?.id;
-      const user = await storage.getUser(userId);
-      
-      if (!user) {
-        return res.status(404).json({ message: "User not found" });
-      }
-
-      // Validate vendor onboarding data
-      const { vendorOnboardingSchema } = await import("@shared/schema");
-      const validatedData = vendorOnboardingSchema.parse(req.body);
-
-      // Update user with vendor details and mark as pending verification
-      const updatedUser = await storage.upsertUser({
-        ...user,
-        userType: "vendor",
-        vendorVerificationStatus: "pending",
-        ...validatedData
-      });
-
-      res.json(updatedUser);
-    } catch (error) {
-      console.error("Error during vendor onboarding:", error);
-      if (error.name === 'ZodError') {
-        return res.status(400).json({ 
-          message: "Invalid vendor data", 
-          errors: error.errors 
-        });
-      }
-      res.status(500).json({ message: "Failed to complete vendor onboarding" });
-    }
-  });
-
-  // Check if user can create courts (must be verified vendor)
-  app.get('/api/vendor/can-create-courts', isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user?.claims?.sub || req.user?.id;
-      const user = await storage.getUser(userId);
-      
-      if (!user) {
-        return res.status(404).json({ message: "User not found" });
-      }
-
-      const canCreate = user.userType === "vendor" && user.vendorVerificationStatus === "verified";
-      
-      // Provide detailed verification status
-      const verificationDetails = {
-        canCreate,
-        userType: user.userType,
-        verificationStatus: user.vendorVerificationStatus,
-        hasNationalId: !!user.nationalIdDocument,
-        hasBankStatement: !!user.bankStatement,
-        hasBusinessLicense: !!user.businessLicense,
-        hasRequiredDocuments: !!user.nationalIdDocument && 
-          (user.paymentPreference !== "bank" && user.paymentPreference !== "both" || !!user.bankStatement)
-      };
-      
-      res.json({ ...verificationDetails, user });
-    } catch (error) {
-      console.error("Error checking vendor status:", error);
-      res.status(500).json({ message: "Failed to check vendor status" });
-    }
-  });
-
-  // Enhanced vendor verification status check
-  app.get('/api/vendor/verification-status', isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user?.claims?.sub || req.user?.id;
-      const user = await storage.getUser(userId);
-      
-      if (!user) {
-        return res.status(404).json({ message: "User not found" });
-      }
-
-      if (user.userType !== "vendor") {
-        return res.status(403).json({ message: "Access denied. Vendor account required." });
-      }
-
-      const missingRequirements = [];
-      
-      // Check document requirements
-      if (!user.nationalIdDocument) {
-        missingRequirements.push("National ID document");
-      }
-      
-      if ((user.paymentPreference === "bank" || user.paymentPreference === "both") && !user.bankStatement) {
-        missingRequirements.push("Bank statement");
-      }
-      
-      // Check basic info requirements
-      if (!user.phoneNumber) missingRequirements.push("Phone number");
-      if (!user.businessName) missingRequirements.push("Business name");
-      if (!user.businessAddress) missingRequirements.push("Business address");
-      if (!user.kraPin) missingRequirements.push("KRA PIN");
-      if (!user.nationalId) missingRequirements.push("National ID number");
-
-      const verificationStatus = {
-        status: user.vendorVerificationStatus,
-        canCreateCourts: user.vendorVerificationStatus === "verified",
-        isComplete: missingRequirements.length === 0,
-        missingRequirements,
-        documentsUploaded: {
-          nationalId: !!user.nationalIdDocument,
-          bankStatement: !!user.bankStatement,
-          businessLicense: !!user.businessLicense
-        }
-      };
-
-      res.json(verificationStatus);
-    } catch (error) {
-      console.error("Error checking verification status:", error);
-      res.status(500).json({ message: "Failed to check verification status" });
     }
   });
 
@@ -193,77 +75,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Simplified direct file upload for vendor documents
-  app.post("/api/vendor/upload-document", isAuthenticated, async (req, res) => {
-    try {
-      const userId = req.user?.claims?.sub || req.user?.id;
-      console.log('Document upload request from user:', userId);
-      
-      // For now, simulate a successful upload and return a placeholder URL
-      // In a real implementation, you would handle the file upload here
-      const documentId = `doc_${userId}_${Date.now()}`;
-      const mockDocumentUrl = `/api/documents/${documentId}`;
-      
-      console.log('Generated document URL:', mockDocumentUrl);
-      res.json({ documentUrl: mockDocumentUrl });
-    } catch (error) {
-      console.error('Error uploading document:', error);
-      res.status(500).json({ error: 'Failed to upload document', message: error.message });
-    }
-  });
-
-  // Serve uploaded documents
-  app.get("/api/documents/:documentId", async (req, res) => {
-    try {
-      const { documentId } = req.params;
-      
-      // For demo purposes, return a placeholder image
-      // In a real implementation, you would serve the actual uploaded file
-      const placeholderImageUrl = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjMwMCIgdmlld0JveD0iMCAwIDQwMCAzMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSI0MDAiIGhlaWdodD0iMzAwIiBmaWxsPSIjRjNGNEY2Ii8+CjxyZWN0IHg9IjEwIiB5PSIxMCIgd2lkdGg9IjM4MCIgaGVpZ2h0PSIyODAiIGZpbGw9IndoaXRlIiBzdHJva2U9IiNEMUQ1REIiIHN0cm9rZS13aWR0aD0iMiIvPgo8cGF0aCBkPSJNMTAwIDEwMEwzMDAgMjAwTTMwMCAxMDBMMTAwIDIwMCIgc3Ryb2tlPSIjOUNBM0FGIiBzdHJva2Utd2lkdGg9IjIiLz4KPHR5cGUgeD0iMjAwIiB5PSIxNTAiIGZpbGw9IiM2QjcyODAiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZvbnQtZmFtaWx5PSJzYW5zLXNlcmlmIiBmb250LXNpemU9IjE0Ij5Eb2N1bWVudCB7ZG9jdW1lbnRJZH08L3R5cGU+Cjwvc3ZnPgo=';
-      
-      // Set appropriate headers for image
-      res.set({
-        'Content-Type': 'image/svg+xml',
-        'Cache-Control': 'public, max-age=3600'
-      });
-      
-      // Return the base64 decoded image
-      const imageBuffer = Buffer.from(placeholderImageUrl.split(',')[1], 'base64');
-      res.send(imageBuffer);
-    } catch (error) {
-      console.error('Error serving document:', error);
-      res.status(500).json({ error: 'Failed to serve document' });
-    }
-  });
-
   app.post("/api/objects/upload", isAuthenticated, async (req, res) => {
-    try {
-      console.log('Upload URL request received from user:', req.user?.claims?.sub);
-      const objectStorageService = new ObjectStorageService();
-      const uploadURL = await objectStorageService.getObjectEntityUploadURL();
-      console.log('Generated upload URL:', uploadURL);
-      res.json({ uploadURL });
-    } catch (error) {
-      console.error('Error generating upload URL:', error);
-      res.status(500).json({ error: 'Failed to generate upload URL', message: error.message });
-    }
-  });
-
-  // Serve objects from cloud storage
-  app.get("/objects/:objectPath(*)", async (req, res) => {
-    try {
-      const objectStorageService = new ObjectStorageService();
-      const file = await objectStorageService.getObjectEntityFile(req.params.objectPath);
-      
-      if (!file) {
-        return res.status(404).json({ error: 'File not found' });
-      }
-      
-      await objectStorageService.downloadObject(file, res);
-    } catch (error) {
-      console.error('Error serving object:', error);
-      res.status(500).json({ error: 'Failed to serve file' });
-    }
+    const objectStorageService = new ObjectStorageService();
+    const uploadURL = await objectStorageService.getObjectEntityUploadURL();
+    res.json({ uploadURL });
   });
 
   // Court routes
@@ -682,61 +497,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/courts", isAuthenticated, async (req: any, res) => {
     try {
-      const vendorId = req.user?.claims?.sub || req.user?.id;
-      if (!vendorId) {
-        return res.status(401).json({ message: "Authentication required" });
-      }
-      
-      // Check vendor verification status before allowing court creation
-      const vendor = await storage.getUser(vendorId);
-      if (!vendor) {
-        return res.status(404).json({ message: "User not found" });
-      }
-      
-      if (vendor.userType !== "vendor") {
-        return res.status(403).json({ 
-          message: "Access denied. Only verified vendors can create courts.",
-          code: "NOT_VENDOR"
-        });
-      }
-      
-      if (vendor.vendorVerificationStatus !== "verified") {
-        const statusMessages = {
-          pending: "Your vendor application is still under review. You cannot create courts until verified.",
-          rejected: "Your vendor application was rejected. Please contact support for assistance."
-        };
-        
-        return res.status(403).json({ 
-          message: statusMessages[vendor.vendorVerificationStatus as keyof typeof statusMessages] || "Vendor verification required.",
-          code: "NOT_VERIFIED",
-          verificationStatus: vendor.vendorVerificationStatus
-        });
-      }
-      
-      // Additional document verification check
-      const missingDocs = [];
-      if (!vendor.nationalIdDocument) missingDocs.push("National ID");
-      if ((vendor.paymentPreference === "bank" || vendor.paymentPreference === "both") && !vendor.bankStatement) {
-        missingDocs.push("Bank statement");
-      }
-      
-      if (missingDocs.length > 0) {
-        return res.status(403).json({
-          message: `Missing required documents: ${missingDocs.join(", ")}. Please complete your verification.`,
-          code: "MISSING_DOCUMENTS",
-          missingDocuments: missingDocs
-        });
-      }
-      
-      console.log('Creating court with data:', req.body);
+      const vendorId = req.user.claims.sub;
       const courtData = insertCourtSchema.parse(req.body);
-      console.log('Parsed court data:', courtData);
-      
       const court = await storage.createCourt(vendorId, courtData);
       res.status(201).json(court);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        console.error("Zod validation errors:", error.errors);
         return res.status(400).json({ message: "Invalid court data", errors: error.errors });
       }
       console.error("Error creating court:", error);
@@ -838,12 +604,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const customerId = req.user?.claims?.sub || req.user?.id;
       const bookingData = insertBookingSchema.parse(req.body);
-      const booking = await storage.createBooking({ 
-        ...bookingData, 
-        customerId,
-        createdAt: new Date(),
-        updatedAt: new Date()
-      });
+      const booking = await storage.createBooking({ ...bookingData, customerId });
       
       // Get customer and court details for notifications
       const customer = await storage.getUser(customerId);
@@ -1019,46 +780,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error updating commission rate:", error);
       res.status(500).json({ message: "Failed to update commission rate" });
-    }
-  });
-
-  // Admin routes for vendor approval management
-  app.get('/api/admin/pending-vendors', requireAdminAuth, async (req, res) => {
-    try {
-      const pendingVendors = await storage.getPendingVendors();
-      res.json(pendingVendors);
-    } catch (error) {
-      console.error("Error fetching pending vendors:", error);
-      res.status(500).json({ message: "Failed to fetch pending vendors" });
-    }
-  });
-
-  app.post('/api/admin/approve-vendor/:vendorId', requireAdminAuth, async (req, res) => {
-    try {
-      const { vendorId } = req.params;
-      const updatedVendor = await storage.updateVendorStatus(vendorId, "verified");
-      if (!updatedVendor) {
-        return res.status(404).json({ message: "Vendor not found" });
-      }
-      res.json({ message: "Vendor approved successfully", vendor: updatedVendor });
-    } catch (error) {
-      console.error("Error approving vendor:", error);
-      res.status(500).json({ message: "Failed to approve vendor" });
-    }
-  });
-
-  app.post('/api/admin/reject-vendor/:vendorId', requireAdminAuth, async (req, res) => {
-    try {
-      const { vendorId } = req.params;
-      const { reason } = req.body;
-      const updatedVendor = await storage.updateVendorStatus(vendorId, "rejected");
-      if (!updatedVendor) {
-        return res.status(404).json({ message: "Vendor not found" });
-      }
-      res.json({ message: "Vendor rejected successfully", vendor: updatedVendor });
-    } catch (error) {
-      console.error("Error rejecting vendor:", error);
-      res.status(500).json({ message: "Failed to reject vendor" });
     }
   });
 

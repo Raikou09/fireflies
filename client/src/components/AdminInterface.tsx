@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { apiRequest } from "@/lib/queryClient";
-import { CheckCircle, XCircle, MapPin, Clock, Calendar, Star, Database, BarChart3, Users, Phone, Building, FileText } from "lucide-react";
+import { CheckCircle, XCircle, MapPin, Clock, Calendar, Star, Database, BarChart3 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import AdminCourtsManager from "./AdminCourtsManager";
 import AdminAnalytics from "./AdminAnalytics";
@@ -37,28 +37,6 @@ interface PendingCourt {
   createdAt: string;
 }
 
-interface PendingVendor {
-  id: string;
-  email: string;
-  firstName?: string;
-  lastName?: string;
-  phoneNumber?: string;
-  businessName?: string;
-  businessAddress?: string;
-  kraPin?: string;
-  nationalId?: string;
-  bankName?: string;
-  bankAccountNumber?: string;
-  bankAccountName?: string;
-  mpesaNumber?: string;
-  paymentPreference?: string;
-  nationalIdDocument?: string;
-  bankStatement?: string;
-  businessLicense?: string;
-  vendorVerificationStatus: string;
-  createdAt: string;
-}
-
 export default function AdminInterface() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -73,11 +51,6 @@ export default function AdminInterface() {
 
   const { data: pendingCourts, isLoading } = useQuery({
     queryKey: ["/api/admin/pending-courts"],
-    retry: false,
-  });
-
-  const { data: pendingVendors, isLoading: vendorsLoading } = useQuery({
-    queryKey: ["/api/admin/pending-vendors"],
     retry: false,
   });
 
@@ -188,68 +161,6 @@ export default function AdminInterface() {
     },
   });
 
-  const approveVendorMutation = useMutation({
-    mutationFn: async (vendorId: string) => {
-      await apiRequest(`/api/admin/approve-vendor/${vendorId}`, "POST");
-    },
-    onSuccess: () => {
-      toast({
-        title: "Vendor Approved",
-        description: "The vendor has been approved and can now create courts.",
-      });
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/pending-vendors"] });
-    },
-    onError: (error) => {
-      if (isUnauthorizedError(error)) {
-        toast({
-          title: "Unauthorized",
-          description: "You are logged out. Logging in again...",
-          variant: "destructive",
-        });
-        setTimeout(() => {
-          window.location.href = "/api/login";
-        }, 500);
-        return;
-      }
-      toast({
-        title: "Error",
-        description: "Failed to approve vendor. Please try again.",
-        variant: "destructive",
-      });
-    },
-  });
-
-  const rejectVendorMutation = useMutation({
-    mutationFn: async (vendorId: string) => {
-      await apiRequest(`/api/admin/reject-vendor/${vendorId}`, "POST");
-    },
-    onSuccess: () => {
-      toast({
-        title: "Vendor Rejected",
-        description: "The vendor application has been rejected.",
-      });
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/pending-vendors"] });
-    },
-    onError: (error) => {
-      if (isUnauthorizedError(error)) {
-        toast({
-          title: "Unauthorized",
-          description: "You are logged out. Logging in again...",
-          variant: "destructive",
-        });
-        setTimeout(() => {
-          window.location.href = "/api/login";
-        }, 500);
-        return;
-      }
-      toast({
-        title: "Error",
-        description: "Failed to reject vendor. Please try again.",
-        variant: "destructive",
-      });
-    },
-  });
-
   const handleApproval = (court: PendingCourt, action: "approve" | "reject") => {
     setSelectedCourt(court);
     setApprovalAction(action);
@@ -308,15 +219,11 @@ export default function AdminInterface() {
     <div className="space-y-6">
       <div>
         <h2 className="text-2xl font-bold text-gray-900">Admin Dashboard</h2>
-        <p className="text-gray-600">Manage vendor verification, court approvals and commission rates</p>
+        <p className="text-gray-600">Manage court approvals and commission rates</p>
       </div>
 
-      <Tabs defaultValue="vendor-approvals" className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="vendor-approvals" className="flex items-center gap-2">
-            <Users className="h-4 w-4" />
-            Vendor Approvals ({(pendingVendors as PendingVendor[])?.length || 0} pending)
-          </TabsTrigger>
+      <Tabs defaultValue="approvals" className="w-full">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="approvals" className="flex items-center gap-2">
             <Clock className="h-4 w-4" />
             Court Approvals ({courts.length} pending)
@@ -330,143 +237,6 @@ export default function AdminInterface() {
             Analytics & Performance
           </TabsTrigger>
         </TabsList>
-
-        <TabsContent value="vendor-approvals" className="mt-6">
-          {vendorsLoading ? (
-            <div className="flex items-center justify-center py-12">
-              <div className="text-center">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-                <p className="text-gray-600">Loading pending vendors...</p>
-              </div>
-            </div>
-          ) : (pendingVendors as PendingVendor[])?.length === 0 ? (
-            <Card>
-              <CardContent className="text-center py-12">
-                <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-4" />
-                <h3 className="text-xl font-semibold mb-2">All Caught Up!</h3>
-                <p className="text-gray-600">No vendor applications pending approval.</p>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="grid gap-6">
-              {(pendingVendors as PendingVendor[])?.map((vendor) => (
-                <Card key={vendor.id} className="overflow-hidden" data-testid={`card-vendor-${vendor.id}`}>
-                  <CardHeader className="pb-4">
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="text-xl">
-                        {vendor.businessName || `${vendor.firstName} ${vendor.lastName}`}
-                      </CardTitle>
-                      <Badge variant="outline" className="text-orange-600 border-orange-600">
-                        Pending Review
-                      </Badge>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                      <div className="flex items-center gap-2">
-                        <Users className="h-4 w-4 text-blue-500" />
-                        <span className="font-medium">{vendor.email}</span>
-                      </div>
-                      {vendor.phoneNumber && (
-                        <div className="flex items-center gap-2">
-                          <Phone className="h-4 w-4 text-green-500" />
-                          <span>{vendor.phoneNumber}</span>
-                        </div>
-                      )}
-                      {vendor.businessAddress && (
-                        <div className="flex items-center gap-2">
-                          <Building className="h-4 w-4 text-purple-500" />
-                          <span>{vendor.businessAddress}</span>
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div>
-                        <h4 className="font-medium mb-2">Business Information</h4>
-                        <div className="text-sm text-gray-600 space-y-1">
-                          {vendor.kraPin && <p><strong>KRA PIN:</strong> {vendor.kraPin}</p>}
-                          {vendor.nationalId && <p><strong>National ID:</strong> {vendor.nationalId}</p>}
-                        </div>
-                      </div>
-                      <div>
-                        <h4 className="font-medium mb-2">Banking Details</h4>
-                        <div className="text-sm text-gray-600 space-y-1">
-                          {vendor.bankName && <p><strong>Bank:</strong> {vendor.bankName}</p>}
-                          {vendor.bankAccountName && <p><strong>Account Name:</strong> {vendor.bankAccountName}</p>}
-                          {vendor.bankAccountNumber && <p><strong>Account Number:</strong> {vendor.bankAccountNumber}</p>}
-                        </div>
-                      </div>
-                      <div>
-                        <h4 className="font-medium mb-2">Documents</h4>
-                        <div className="text-sm space-y-2">
-                          {vendor.nationalIdDocument && (
-                            <a 
-                              href={vendor.nationalIdDocument} 
-                              target="_blank" 
-                              rel="noopener noreferrer"
-                              className="flex items-center gap-2 text-blue-600 hover:text-blue-800"
-                              data-testid={`link-national-id-${vendor.id}`}
-                            >
-                              <FileText className="h-4 w-4" />
-                              National ID
-                            </a>
-                          )}
-                          {vendor.bankStatement && (
-                            <a 
-                              href={vendor.bankStatement} 
-                              target="_blank" 
-                              rel="noopener noreferrer"
-                              className="flex items-center gap-2 text-blue-600 hover:text-blue-800"
-                              data-testid={`link-bank-statement-${vendor.id}`}
-                            >
-                              <FileText className="h-4 w-4" />
-                              Bank Statement
-                            </a>
-                          )}
-                          {vendor.businessLicense && (
-                            <a 
-                              href={vendor.businessLicense} 
-                              target="_blank" 
-                              rel="noopener noreferrer"
-                              className="flex items-center gap-2 text-blue-600 hover:text-blue-800"
-                              data-testid={`link-business-license-${vendor.id}`}
-                            >
-                              <FileText className="h-4 w-4" />
-                              Business License
-                            </a>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex space-x-3 pt-4 border-t">
-                      <Button
-                        onClick={() => approveVendorMutation.mutate(vendor.id)}
-                        className="flex items-center gap-2 bg-green-600 hover:bg-green-700"
-                        disabled={approveVendorMutation.isPending || rejectVendorMutation.isPending}
-                        data-testid={`button-approve-vendor-${vendor.id}`}
-                      >
-                        <CheckCircle className="h-4 w-4" />
-                        Approve Vendor
-                      </Button>
-                      <Button
-                        onClick={() => rejectVendorMutation.mutate(vendor.id)}
-                        variant="destructive"
-                        className="flex items-center gap-2"
-                        disabled={approveVendorMutation.isPending || rejectVendorMutation.isPending}
-                        data-testid={`button-reject-vendor-${vendor.id}`}
-                      >
-                        <XCircle className="h-4 w-4" />
-                        Reject Vendor
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
-        </TabsContent>
 
         <TabsContent value="approvals" className="mt-6">
           {courts.length === 0 ? (

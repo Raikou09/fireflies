@@ -24,7 +24,6 @@ import {
   MapPin,
   LogOut,
   AlertCircle,
-  AlertTriangle,
   ArrowLeft,
   Package,
   Edit,
@@ -74,12 +73,6 @@ export default function VendorDashboard() {
   const { user, isAuthenticated, isLoading } = useAuth();
   const { toast } = useToast();
   const [isVendor, setIsVendor] = useState(false);
-  
-  // Check if user can create courts (verified vendor)
-  const { data: vendorStatus } = useQuery({
-    queryKey: ["/api/vendor/can-create-courts"],
-    enabled: isAuthenticated && ((user as any)?.userType === "vendor" || (user as any)?.user_type === "vendor"),
-  });
   const [vendorCheckLoading, setVendorCheckLoading] = useState(true);
   const [selectedCourtForEquipment, setSelectedCourtForEquipment] = useState<string | null>(null);
   const [courtToUpdate, setCourtToUpdate] = useState<CourtWithDetails | null>(null);
@@ -192,49 +185,6 @@ export default function VendorDashboard() {
     );
   }
 
-  // Check vendor verification status
-  if ((user as any)?.userType === "vendor" || (user as any)?.user_type === "vendor") {
-    const verificationStatus = (user as any)?.vendorVerificationStatus;
-    
-    if (!verificationStatus || verificationStatus === "pending") {
-      return (
-        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-          <Card className="w-full max-w-md">
-            <CardHeader className="text-center">
-              <Clock className="h-12 w-12 text-orange-500 mx-auto mb-4" />
-              <CardTitle className="text-2xl">Vendor Application Pending</CardTitle>
-              <p className="text-gray-600">Your vendor application is under review. You'll be able to create courts once approved by our admin team.</p>
-            </CardHeader>
-            <CardContent>
-              <Button onClick={() => window.location.href = "/"} variant="outline" className="w-full">
-                Back to Home
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-      );
-    }
-
-    if (verificationStatus === "rejected") {
-      return (
-        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-          <Card className="w-full max-w-md">
-            <CardHeader className="text-center">
-              <AlertTriangle className="h-12 w-12 text-red-500 mx-auto mb-4" />
-              <CardTitle className="text-2xl">Vendor Application Rejected</CardTitle>
-              <p className="text-gray-600">Unfortunately, your vendor application was not approved. Please contact support for more information.</p>
-            </CardHeader>
-            <CardContent>
-              <Button onClick={() => window.location.href = "/"} variant="outline" className="w-full">
-                Back to Home
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-      );
-    }
-  }
-
   if (!isVendor) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -242,10 +192,10 @@ export default function VendorDashboard() {
           <CardHeader className="text-center">
             <AlertCircle className="h-12 w-12 text-orange-500 mx-auto mb-4" />
             <CardTitle className="text-2xl">Access Restricted</CardTitle>
-            <p className="text-gray-600">This dashboard is only available to verified vendor accounts.</p>
+            <p className="text-gray-600">This dashboard is only available to vendor accounts. Please contact support to upgrade your account.</p>
           </CardHeader>
           <CardContent>
-            <Button onClick={() => window.location.href = "/"} variant="outline" className="w-full">
+            <Button onClick={handleLogout} variant="outline" className="w-full">
               Back to Home
             </Button>
           </CardContent>

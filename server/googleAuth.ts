@@ -11,18 +11,11 @@ export function setupGoogleAuth(app: Express) {
     return;
   }
 
-  // Construct the full callback URL using Replit's domain
-  const callbackURL = process.env.REPLIT_DEV_DOMAIN 
-    ? `https://${process.env.REPLIT_DEV_DOMAIN}/api/auth/google/callback`
-    : "/api/auth/google/callback";
-    
-  console.log("Setting up Google OAuth with callback URL:", callbackURL);
-  
   // Google OAuth Strategy
   passport.use(new GoogleStrategy({
     clientID: process.env.GOOGLE_CLIENT_ID,
     clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-    callbackURL: callbackURL
+    callbackURL: "/api/auth/google/callback"
   },
   async (accessToken: string, refreshToken: string, profile: any, done: any) => {
     try {
@@ -75,8 +68,6 @@ export function setupGoogleAuth(app: Express) {
       failureRedirect: "/?error=google_auth_failed" 
     }),
     (req, res) => {
-      console.log("Google OAuth callback - successful authentication");
-      console.log("User:", req.user);
       // Successful authentication, redirect to home
       res.redirect("/");
     }
