@@ -65,7 +65,15 @@ export default function VendorOnboardingModal({ isOpen, onClose }: VendorOnboard
 
   const mutation = useMutation({
     mutationFn: async (data: VendorOnboarding) => {
-      const response = await apiRequest("POST", "/api/vendor/onboard", data);
+      const response = await fetch("/api/vendor/onboard", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(data),
+        credentials: "include", // Include cookies for authentication
+      });
+      
       if (!response.ok) {
         const error = await response.json();
         throw new Error(error.message || "Failed to complete vendor onboarding");
