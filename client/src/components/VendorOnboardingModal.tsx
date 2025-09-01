@@ -98,10 +98,17 @@ export default function VendorOnboardingModal({ isOpen, onClose }: VendorOnboard
       console.log('Starting document upload for:', documentType, 'File:', file.name);
       
       // Use simplified upload endpoint
-      const uploadResponse = await apiRequest("POST", "/api/vendor/upload-document", {
-        fileName: file.name,
-        fileType: file.type,
-        fileSize: file.size
+      const uploadResponse = await fetch("/api/vendor/upload-document", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          fileName: file.name,
+          fileType: file.type,
+          fileSize: file.size
+        }),
+        credentials: "include", // Include cookies for authentication
       });
       console.log('Upload response status:', uploadResponse.status);
       
