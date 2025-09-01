@@ -207,20 +207,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Serve objects from cloud storage
-  app.get("/objects/:objectPath(*)", async (req, res) => {
+  // Serve uploaded documents (handles both old mock documents and new real uploads)
+  app.get("/api/documents/:documentId", async (req, res) => {
     try {
-      const objectStorageService = new ObjectStorageService();
-      const file = await objectStorageService.getObjectEntityFile(req.params.objectPath);
+      const { documentId } = req.params;
       
-      if (!file) {
-        return res.status(404).json({ error: 'File not found' });
+      // For old mock documents, return a placeholder
+      if (documentId.startsWith('doc_')) {
+        const placeholderImageUrl = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjMwMCIgdmlld0JveD0iMCAwIDQwMCAzMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSI0MDAiIGhlaWdodD0iMzAwIiBmaWxsPSIjRjNGNEY2Ii8+CjxyZWN0IHg9IjEwIiB5PSIxMCIgd2lkdGg9IjM4MCIgaGVpZ2h0PSIyODAiIGZpbGw9IndoaXRlIiBzdHJva2U9IiNEMUQ1REIiIHN0cm9rZS13aWR0aD0iMiIvPgo8dGV4dCB4PSIyMDAiIHk9IjEzMCIgZmlsbD0iIzZCNzI4MCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC1mYW1pbHk9InNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMTYiIGZvbnQtd2VpZ2h0PSI2MDAiPkRvY3VtZW50IFBsYWNlaG9sZGVyPC90ZXh0Pjx0ZXh0IHg9IjIwMCIgeT0iMTUwIiBmaWxsPSIjOUI3QzgwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LWZhbWlseT0ic2Fucy1zZXJpZiIgZm9udC1zaXplPSIxMiI+VGhpcyBpcyBhIHBsYWNlaG9sZGVyIGZvciBvbGQgdXBsb2FkczwvdGV4dD48dGV4dCB4PSIyMDAiIHk9IjE3MCIgZmlsbD0iIzlCN0M4MCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC1mYW1pbHk9InNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMTIiPk5ldyB1cGxvYWRzIHdpbGwgc2hvdyByZWFsIGZpbGVzPC90ZXh0Pjwvc3ZnPg==';
+        
+        res.set({
+          'Content-Type': 'image/svg+xml',
+          'Cache-Control': 'public, max-age=3600'
+        });
+        
+        const imageBuffer = Buffer.from(placeholderImageUrl.split(',')[1], 'base64');
+        res.send(imageBuffer);
+        return;
       }
       
-      await objectStorageService.downloadObject(file, res);
+      // For new uploads, this shouldn't be reached as they use /objects/ paths
+      res.status(404).json({ error: 'Document not found' });
     } catch (error) {
-      console.error('Error serving object:', error);
-      res.status(500).json({ error: 'Failed to serve file' });
+      console.error('Error serving document:', error);
+      res.status(500).json({ error: 'Failed to serve document' });
+    }
+  });
+
+  app.post("/api/objects/upload", isAuthenticated, async (req, res) => {
+    try {
+      console.log('Upload URL request received from user:', req.user?.claims?.sub);
+      const objectStorageService = new ObjectStorageService();
+      const uploadURL = await objectStorageService.getObjectEntityUploadURL();
+      console.log('Generated upload URL:', uploadURL);
+      res.json({ uploadURL });
+    } catch (error) {
+      console.error('Error generating upload URL:', error);
+      res.status(500).json({ error: 'Failed to generate upload URL', message: (error as Error).message });
     }
   });
 
