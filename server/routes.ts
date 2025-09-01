@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
-import { setupGoogleAuth } from "./googleAuth";
+// import { setupGoogleAuth } from "./googleAuth"; // Disabled - using Replit Auth instead
 import {
   ObjectStorageService,
   ObjectNotFoundError,
@@ -30,9 +30,10 @@ const requireAdminAuth = (req: any, res: any, next: any) => {
 };
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Auth middleware
+  // Auth middleware - using Replit's built-in authentication
   await setupAuth(app);
-  setupGoogleAuth(app);
+  // Google OAuth disabled - using Replit Auth instead
+  // setupGoogleAuth(app);
 
   // Auth routes
   app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
