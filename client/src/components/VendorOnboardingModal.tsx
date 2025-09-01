@@ -95,28 +95,40 @@ export default function VendorOnboardingModal({ isOpen, onClose }: VendorOnboard
   const uploadDocument = async (file: File, documentType: string) => {
     try {
       setUploadingDoc(documentType);
+      console.log('Starting document upload for:', documentType, 'File:', file.name);
       
       // Get upload URL
       const uploadResponse = await apiRequest("POST", "/api/objects/upload");
+      console.log('Upload response status:', uploadResponse.status);
+      
       if (!uploadResponse.ok) {
+        const errorData = await uploadResponse.text();
+        console.error('Failed to get upload URL:', errorData);
         throw new Error("Failed to get upload URL");
       }
+      
       const { uploadURL } = await uploadResponse.json();
+      console.log('Got upload URL:', uploadURL);
       
-      // Upload file
-      const formData = new FormData();
-      formData.append("file", file);
-      
+      // Upload file directly to cloud storage using PUT method
       const uploadFileResponse = await fetch(uploadURL, {
-        method: "POST",
-        body: formData,
+        method: "PUT",
+        body: file,
+        headers: {
+          'Content-Type': file.type,
+        },
       });
       
+      console.log('File upload response status:', uploadFileResponse.status);
+      
       if (!uploadFileResponse.ok) {
+        const errorText = await uploadFileResponse.text();
+        console.error('File upload failed:', errorText);
         throw new Error("Failed to upload file");
       }
       
       const fileUrl = uploadURL.split('?')[0]; // Get the base URL without query params
+      console.log('File uploaded successfully, URL:', fileUrl);
       
       // Update form and state
       form.setValue(documentType as keyof VendorOnboarding, fileUrl);
@@ -127,9 +139,10 @@ export default function VendorOnboardingModal({ isOpen, onClose }: VendorOnboard
         description: `${file.name} has been uploaded successfully.`,
       });
     } catch (error) {
+      console.error('Document upload error:', error);
       toast({
         title: "Upload Error",
-        description: "Failed to upload document. Please try again.",
+        description: error instanceof Error ? error.message : "Failed to upload document. Please try again.",
         variant: "destructive",
       });
     } finally {
