@@ -102,6 +102,22 @@ export default function Navigation({ userMode, setUserMode }: NavigationProps) {
                           </Link>
                         </DropdownMenuItem>
                       )}
+                      {((user as any)?.user_type !== "vendor" && (user as any)?.userType !== "vendor") && (
+                        <DropdownMenuItem onClick={async () => {
+                          try {
+                            const response = await fetch("/api/auth/become-vendor", {
+                              method: "POST"
+                            });
+                            if (response.ok) {
+                              window.location.reload();
+                            }
+                          } catch (error) {
+                            console.error("Error becoming vendor:", error);
+                          }
+                        }}>
+                          Become a Vendor
+                        </DropdownMenuItem>
+                      )}
                       <DropdownMenuItem onClick={() => window.location.href = "/api/logout"}>
                         Sign Out
                       </DropdownMenuItem>

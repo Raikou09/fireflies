@@ -58,12 +58,17 @@ function updateUserSession(
 async function upsertUser(
   claims: any,
 ) {
+  // Check if user already exists to preserve their userType
+  const existingUser = await storage.getUserByEmail(claims["email"]);
+  
   await storage.upsertUser({
     id: claims["sub"],
     email: claims["email"],
     firstName: claims["first_name"],
     lastName: claims["last_name"],
     profileImageUrl: claims["profile_image_url"],
+    // Preserve existing userType if user exists, otherwise default to customer
+    userType: existingUser?.userType || "customer"
   });
 }
 

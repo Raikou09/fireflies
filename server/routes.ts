@@ -52,6 +52,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Route to upgrade user to vendor
+  app.post('/api/auth/become-vendor', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub || req.user?.id;
+      const user = await storage.getUser(userId);
+      
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // Update user to vendor type
+      const updatedUser = await storage.upsertUser({
+        ...user,
+        userType: "vendor"
+      });
+
+      res.json(updatedUser);
+    } catch (error) {
+      console.error("Error upgrading user to vendor:", error);
+      res.status(500).json({ message: "Failed to upgrade user to vendor" });
+    }
+  });
+
   // Object storage routes for court images
   app.get("/objects/:objectPath(*)", async (req, res) => {
     const objectStorageService = new ObjectStorageService();
