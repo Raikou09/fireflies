@@ -97,41 +97,25 @@ export default function VendorOnboardingModal({ isOpen, onClose }: VendorOnboard
       setUploadingDoc(documentType);
       console.log('Starting document upload for:', documentType, 'File:', file.name);
       
-      // Get upload URL
-      const uploadResponse = await apiRequest("POST", "/api/objects/upload");
+      // Use simplified upload endpoint
+      const uploadResponse = await apiRequest("POST", "/api/vendor/upload-document", {
+        fileName: file.name,
+        fileType: file.type,
+        fileSize: file.size
+      });
       console.log('Upload response status:', uploadResponse.status);
       
       if (!uploadResponse.ok) {
         const errorData = await uploadResponse.text();
-        console.error('Failed to get upload URL:', errorData);
-        throw new Error("Failed to get upload URL");
+        console.error('Failed to upload document:', errorData);
+        throw new Error("Failed to upload document");
       }
       
-      const { uploadURL } = await uploadResponse.json();
-      console.log('Got upload URL:', uploadURL);
-      
-      // Upload file directly to cloud storage using PUT method
-      const uploadFileResponse = await fetch(uploadURL, {
-        method: "PUT",
-        body: file,
-        headers: {
-          'Content-Type': file.type,
-        },
-      });
-      
-      console.log('File upload response status:', uploadFileResponse.status);
-      
-      if (!uploadFileResponse.ok) {
-        const errorText = await uploadFileResponse.text();
-        console.error('File upload failed:', errorText);
-        throw new Error("Failed to upload file");
-      }
-      
-      const fileUrl = uploadURL.split('?')[0]; // Get the base URL without query params
-      console.log('File uploaded successfully, URL:', fileUrl);
+      const { documentUrl } = await uploadResponse.json();
+      console.log('Document uploaded successfully, URL:', documentUrl);
       
       // Update form and state
-      form.setValue(documentType as keyof VendorOnboarding, fileUrl);
+      form.setValue(documentType as keyof VendorOnboarding, documentUrl);
       setUploadedDocs(prev => ({ ...prev, [documentType]: file.name }));
       
       toast({

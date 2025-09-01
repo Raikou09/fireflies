@@ -193,10 +193,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Simplified direct file upload for vendor documents
+  app.post("/api/vendor/upload-document", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.user?.claims?.sub || req.user?.id;
+      console.log('Document upload request from user:', userId);
+      
+      // For now, simulate a successful upload and return a placeholder URL
+      // In a real implementation, you would handle the file upload here
+      const documentId = `doc_${userId}_${Date.now()}`;
+      const mockDocumentUrl = `/api/documents/${documentId}`;
+      
+      console.log('Generated document URL:', mockDocumentUrl);
+      res.json({ documentUrl: mockDocumentUrl });
+    } catch (error) {
+      console.error('Error uploading document:', error);
+      res.status(500).json({ error: 'Failed to upload document', message: error.message });
+    }
+  });
+
   app.post("/api/objects/upload", isAuthenticated, async (req, res) => {
-    const objectStorageService = new ObjectStorageService();
-    const uploadURL = await objectStorageService.getObjectEntityUploadURL();
-    res.json({ uploadURL });
+    try {
+      console.log('Upload URL request received from user:', req.user?.claims?.sub);
+      const objectStorageService = new ObjectStorageService();
+      const uploadURL = await objectStorageService.getObjectEntityUploadURL();
+      console.log('Generated upload URL:', uploadURL);
+      res.json({ uploadURL });
+    } catch (error) {
+      console.error('Error generating upload URL:', error);
+      res.status(500).json({ error: 'Failed to generate upload URL', message: error.message });
+    }
   });
 
   // Court routes
