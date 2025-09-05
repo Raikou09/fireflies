@@ -297,9 +297,9 @@ export const insertUserNotificationPreferencesSchema = createInsertSchema(userNo
 // Vendor onboarding schema
 export const vendorOnboardingSchema = z.object({
   // Personal Information (Required)
-  phoneNumber: z.string().min(10, "Phone number must be at least 10 digits").regex(/^(\+254|0)[17]\d{8}$/, "Must be a valid Kenyan phone number"),
+  phoneNumber: z.string().min(10, "Phone number must be at least 10 digits"),
   alternatePhoneNumber: z.string().optional(),
-  nationalId: z.string().min(7, "National ID must be at least 7 characters").max(8, "National ID must be at most 8 characters"),
+  nationalId: z.string().min(1, "National ID is required"),
   
   // Business Information (Required)
   businessName: z.string().min(2, "Business name must be at least 2 characters"),
@@ -307,11 +307,11 @@ export const vendorOnboardingSchema = z.object({
   businessType: z.enum(["Individual", "Partnership", "Company", "LLC"], {
     errorMap: () => ({ message: "Please select a business type" })
   }),
-  businessRegistrationNumber: z.string().min(1, "Business registration number is required"),
+  businessRegistrationNumber: z.string().optional(),
   yearsInBusiness: z.number().min(0, "Years in business must be 0 or more").max(100, "Years in business seems too high"),
   
-  // Government Compliance (Required)
-  kraPin: z.string().min(11, "KRA PIN must be 11 characters").max(11, "KRA PIN must be 11 characters").regex(/^[A-Z]\d{9}[A-Z]$/, "KRA PIN format: A000000000Z"),
+  // Government Compliance (Optional)
+  kraPin: z.string().optional(),
   
   
   // Banking Information
@@ -340,7 +340,7 @@ export const vendorOnboardingSchema = z.object({
 ).refine(
   (data) => {
     if (data.paymentPreference === "mpesa" || data.paymentPreference === "both") {
-      return data.mpesaNumber;
+      return data.mpesaNumber && data.mpesaNumber.length >= 10;
     }
     return true;
   },
