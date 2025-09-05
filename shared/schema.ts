@@ -57,8 +57,6 @@ export const users = pgTable("users", {
   businessRegistrationNumber: varchar("business_registration_number"), // Company registration number
   taxCertificate: varchar("tax_certificate"), // Tax compliance certificate
   alternatePhoneNumber: varchar("alternate_phone_number"), // Secondary contact number
-  emergencyContactName: varchar("emergency_contact_name"), // Emergency contact
-  emergencyContactPhone: varchar("emergency_contact_phone"), // Emergency contact phone
   yearsInBusiness: integer("years_in_business"), // How long in business
   businessType: varchar("business_type"), // Individual/Partnership/Company/LLC
   

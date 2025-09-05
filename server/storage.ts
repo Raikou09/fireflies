@@ -422,11 +422,7 @@ export class DatabaseStorage implements IStorage {
   async createBooking(booking: InsertBooking): Promise<Booking> {
     const [newBooking] = await db
       .insert(bookings)
-      .values({
-        ...booking,
-        createdAt: new Date(),
-        updatedAt: new Date()
-      })
+      .values(booking)
       .returning();
     return newBooking;
   }
