@@ -13,7 +13,7 @@ import CourtDetails from "@/pages/CourtDetails";
 import BookingHistory from "@/pages/BookingHistory";
 import UserProfile from "@/pages/UserProfile";
 import NotFound from "@/pages/not-found";
-import VendorOnboardingModal from "@/components/VendorOnboardingModal";
+import GamifiedVendorOnboarding from "@/components/GamifiedVendorOnboarding";
 import { useState, useEffect } from "react";
 
 function Router() {
@@ -58,7 +58,7 @@ function App() {
         <NotificationToast />
         <Toaster />
         <Router />
-        <VendorOnboardingModal 
+        <GamifiedVendorOnboarding 
           isOpen={isVendorOnboardingOpen} 
           onClose={() => setIsVendorOnboardingOpen(false)} 
         />
