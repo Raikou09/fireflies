@@ -315,9 +315,6 @@ export const vendorOnboardingSchema = z.object({
   // Government Compliance (Required)
   kraPin: z.string().min(11, "KRA PIN must be 11 characters").max(11, "KRA PIN must be 11 characters").regex(/^[A-Z]\d{9}[A-Z]$/, "KRA PIN format: A000000000Z"),
   
-  // Emergency Contact (Required)
-  emergencyContactName: z.string().min(2, "Emergency contact name is required"),
-  emergencyContactPhone: z.string().min(10, "Emergency contact phone is required").regex(/^(\+254|0)[17]\d{8}$/, "Must be a valid Kenyan phone number"),
   
   // Banking Information
   bankName: z.string().optional(),
@@ -326,10 +323,10 @@ export const vendorOnboardingSchema = z.object({
   mpesaNumber: z.string().optional(),
   paymentPreference: z.enum(["bank", "mpesa", "both"]),
   
-  // Required Documents for verification
-  nationalIdDocument: z.string().min(1, "National ID document is required"),
-  businessLicense: z.string().min(1, "Business license/registration certificate is required"),
-  taxCertificate: z.string().min(1, "Tax compliance certificate is required"),
+  // Optional Documents for verification
+  nationalIdDocument: z.string().optional(),
+  businessLicense: z.string().optional(),
+  taxCertificate: z.string().optional(),
   bankStatement: z.string().optional(),
 }).refine(
   (data) => {
@@ -341,19 +338,6 @@ export const vendorOnboardingSchema = z.object({
   {
     message: "Bank details are required when bank payment is selected",
     path: ["bankName"],
-  }
-).refine(
-  (data) => {
-    // Only validate bank statement if all other bank details are provided
-    if ((data.paymentPreference === "bank" || data.paymentPreference === "both") && 
-        data.bankName && data.bankAccountNumber && data.bankAccountName) {
-      return data.bankStatement;
-    }
-    return true;
-  },
-  {
-    message: "Bank statement is required when bank payment is selected",
-    path: ["bankStatement"],
   }
 ).refine(
   (data) => {

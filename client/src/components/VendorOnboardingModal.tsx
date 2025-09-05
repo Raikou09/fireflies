@@ -55,8 +55,6 @@ export default function VendorOnboardingModal({ isOpen, onClose }: VendorOnboard
       businessRegistrationNumber: "",
       yearsInBusiness: 0,
       kraPin: "",
-      emergencyContactName: "",
-      emergencyContactPhone: "",
       bankName: "",
       bankAccountNumber: "",
       bankAccountName: "",
@@ -297,41 +295,6 @@ export default function VendorOnboardingModal({ isOpen, onClose }: VendorOnboard
                   )}
                 />
 
-                <FormField
-                  control={form.control}
-                  name="emergencyContactName"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Emergency Contact Name *</FormLabel>
-                      <FormControl>
-                        <Input 
-                          placeholder="John Doe" 
-                          {...field} 
-                          data-testid="input-emergency-contact-name"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="emergencyContactPhone"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Emergency Contact Phone *</FormLabel>
-                      <FormControl>
-                        <Input 
-                          placeholder="+254 712 345 678" 
-                          {...field} 
-                          data-testid="input-emergency-contact-phone"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
 
                 <FormField
                   control={form.control}
@@ -592,13 +555,13 @@ export default function VendorOnboardingModal({ isOpen, onClose }: VendorOnboard
             <Card>
               <CardHeader>
                 <CardTitle className="text-lg">Document Verification</CardTitle>
-                <p className="text-sm text-gray-600">Upload the required documents for verification. All documents must be clear and readable.</p>
+                <p className="text-sm text-gray-600">Upload supporting documents for verification. You can choose which documents to provide. All documents must be clear and readable.</p>
               </CardHeader>
               <CardContent className="space-y-6">
                 <DocumentUpload
                   documentType="nationalIdDocument"
                   label="National ID"
-                  required={true}
+                  required={false}
                   description="Upload a clear photo or scan of your National ID (both sides if needed). Accepted formats: PDF, JPG, PNG (Max 5MB)"
                 />
                 
@@ -606,23 +569,23 @@ export default function VendorOnboardingModal({ isOpen, onClose }: VendorOnboard
                   <DocumentUpload
                     documentType="bankStatement"
                     label="Bank Statement"
-                    required={true}
-                    description="Upload a recent bank statement (not older than 3 months) showing your account details. Required after completing bank details above. Accepted formats: PDF, JPG, PNG (Max 5MB)"
+                    required={false}
+                    description="Upload a recent bank statement (not older than 3 months) showing your account details. Optional supporting document. Accepted formats: PDF, JPG, PNG (Max 5MB)"
                   />
                 )}
                 
                 <DocumentUpload
                   documentType="businessLicense"
                   label="Business License/Registration Certificate"
-                  required={true}
-                  description="Upload your business registration certificate or trading license. Required for all business types. Accepted formats: PDF, JPG, PNG (Max 5MB)"
+                  required={false}
+                  description="Upload your business registration certificate or trading license. Optional supporting document. Accepted formats: PDF, JPG, PNG (Max 5MB)"
                 />
 
                 <DocumentUpload
                   documentType="taxCertificate"
                   label="Tax Compliance Certificate"
-                  required={true}
-                  description="Upload your current KRA Tax Compliance Certificate. Must be valid and not expired. Accepted formats: PDF, JPG, PNG (Max 5MB)"
+                  required={false}
+                  description="Upload your current KRA Tax Compliance Certificate. Optional supporting document for tax compliance verification. Accepted formats: PDF, JPG, PNG (Max 5MB)"
                 />
               </CardContent>
             </Card>
