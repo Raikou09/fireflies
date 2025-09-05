@@ -53,6 +53,20 @@ export const users = pgTable("users", {
   bankStatement: varchar("bank_statement"), // Bank statement document URL
   businessLicense: varchar("business_license"), // Business license document URL
   
+  // Additional verification fields
+  businessRegistrationNumber: varchar("business_registration_number"), // Company registration number
+  taxCertificate: varchar("tax_certificate"), // Tax compliance certificate
+  alternatePhoneNumber: varchar("alternate_phone_number"), // Secondary contact number
+  emergencyContactName: varchar("emergency_contact_name"), // Emergency contact
+  emergencyContactPhone: varchar("emergency_contact_phone"), // Emergency contact phone
+  yearsInBusiness: integer("years_in_business"), // How long in business
+  businessType: varchar("business_type"), // Individual/Partnership/Company/LLC
+  
+  // Verification notes and admin comments
+  adminVerificationNotes: text("admin_verification_notes"), // Admin's verification notes
+  rejectionReason: text("rejection_reason"), // Reason for rejection if applicable
+  verificationDate: timestamp("verification_date"), // Date when verified/rejected
+  
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -284,20 +298,39 @@ export const insertUserNotificationPreferencesSchema = createInsertSchema(userNo
 
 // Vendor onboarding schema
 export const vendorOnboardingSchema = z.object({
-  phoneNumber: z.string().min(10, "Phone number must be at least 10 digits"),
+  // Personal Information (Required)
+  phoneNumber: z.string().min(10, "Phone number must be at least 10 digits").regex(/^(\+254|0)[17]\d{8}$/, "Must be a valid Kenyan phone number"),
+  alternatePhoneNumber: z.string().optional(),
+  nationalId: z.string().min(7, "National ID must be at least 7 characters").max(8, "National ID must be at most 8 characters"),
+  
+  // Business Information (Required)
   businessName: z.string().min(2, "Business name must be at least 2 characters"),
   businessAddress: z.string().min(10, "Business address must be at least 10 characters"),
-  kraPin: z.string().min(11, "KRA PIN must be 11 characters").max(11, "KRA PIN must be 11 characters"),
-  nationalId: z.string().min(7, "National ID must be at least 7 characters").max(8, "National ID must be at most 8 characters"),
+  businessType: z.enum(["Individual", "Partnership", "Company", "LLC"], {
+    errorMap: () => ({ message: "Please select a business type" })
+  }),
+  businessRegistrationNumber: z.string().min(1, "Business registration number is required"),
+  yearsInBusiness: z.number().min(0, "Years in business must be 0 or more").max(100, "Years in business seems too high"),
+  
+  // Government Compliance (Required)
+  kraPin: z.string().min(11, "KRA PIN must be 11 characters").max(11, "KRA PIN must be 11 characters").regex(/^[A-Z]\d{9}[A-Z]$/, "KRA PIN format: A000000000Z"),
+  
+  // Emergency Contact (Required)
+  emergencyContactName: z.string().min(2, "Emergency contact name is required"),
+  emergencyContactPhone: z.string().min(10, "Emergency contact phone is required").regex(/^(\+254|0)[17]\d{8}$/, "Must be a valid Kenyan phone number"),
+  
+  // Banking Information
   bankName: z.string().optional(),
   bankAccountNumber: z.string().optional(),
   bankAccountName: z.string().optional(),
   mpesaNumber: z.string().optional(),
   paymentPreference: z.enum(["bank", "mpesa", "both"]),
-  // Document URLs for verification
+  
+  // Required Documents for verification
   nationalIdDocument: z.string().min(1, "National ID document is required"),
+  businessLicense: z.string().min(1, "Business license/registration certificate is required"),
+  taxCertificate: z.string().min(1, "Tax compliance certificate is required"),
   bankStatement: z.string().optional(),
-  businessLicense: z.string().optional(),
 }).refine(
   (data) => {
     if (data.paymentPreference === "bank" || data.paymentPreference === "both") {

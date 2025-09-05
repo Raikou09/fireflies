@@ -47,18 +47,25 @@ export default function VendorOnboardingModal({ isOpen, onClose }: VendorOnboard
     resolver: zodResolver(vendorOnboardingSchema),
     defaultValues: {
       phoneNumber: "",
+      alternatePhoneNumber: "",
+      nationalId: "",
       businessName: "",
       businessAddress: "",
+      businessType: "Individual" as const,
+      businessRegistrationNumber: "",
+      yearsInBusiness: 0,
       kraPin: "",
-      nationalId: "",
+      emergencyContactName: "",
+      emergencyContactPhone: "",
       bankName: "",
       bankAccountNumber: "",
       bankAccountName: "",
       mpesaNumber: "",
-      paymentPreference: "bank",
+      paymentPreference: "mpesa" as const,
       nationalIdDocument: "",
-      bankStatement: "",
       businessLicense: "",
+      taxCertificate: "",
+      bankStatement: "",
     },
   });
 
@@ -259,12 +266,66 @@ export default function VendorOnboardingModal({ isOpen, onClose }: VendorOnboard
                   name="phoneNumber"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Phone Number</FormLabel>
+                      <FormLabel>Primary Phone Number *</FormLabel>
                       <FormControl>
                         <Input 
                           placeholder="+254 712 345 678" 
                           {...field} 
                           data-testid="input-phone-number"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="alternatePhoneNumber"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Alternate Phone Number</FormLabel>
+                      <FormControl>
+                        <Input 
+                          placeholder="+254 712 345 678" 
+                          {...field} 
+                          data-testid="input-alternate-phone"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="emergencyContactName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Emergency Contact Name *</FormLabel>
+                      <FormControl>
+                        <Input 
+                          placeholder="John Doe" 
+                          {...field} 
+                          data-testid="input-emergency-contact-name"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="emergencyContactPhone"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Emergency Contact Phone *</FormLabel>
+                      <FormControl>
+                        <Input 
+                          placeholder="+254 712 345 678" 
+                          {...field} 
+                          data-testid="input-emergency-contact-phone"
                         />
                       </FormControl>
                       <FormMessage />
@@ -339,12 +400,76 @@ export default function VendorOnboardingModal({ isOpen, onClose }: VendorOnboard
                   name="businessAddress"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Business Address</FormLabel>
+                      <FormLabel>Business Address *</FormLabel>
                       <FormControl>
                         <Textarea 
                           placeholder="Full business address including city" 
                           {...field} 
                           data-testid="textarea-business-address"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="businessType"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Business Type *</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger data-testid="select-business-type">
+                            <SelectValue placeholder="Select business type" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="Individual">Individual/Sole Proprietor</SelectItem>
+                          <SelectItem value="Partnership">Partnership</SelectItem>
+                          <SelectItem value="Company">Limited Company</SelectItem>
+                          <SelectItem value="LLC">Limited Liability Company</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="businessRegistrationNumber"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Business Registration Number *</FormLabel>
+                      <FormControl>
+                        <Input 
+                          placeholder="e.g., CPR/2023/123456 or Certificate Number" 
+                          {...field} 
+                          data-testid="input-business-registration-number"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="yearsInBusiness"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Years in Business *</FormLabel>
+                      <FormControl>
+                        <Input 
+                          type="number"
+                          min="0"
+                          max="100"
+                          placeholder="0" 
+                          {...field} 
+                          onChange={(e) => field.onChange(Number(e.target.value))}
+                          data-testid="input-years-in-business"
                         />
                       </FormControl>
                       <FormMessage />
@@ -488,9 +613,16 @@ export default function VendorOnboardingModal({ isOpen, onClose }: VendorOnboard
                 
                 <DocumentUpload
                   documentType="businessLicense"
-                  label="Business License"
-                  required={false}
-                  description="Upload your business registration certificate or trading license (optional but recommended). Accepted formats: PDF, JPG, PNG (Max 5MB)"
+                  label="Business License/Registration Certificate"
+                  required={true}
+                  description="Upload your business registration certificate or trading license. Required for all business types. Accepted formats: PDF, JPG, PNG (Max 5MB)"
+                />
+
+                <DocumentUpload
+                  documentType="taxCertificate"
+                  label="Tax Compliance Certificate"
+                  required={true}
+                  description="Upload your current KRA Tax Compliance Certificate. Must be valid and not expired. Accepted formats: PDF, JPG, PNG (Max 5MB)"
                 />
               </CardContent>
             </Card>

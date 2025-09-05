@@ -43,10 +43,16 @@ interface PendingVendor {
   firstName?: string;
   lastName?: string;
   phoneNumber?: string;
+  alternatePhoneNumber?: string;
   businessName?: string;
   businessAddress?: string;
+  businessType?: string;
+  businessRegistrationNumber?: string;
+  yearsInBusiness?: number;
   kraPin?: string;
   nationalId?: string;
+  emergencyContactName?: string;
+  emergencyContactPhone?: string;
   bankName?: string;
   bankAccountNumber?: string;
   bankAccountName?: string;
@@ -55,6 +61,10 @@ interface PendingVendor {
   nationalIdDocument?: string;
   bankStatement?: string;
   businessLicense?: string;
+  taxCertificate?: string;
+  adminVerificationNotes?: string;
+  rejectionReason?: string;
+  verificationDate?: string;
   vendorVerificationStatus: string;
   createdAt: string;
 }
@@ -381,24 +391,37 @@ export default function AdminInterface() {
                       )}
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                       <div>
-                        <h4 className="font-medium mb-2">Business Information</h4>
+                        <h4 className="font-medium mb-2 text-blue-700">Personal Information</h4>
                         <div className="text-sm text-gray-600 space-y-1">
-                          {vendor.kraPin && <p><strong>KRA PIN:</strong> {vendor.kraPin}</p>}
                           {vendor.nationalId && <p><strong>National ID:</strong> {vendor.nationalId}</p>}
+                          {vendor.alternatePhoneNumber && <p><strong>Alt. Phone:</strong> {vendor.alternatePhoneNumber}</p>}
+                          {vendor.emergencyContactName && <p><strong>Emergency Contact:</strong> {vendor.emergencyContactName}</p>}
+                          {vendor.emergencyContactPhone && <p><strong>Emergency Phone:</strong> {vendor.emergencyContactPhone}</p>}
                         </div>
                       </div>
                       <div>
-                        <h4 className="font-medium mb-2">Banking Details</h4>
+                        <h4 className="font-medium mb-2 text-green-700">Business Details</h4>
                         <div className="text-sm text-gray-600 space-y-1">
+                          {vendor.businessType && <p><strong>Business Type:</strong> {vendor.businessType}</p>}
+                          {vendor.businessRegistrationNumber && <p><strong>Reg. Number:</strong> {vendor.businessRegistrationNumber}</p>}
+                          {vendor.yearsInBusiness !== undefined && <p><strong>Years in Business:</strong> {vendor.yearsInBusiness}</p>}
+                          {vendor.kraPin && <p><strong>KRA PIN:</strong> {vendor.kraPin}</p>}
+                        </div>
+                      </div>
+                      <div>
+                        <h4 className="font-medium mb-2 text-purple-700">Banking Details</h4>
+                        <div className="text-sm text-gray-600 space-y-1">
+                          {vendor.paymentPreference && <p><strong>Payment Method:</strong> {vendor.paymentPreference.toUpperCase()}</p>}
                           {vendor.bankName && <p><strong>Bank:</strong> {vendor.bankName}</p>}
                           {vendor.bankAccountName && <p><strong>Account Name:</strong> {vendor.bankAccountName}</p>}
                           {vendor.bankAccountNumber && <p><strong>Account Number:</strong> {vendor.bankAccountNumber}</p>}
+                          {vendor.mpesaNumber && <p><strong>M-Pesa:</strong> {vendor.mpesaNumber}</p>}
                         </div>
                       </div>
                       <div>
-                        <h4 className="font-medium mb-2">Documents</h4>
+                        <h4 className="font-medium mb-2 text-orange-700">Required Documents</h4>
                         <div className="text-sm space-y-2">
                           {vendor.nationalIdDocument && (
                             <a 
@@ -412,18 +435,6 @@ export default function AdminInterface() {
                               National ID
                             </a>
                           )}
-                          {vendor.bankStatement && (
-                            <a 
-                              href={vendor.bankStatement} 
-                              target="_blank" 
-                              rel="noopener noreferrer"
-                              className="flex items-center gap-2 text-blue-600 hover:text-blue-800"
-                              data-testid={`link-bank-statement-${vendor.id}`}
-                            >
-                              <FileText className="h-4 w-4" />
-                              Bank Statement
-                            </a>
-                          )}
                           {vendor.businessLicense && (
                             <a 
                               href={vendor.businessLicense} 
@@ -434,6 +445,30 @@ export default function AdminInterface() {
                             >
                               <FileText className="h-4 w-4" />
                               Business License
+                            </a>
+                          )}
+                          {vendor.taxCertificate && (
+                            <a 
+                              href={vendor.taxCertificate} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-2 text-blue-600 hover:text-blue-800"
+                              data-testid={`link-tax-certificate-${vendor.id}`}
+                            >
+                              <FileText className="h-4 w-4" />
+                              Tax Certificate
+                            </a>
+                          )}
+                          {vendor.bankStatement && (
+                            <a 
+                              href={vendor.bankStatement} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-2 text-blue-600 hover:text-blue-800"
+                              data-testid={`link-bank-statement-${vendor.id}`}
+                            >
+                              <FileText className="h-4 w-4" />
+                              Bank Statement
                             </a>
                           )}
                         </div>
