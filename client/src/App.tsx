@@ -11,6 +11,7 @@ import FirefliesHome from "@/pages/FirefliesHome";
 import Admin from "@/pages/Admin";
 import VendorDashboard from "@/pages/VendorDashboard";
 import CourtDetails from "@/pages/CourtDetails";
+import EventDetails from "@/pages/EventDetails";
 import BookingHistory from "@/pages/BookingHistory";
 import UserProfile from "@/pages/UserProfile";
 import NotFound from "@/pages/not-found";
@@ -31,6 +32,7 @@ function Router() {
       <Route path="/sportsbox" component={Home} />
       <Route path="/fireflies" component={FirefliesHome} />
       <Route path="/court/:id" component={CourtDetails} />
+      <Route path="/fireflies/event/:id" component={EventDetails} />
       <Route path="/booking-history" component={BookingHistory} />
       <Route path="/profile" component={UserProfile} />
       <Route path="/admin" component={Admin} />
