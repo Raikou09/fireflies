@@ -10,6 +10,9 @@ import {
   events,
   ticketTiers,
   eventBookings,
+  seatSections,
+  seats,
+  eventSeatReservations,
   type User,
   type UpsertUser,
   type Court,
@@ -38,6 +41,12 @@ import {
   type VenueWithDetails,
   type EventWithDetails,
   type EventBookingWithDetails,
+  type SeatSection,
+  type InsertSeatSection,
+  type Seat,
+  type InsertSeat,
+  type EventSeatReservation,
+  type InsertEventSeatReservation,
 } from "@shared/schema";
 import { db, pool } from "./db";
 import { eq, and, desc, sql, gte, lte } from "drizzle-orm";
@@ -183,6 +192,29 @@ export interface IStorage {
   rejectVenue(venueId: string, adminNotes?: string): Promise<Venue | undefined>;
   approveEvent(eventId: string, adminNotes?: string): Promise<Event | undefined>;
   rejectEvent(eventId: string, adminNotes?: string): Promise<Event | undefined>;
+
+  // Seat map operations
+  createSeatSection(seatSection: InsertSeatSection): Promise<SeatSection>;
+  getSeatSectionsByVenue(venueId: string): Promise<SeatSection[]>;
+  updateSeatSection(id: string, seatSection: Partial<InsertSeatSection>): Promise<SeatSection | undefined>;
+  deleteSeatSection(id: string): Promise<boolean>;
+  
+  createSeat(seat: InsertSeat): Promise<Seat>;
+  getSeatsByVenue(venueId: string): Promise<(Seat & { section: SeatSection })[]>;
+  getSeatsBySection(sectionId: string): Promise<Seat[]>;
+  updateSeat(id: string, seat: Partial<InsertSeat>): Promise<Seat | undefined>;
+  deleteSeat(id: string): Promise<boolean>;
+  bulkCreateSeats(seats: InsertSeat[]): Promise<Seat[]>;
+  
+  getEventSeatAvailability(eventId: string): Promise<Array<{
+    seat: Seat;
+    section: SeatSection;
+    status: string;
+    reservedUntil?: Date;
+  }>>;
+  reserveEventSeats(eventId: string, seatIds: string[], bookingId?: string): Promise<EventSeatReservation[]>;
+  releaseExpiredReservations(eventId: string): Promise<void>;
+  markSeatsAsBooked(eventId: string, seatIds: string[], bookingId: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1864,6 +1896,183 @@ export class DatabaseStorage implements IStorage {
       .where(eq(events.id, eventId))
       .returning();
     return event;
+  }
+
+  // Seat map operations
+  async createSeatSection(seatSection: InsertSeatSection): Promise<SeatSection> {
+    const [section] = await db.insert(seatSections).values(seatSection).returning();
+    return section;
+  }
+
+  async getSeatSectionsByVenue(venueId: string): Promise<SeatSection[]> {
+    return await db.select().from(seatSections).where(eq(seatSections.venueId, venueId));
+  }
+
+  async updateSeatSection(id: string, seatSection: Partial<InsertSeatSection>): Promise<SeatSection | undefined> {
+    const [section] = await db
+      .update(seatSections)
+      .set({ ...seatSection, updatedAt: new Date() })
+      .where(eq(seatSections.id, id))
+      .returning();
+    return section;
+  }
+
+  async deleteSeatSection(id: string): Promise<boolean> {
+    const result = await db.delete(seatSections).where(eq(seatSections.id, id));
+    return result.rowCount ? result.rowCount > 0 : false;
+  }
+
+  async createSeat(seat: InsertSeat): Promise<Seat> {
+    const [newSeat] = await db.insert(seats).values(seat).returning();
+    
+    // Update seat count in section
+    await db.execute(sql`
+      UPDATE seat_sections 
+      SET seat_count = (SELECT COUNT(*) FROM seats WHERE section_id = ${seat.sectionId})
+      WHERE id = ${seat.sectionId}
+    `);
+    
+    return newSeat;
+  }
+
+  async getSeatsByVenue(venueId: string): Promise<(Seat & { section: SeatSection })[]> {
+    const result = await db
+      .select()
+      .from(seats)
+      .leftJoin(seatSections, eq(seats.sectionId, seatSections.id))
+      .where(eq(seats.venueId, venueId));
+    
+    return result.map(row => ({
+      ...row.seats,
+      section: row.seat_sections!,
+    }));
+  }
+
+  async getSeatsBySection(sectionId: string): Promise<Seat[]> {
+    return await db.select().from(seats).where(eq(seats.sectionId, sectionId));
+  }
+
+  async updateSeat(id: string, seat: Partial<InsertSeat>): Promise<Seat | undefined> {
+    const [updatedSeat] = await db
+      .update(seats)
+      .set({ ...seat, updatedAt: new Date() })
+      .where(eq(seats.id, id))
+      .returning();
+    return updatedSeat;
+  }
+
+  async deleteSeat(id: string): Promise<boolean> {
+    const [seat] = await db.select().from(seats).where(eq(seats.id, id));
+    if (!seat) return false;
+    
+    const result = await db.delete(seats).where(eq(seats.id, id));
+    
+    // Update seat count in section
+    await db.execute(sql`
+      UPDATE seat_sections 
+      SET seat_count = (SELECT COUNT(*) FROM seats WHERE section_id = ${seat.sectionId})
+      WHERE id = ${seat.sectionId}
+    `);
+    
+    return result.rowCount ? result.rowCount > 0 : false;
+  }
+
+  async bulkCreateSeats(seatsList: InsertSeat[]): Promise<Seat[]> {
+    if (seatsList.length === 0) return [];
+    
+    const createdSeats = await db.insert(seats).values(seatsList).returning();
+    
+    // Update seat counts for all affected sections
+    const sectionIds = Array.from(new Set(seatsList.map(s => s.sectionId)));
+    for (const sectionId of sectionIds) {
+      await db.execute(sql`
+        UPDATE seat_sections 
+        SET seat_count = (SELECT COUNT(*) FROM seats WHERE section_id = ${sectionId})
+        WHERE id = ${sectionId}
+      `);
+    }
+    
+    return createdSeats;
+  }
+
+  async getEventSeatAvailability(eventId: string): Promise<Array<{
+    seat: Seat;
+    section: SeatSection;
+    status: string;
+    reservedUntil?: Date;
+  }>> {
+    // Get event to find venue
+    const [event] = await db.select().from(events).where(eq(events.id, eventId));
+    if (!event) return [];
+
+    // Get all seats for the venue with sections
+    const seatsWithSections = await db
+      .select()
+      .from(seats)
+      .leftJoin(seatSections, eq(seats.sectionId, seatSections.id))
+      .where(eq(seats.venueId, event.venueId));
+
+    // Get reservations for this event
+    const reservations = await db
+      .select()
+      .from(eventSeatReservations)
+      .where(eq(eventSeatReservations.eventId, eventId));
+
+    const reservationMap = new Map(reservations.map(r => [r.seatId, r]));
+
+    return seatsWithSections.map(row => {
+      const reservation = reservationMap.get(row.seats.id);
+      return {
+        seat: row.seats,
+        section: row.seat_sections!,
+        status: reservation?.status || 'available',
+        reservedUntil: reservation?.reservedUntil || undefined,
+      };
+    });
+  }
+
+  async reserveEventSeats(eventId: string, seatIds: string[], bookingId?: string): Promise<EventSeatReservation[]> {
+    const reservedUntil = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes from now
+    
+    const reservations = seatIds.map(seatId => ({
+      eventId,
+      seatId,
+      eventBookingId: bookingId || null,
+      status: 'reserved' as const,
+      reservedUntil,
+    }));
+
+    return await db.insert(eventSeatReservations).values(reservations).returning();
+  }
+
+  async releaseExpiredReservations(eventId: string): Promise<void> {
+    await db
+      .delete(eventSeatReservations)
+      .where(
+        and(
+          eq(eventSeatReservations.eventId, eventId),
+          eq(eventSeatReservations.status, 'reserved'),
+          lte(eventSeatReservations.reservedUntil, new Date())
+        )
+      );
+  }
+
+  async markSeatsAsBooked(eventId: string, seatIds: string[], bookingId: string): Promise<void> {
+    for (const seatId of seatIds) {
+      await db
+        .update(eventSeatReservations)
+        .set({
+          status: 'booked',
+          eventBookingId: bookingId,
+          reservedUntil: null,
+        })
+        .where(
+          and(
+            eq(eventSeatReservations.eventId, eventId),
+            eq(eventSeatReservations.seatId, seatId)
+          )
+        );
+    }
   }
 }
 

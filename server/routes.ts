@@ -1422,6 +1422,151 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Seat map routes
+  app.get("/api/venues/:id/seat-map", async (req, res) => {
+    try {
+      const venueId = req.params.id;
+      const sections = await storage.getSeatSectionsByVenue(venueId);
+      const seats = await storage.getSeatsByVenue(venueId);
+      res.json({ sections, seats });
+    } catch (error) {
+      console.error("Error fetching seat map:", error);
+      res.status(500).json({ message: "Failed to fetch seat map" });
+    }
+  });
+
+  app.post("/api/venues/:id/seat-map", isAuthenticated, async (req, res) => {
+    try {
+      const venueId = req.params.id;
+      const userId = req.user?.claims?.sub || req.user?.id;
+      const { sections, seats } = req.body;
+
+      // Verify venue ownership
+      const venue = await storage.getVenueById(venueId);
+      if (!venue || venue.vendorId !== userId) {
+        return res.status(403).json({ message: "Unauthorized to modify this venue" });
+      }
+
+      // Validate input
+      if (!Array.isArray(sections) || !Array.isArray(seats)) {
+        return res.status(400).json({ message: "Invalid seat map data" });
+      }
+
+      // Start transaction by clearing all existing seat data for this venue
+      // This cascades to seats and event_seat_reservations
+      const existingSections = await storage.getSeatSectionsByVenue(venueId);
+      for (const section of existingSections) {
+        await storage.deleteSeatSection(section.id);
+      }
+
+      // Create new sections (strip temp IDs and other UI-only fields)
+      const createdSections = [];
+      const sectionIdMap = new Map();
+      
+      for (const section of sections) {
+        const { tempId, ...sectionData } = section;
+        const created = await storage.createSeatSection({
+          venueId,
+          name: sectionData.name,
+          color: sectionData.color,
+          basePrice: sectionData.basePrice,
+          description: sectionData.description || null,
+        });
+        createdSections.push(created);
+        if (tempId) {
+          sectionIdMap.set(tempId, created.id);
+        }
+      }
+
+      // Create seats with sanitized data and correct section IDs
+      const seatsToCreate = seats.map((seat: any) => {
+        const { tempId, ...seatData } = seat;
+        return {
+          venueId,
+          sectionId: sectionIdMap.get(seat.sectionId) || seat.sectionId,
+          row: seatData.row,
+          number: seatData.number,
+          seatLabel: seatData.seatLabel,
+          priceOverride: seatData.priceOverride || null,
+          x: seatData.x,
+          y: seatData.y,
+          isAccessible: seatData.isAccessible || false,
+        };
+      });
+
+      const createdSeats = await storage.bulkCreateSeats(seatsToCreate);
+
+      // Update venue to indicate it has a seat map
+      await storage.updateVenue(venueId, userId, { hasSeatMap: true });
+
+      res.json({ sections: createdSections, seats: createdSeats });
+    } catch (error) {
+      console.error("Error saving seat map:", error);
+      res.status(500).json({ message: "Failed to save seat map" });
+    }
+  });
+
+  app.get("/api/events/:id/seat-availability", async (req, res) => {
+    try {
+      const eventId = req.params.id;
+      
+      // Release expired reservations first
+      await storage.releaseExpiredReservations(eventId);
+      
+      const availability = await storage.getEventSeatAvailability(eventId);
+      res.json(availability);
+    } catch (error) {
+      console.error("Error fetching seat availability:", error);
+      res.status(500).json({ message: "Failed to fetch seat availability" });
+    }
+  });
+
+  app.post("/api/events/:id/reserve-seats", isAuthenticated, async (req, res) => {
+    try {
+      const eventId = req.params.id;
+      const { seatIds } = req.body;
+
+      if (!Array.isArray(seatIds) || seatIds.length === 0) {
+        return res.status(400).json({ message: "Seat IDs are required" });
+      }
+
+      // Release expired reservations first (before availability check)
+      await storage.releaseExpiredReservations(eventId);
+
+      // Check if seats are available (immediately before reservation attempt)
+      const availability = await storage.getEventSeatAvailability(eventId);
+      const unavailableSeats = seatIds.filter(seatId => {
+        const seat = availability.find(a => a.seat.id === seatId);
+        return !seat || seat.status !== 'available';
+      });
+
+      if (unavailableSeats.length > 0) {
+        return res.status(409).json({ 
+          message: "Some seats are no longer available",
+          unavailableSeats 
+        });
+      }
+
+      // Attempt to reserve the seats
+      // The database unique constraint on (event_id, seat_id) will prevent double-booking
+      try {
+        const reservations = await storage.reserveEventSeats(eventId, seatIds);
+        res.json(reservations);
+      } catch (dbError: any) {
+        // If constraint violation, seats were just reserved by another request
+        if (dbError.code === '23505') { // Unique constraint violation
+          return res.status(409).json({ 
+            message: "Some seats were just reserved by another user",
+          });
+        }
+        throw dbError;
+      }
+    } catch (error) {
+      console.error("Error reserving seats:", error);
+      res.status(500).json({ message: "Failed to reserve seats" });
+    }
+  });
+
   // Admin routes (protected with middleware)
   
   // Get all courts data for admin (with detailed information)
