@@ -412,11 +412,6 @@ export default function EventDetails() {
                     <Ticket className="w-12 h-12 mx-auto text-gray-400 mb-3" />
                     <p className="text-gray-600">No tickets available for this event.</p>
                   </div>
-                ) : (
-                  <div className="text-center py-8">
-                    <Ticket className="w-12 h-12 mx-auto text-gray-400 mb-3" />
-                    <p className="text-gray-600">No tickets available for this event.</p>
-                  </div>
                 ))}
               </CardContent>
             </Card>
