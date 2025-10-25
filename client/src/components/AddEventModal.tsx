@@ -116,11 +116,8 @@ export default function AddEventModal({ isOpen, onClose }: AddEventModalProps) {
         event: eventData,
         ticketTiers: data.ticketTiers,
       };
-      return await apiRequest("/api/events", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
+      const res = await apiRequest("/api/events", "POST", payload);
+      return await res.json();
     },
     onSuccess: () => {
       toast({
