@@ -1,10 +1,14 @@
-# SportsBox - Sports Court Booking Platform Kenya
+# SportsBox + Fireflies - Dual Booking Platform Kenya
 
 ## Overview
 
-SportsBox is a full-stack web application that connects sports court owners (vendors) with customers looking to book sports facilities across Kenya. The platform focuses on major cities like Nairobi, Mombasa, and Kisumu, providing an easy-to-use booking system with secure M-Pesa payment integration and location-based court discovery.
+A comprehensive dual-platform booking system featuring **SportsBox** for sports court bookings and **Fireflies** for event ticketing across Kenya. The platform connects vendors with customers in major cities like Nairobi, Mombasa, and Kisumu, providing seamless booking experiences with M-Pesa payment integration.
 
-The application features dual interfaces - one for customers to search and book courts with location-aware filtering, and another for vendors to manage their facilities and bookings. Built with modern web technologies, it provides real-time booking management, file uploads for court images, comprehensive analytics for vendors, geolocation-based court discovery, and a complete SMS/email notification system for enhanced user experience.
+**SportsBox**: Sports court booking platform that connects court owners with customers looking to book facilities. Features location-aware court discovery, real-time availability, and hourly bookings with equipment rentals.
+
+**Fireflies**: Event ticketing platform for concerts, sports events, theater shows, and conferences. Features interactive seat maps, ticket tiers (VIP, General, Early Bird), venue management, and digital ticket verification.
+
+The application features unified authentication and admin oversight across both platforms. Vendors can manage both sports courts and events from a single dashboard. Built with modern web technologies, it provides real-time booking management, file uploads, comprehensive analytics, geolocation-based discovery, and complete SMS/email notification systems.
 
 ## User Preferences
 

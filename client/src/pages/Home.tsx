@@ -8,7 +8,7 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Navigation userMode={userMode} setUserMode={setUserMode} />
+      <Navigation userMode={userMode} setUserMode={setUserMode} platform="sportsbox" />
       
       {userMode === "customer" ? (
         <CustomerInterface />

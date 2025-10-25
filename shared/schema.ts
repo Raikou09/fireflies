@@ -229,6 +229,90 @@ export const userNotificationPreferences = pgTable("user_notification_preference
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// FIREFLIES EVENT BOOKING SYSTEM
+
+// Venues table - for events
+export const venues = pgTable("venues", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  vendorId: varchar("vendor_id").notNull().references(() => users.id),
+  name: varchar("name").notNull(),
+  city: varchar("city").notNull(),
+  area: varchar("area").notNull(),
+  address: text("address"),
+  latitude: decimal("latitude", { precision: 10, scale: 8 }),
+  longitude: decimal("longitude", { precision: 11, scale: 8 }),
+  description: text("description"),
+  capacity: integer("capacity").notNull(),
+  imageUrl: varchar("image_url"),
+  amenities: text("amenities").array(), // ["parking", "wifi", "food", "accessibility"]
+  isActive: boolean("is_active").default(true),
+  approvalStatus: varchar("approval_status", { enum: ["pending", "approved", "rejected"] }).default("pending"),
+  adminNotes: text("admin_notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Events table
+export const events = pgTable("events", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  vendorId: varchar("vendor_id").notNull().references(() => users.id),
+  venueId: varchar("venue_id").notNull().references(() => venues.id),
+  name: varchar("name").notNull(),
+  description: text("description"),
+  category: varchar("category").notNull(), // "music", "sports", "theater", "comedy", "conference"
+  eventDate: timestamp("event_date").notNull(),
+  eventTime: varchar("event_time").notNull(), // "19:00"
+  duration: integer("duration").default(120), // minutes
+  posterImageUrl: varchar("poster_image_url"),
+  seatMap: jsonb("seat_map"), // JSON structure for seat layout
+  hasSeatMap: boolean("has_seat_map").default(false),
+  totalSeats: integer("total_seats").notNull(),
+  availableSeats: integer("available_seats").notNull(),
+  isActive: boolean("is_active").default(true),
+  approvalStatus: varchar("approval_status", { enum: ["pending", "approved", "rejected"] }).default("pending"),
+  adminNotes: text("admin_notes"),
+  rating: decimal("rating", { precision: 3, scale: 2 }).default("0"),
+  totalBookings: integer("total_bookings").default(0),
+  commissionRate: decimal("commission_rate", { precision: 5, scale: 2 }).default("10.00"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Ticket tiers for events
+export const ticketTiers = pgTable("ticket_tiers", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  eventId: varchar("event_id").notNull().references(() => events.id, { onDelete: "cascade" }),
+  name: varchar("name").notNull(), // "VIP", "General", "Student", "Early Bird"
+  description: text("description"),
+  price: decimal("price", { precision: 10, scale: 2 }).notNull(),
+  quantity: integer("quantity").notNull(),
+  availableQuantity: integer("available_quantity").notNull(),
+  seatNumbers: text("seat_numbers").array(), // Optional specific seat assignments
+  benefits: text("benefits").array(), // ["backstage access", "free drink", "priority entry"]
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Event bookings
+export const eventBookings = pgTable("event_bookings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  customerId: varchar("customer_id").notNull().references(() => users.id),
+  eventId: varchar("event_id").notNull().references(() => events.id),
+  ticketTierId: varchar("ticket_tier_id").notNull().references(() => ticketTiers.id),
+  quantity: integer("quantity").notNull(),
+  seatNumbers: text("seat_numbers").array(), // Actual seats booked
+  totalAmount: decimal("total_amount", { precision: 10, scale: 2 }).notNull(),
+  customerPhone: varchar("customer_phone"),
+  customerEmail: varchar("customer_email"),
+  paymentMethod: varchar("payment_method", { enum: ["mpesa", "card"] }).default("mpesa"),
+  paymentStatus: varchar("payment_status", { enum: ["pending", "completed", "failed"] }).default("pending"),
+  status: varchar("status", { enum: ["confirmed", "cancelled"] }).default("confirmed"),
+  bookingCode: varchar("booking_code").notNull(), // Unique code for ticket verification
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Notification relations
 export const notificationRelations = relations(notifications, ({ one }) => ({
   user: one(users, {
@@ -241,6 +325,51 @@ export const userNotificationPreferencesRelations = relations(userNotificationPr
   user: one(users, {
     fields: [userNotificationPreferences.userId],
     references: [users.id],
+  }),
+}));
+
+// Fireflies relations
+export const venueRelations = relations(venues, ({ one, many }) => ({
+  vendor: one(users, {
+    fields: [venues.vendorId],
+    references: [users.id],
+  }),
+  events: many(events),
+}));
+
+export const eventRelations = relations(events, ({ one, many }) => ({
+  vendor: one(users, {
+    fields: [events.vendorId],
+    references: [users.id],
+  }),
+  venue: one(venues, {
+    fields: [events.venueId],
+    references: [venues.id],
+  }),
+  ticketTiers: many(ticketTiers),
+  eventBookings: many(eventBookings),
+}));
+
+export const ticketTierRelations = relations(ticketTiers, ({ one, many }) => ({
+  event: one(events, {
+    fields: [ticketTiers.eventId],
+    references: [events.id],
+  }),
+  bookings: many(eventBookings),
+}));
+
+export const eventBookingRelations = relations(eventBookings, ({ one }) => ({
+  customer: one(users, {
+    fields: [eventBookings.customerId],
+    references: [users.id],
+  }),
+  event: one(events, {
+    fields: [eventBookings.eventId],
+    references: [events.id],
+  }),
+  ticketTier: one(ticketTiers, {
+    fields: [eventBookings.ticketTierId],
+    references: [ticketTiers.id],
   }),
 }));
 
@@ -292,6 +421,40 @@ export const insertNotificationSchema = createInsertSchema(notifications).omit({
 export const insertUserNotificationPreferencesSchema = createInsertSchema(userNotificationPreferences).omit({
   id: true,
   createdAt: true,
+});
+
+// Fireflies insert schemas
+export const insertVenueSchema = createInsertSchema(venues).omit({
+  id: true,
+  vendorId: true,
+  approvalStatus: true,
+  adminNotes: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertEventSchema = createInsertSchema(events).omit({
+  id: true,
+  vendorId: true,
+  rating: true,
+  totalBookings: true,
+  approvalStatus: true,
+  adminNotes: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertTicketTierSchema = createInsertSchema(ticketTiers).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertEventBookingSchema = createInsertSchema(eventBookings).omit({
+  id: true,
+  customerId: true,
+  createdAt: true,
+  updatedAt: true,
 });
 
 // Vendor onboarding schema
@@ -367,6 +530,16 @@ export type Notification = typeof notifications.$inferSelect;
 export type InsertUserNotificationPreferences = z.infer<typeof insertUserNotificationPreferencesSchema>;
 export type UserNotificationPreferences = typeof userNotificationPreferences.$inferSelect;
 
+// Fireflies types
+export type InsertVenue = z.infer<typeof insertVenueSchema>;
+export type Venue = typeof venues.$inferSelect;
+export type InsertEvent = z.infer<typeof insertEventSchema>;
+export type Event = typeof events.$inferSelect;
+export type InsertTicketTier = z.infer<typeof insertTicketTierSchema>;
+export type TicketTier = typeof ticketTiers.$inferSelect;
+export type InsertEventBooking = z.infer<typeof insertEventBookingSchema>;
+export type EventBooking = typeof eventBookings.$inferSelect;
+
 // Extended types with relations
 export type CourtWithDetails = Court & {
   vendor: User;
@@ -383,4 +556,23 @@ export type ReviewWithDetails = Review & {
   customer: User;
   court?: Court;
   booking?: Booking;
+};
+
+// Fireflies extended types with relations
+export type VenueWithDetails = Venue & {
+  vendor: User;
+  events: Event[];
+};
+
+export type EventWithDetails = Event & {
+  vendor: User;
+  venue: Venue;
+  ticketTiers: TicketTier[];
+  distance?: number; // Distance in km when location-based filtering is applied
+};
+
+export type EventBookingWithDetails = EventBooking & {
+  customer: User;
+  event: Event;
+  ticketTier: TicketTier;
 };

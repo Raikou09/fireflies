@@ -7,6 +7,7 @@ import { NotificationToast } from "@/components/NotificationToast";
 import { useAuth } from "@/hooks/useAuth";
 import Landing from "@/pages/Landing";
 import Home from "@/pages/Home";
+import FirefliesHome from "@/pages/FirefliesHome";
 import Admin from "@/pages/Admin";
 import VendorDashboard from "@/pages/VendorDashboard";
 import CourtDetails from "@/pages/CourtDetails";
@@ -27,6 +28,8 @@ function Router() {
       
       {/* Public Routes - No Authentication Required */}
       <Route path="/" component={Home} />
+      <Route path="/sportsbox" component={Home} />
+      <Route path="/fireflies" component={FirefliesHome} />
       <Route path="/court/:id" component={CourtDetails} />
       <Route path="/booking-history" component={BookingHistory} />
       <Route path="/profile" component={UserProfile} />

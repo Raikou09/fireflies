@@ -24,24 +24,48 @@ interface User {
 interface NavigationProps {
   userMode: "customer" | "vendor";
   setUserMode: (mode: "customer" | "vendor") => void;
+  platform?: "sportsbox" | "fireflies";
 }
 
-export default function Navigation({ userMode, setUserMode }: NavigationProps) {
+export default function Navigation({ userMode, setUserMode, platform = "sportsbox" }: NavigationProps) {
   const { user, isAuthenticated, isLoading } = useAuth() as { user: User | undefined, isAuthenticated: boolean, isLoading: boolean };
 
   return (
     <header className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-3 md:px-4 lg:px-8">
         <div className="flex items-center justify-between h-14 md:h-16">
-          <div className="flex items-center space-x-2 md:space-x-4 flex-1 min-w-0">
-            <div className="flex items-center space-x-1 md:space-x-2">
+          <div className="flex items-center space-x-2 md:space-x-6 flex-1 min-w-0">
+            <div className="flex items-center space-x-1 md:space-x-2 flex-shrink-0">
               <img 
                 src={Sports_Box_logo_011} 
-                alt="SportsBox Logo" 
-                className="h-6 md:h-8 w-auto flex-shrink-0"
+                alt="Logo" 
+                className="h-6 md:h-8 w-auto"
               />
-              <span className="text-base md:text-xl font-bold text-gray-900 truncate">SportsBox</span>
             </div>
+            
+            {/* Platform Navigation */}
+            <nav className="hidden md:flex items-center space-x-6">
+              <Link 
+                href="/sportsbox"
+                className={`text-sm font-semibold transition-colors ${
+                  platform === "sportsbox" 
+                    ? "text-primary border-b-2 border-primary pb-1" 
+                    : "text-gray-600 hover:text-gray-900"
+                }`}
+              >
+                SportsBox
+              </Link>
+              <Link 
+                href="/fireflies"
+                className={`text-sm font-semibold transition-colors ${
+                  platform === "fireflies" 
+                    ? "text-primary border-b-2 border-primary pb-1" 
+                    : "text-gray-600 hover:text-gray-900"
+                }`}
+              >
+                Fireflies
+              </Link>
+            </nav>
           </div>
           
           {/* Mobile-Optimized Controls */}
