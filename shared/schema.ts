@@ -245,9 +245,52 @@ export const venues = pgTable("venues", {
   capacity: integer("capacity").notNull(),
   imageUrl: varchar("image_url"),
   amenities: text("amenities").array(), // ["parking", "wifi", "food", "accessibility"]
+  hasSeatMap: boolean("has_seat_map").default(false),
+  seatMapConfig: jsonb("seat_map_config"), // Stores visual layout configuration
   isActive: boolean("is_active").default(true),
   approvalStatus: varchar("approval_status", { enum: ["pending", "approved", "rejected"] }).default("pending"),
   adminNotes: text("admin_notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Seat sections for venue pricing zones (VIP, General, Balcony, etc.)
+export const seatSections = pgTable("seat_sections", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  venueId: varchar("venue_id").notNull().references(() => venues.id, { onDelete: "cascade" }),
+  name: varchar("name").notNull(), // "VIP Section", "Balcony", "General Admission"
+  color: varchar("color").notNull(), // Hex color for visual display
+  basePrice: decimal("base_price", { precision: 10, scale: 2 }).notNull(), // Default price for this section
+  description: text("description"),
+  seatCount: integer("seat_count").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Individual seats in venue
+export const seats = pgTable("seats", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  sectionId: varchar("section_id").notNull().references(() => seatSections.id, { onDelete: "cascade" }),
+  venueId: varchar("venue_id").notNull().references(() => venues.id, { onDelete: "cascade" }),
+  row: varchar("row").notNull(), // "A", "B", "C", etc.
+  number: integer("number").notNull(), // 1, 2, 3, etc.
+  seatLabel: varchar("seat_label").notNull(), // "A1", "B12", etc.
+  priceOverride: decimal("price_override", { precision: 10, scale: 2 }), // Optional custom price for specific seat
+  x: integer("x").notNull(), // X position in grid for visual display
+  y: integer("y").notNull(), // Y position in grid for visual display
+  isAccessible: boolean("is_accessible").default(false), // Wheelchair accessible
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Event-specific seat reservations
+export const eventSeatReservations = pgTable("event_seat_reservations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  eventId: varchar("event_id").notNull().references(() => events.id, { onDelete: "cascade" }),
+  seatId: varchar("seat_id").notNull().references(() => seats.id, { onDelete: "cascade" }),
+  eventBookingId: varchar("event_booking_id").references(() => eventBookings.id, { onDelete: "set null" }),
+  status: varchar("status", { enum: ["available", "reserved", "booked"] }).default("available"),
+  reservedUntil: timestamp("reserved_until"), // Temporary hold for checkout process
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -335,6 +378,43 @@ export const venueRelations = relations(venues, ({ one, many }) => ({
     references: [users.id],
   }),
   events: many(events),
+  seatSections: many(seatSections),
+  seats: many(seats),
+}));
+
+export const seatSectionRelations = relations(seatSections, ({ one, many }) => ({
+  venue: one(venues, {
+    fields: [seatSections.venueId],
+    references: [venues.id],
+  }),
+  seats: many(seats),
+}));
+
+export const seatRelations = relations(seats, ({ one, many }) => ({
+  section: one(seatSections, {
+    fields: [seats.sectionId],
+    references: [seatSections.id],
+  }),
+  venue: one(venues, {
+    fields: [seats.venueId],
+    references: [venues.id],
+  }),
+  reservations: many(eventSeatReservations),
+}));
+
+export const eventSeatReservationRelations = relations(eventSeatReservations, ({ one }) => ({
+  event: one(events, {
+    fields: [eventSeatReservations.eventId],
+    references: [events.id],
+  }),
+  seat: one(seats, {
+    fields: [eventSeatReservations.seatId],
+    references: [seats.id],
+  }),
+  eventBooking: one(eventBookings, {
+    fields: [eventSeatReservations.eventBookingId],
+    references: [eventBookings.id],
+  }),
 }));
 
 export const eventRelations = relations(events, ({ one, many }) => ({
@@ -457,6 +537,24 @@ export const insertEventBookingSchema = createInsertSchema(eventBookings).omit({
   updatedAt: true,
 });
 
+export const insertSeatSectionSchema = createInsertSchema(seatSections).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertSeatSchema = createInsertSchema(seats).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertEventSeatReservationSchema = createInsertSchema(eventSeatReservations).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 // Vendor onboarding schema
 export const vendorOnboardingSchema = z.object({
   // Personal Information (Required)
@@ -539,6 +637,12 @@ export type InsertTicketTier = z.infer<typeof insertTicketTierSchema>;
 export type TicketTier = typeof ticketTiers.$inferSelect;
 export type InsertEventBooking = z.infer<typeof insertEventBookingSchema>;
 export type EventBooking = typeof eventBookings.$inferSelect;
+export type InsertSeatSection = z.infer<typeof insertSeatSectionSchema>;
+export type SeatSection = typeof seatSections.$inferSelect;
+export type InsertSeat = z.infer<typeof insertSeatSchema>;
+export type Seat = typeof seats.$inferSelect;
+export type InsertEventSeatReservation = z.infer<typeof insertEventSeatReservationSchema>;
+export type EventSeatReservation = typeof eventSeatReservations.$inferSelect;
 
 // Extended types with relations
 export type CourtWithDetails = Court & {
