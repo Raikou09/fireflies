@@ -211,6 +211,7 @@ export interface IStorage {
     section: SeatSection;
     status: string;
     reservedUntil?: Date;
+    price: number;
   }>>;
   reserveEventSeats(eventId: string, seatIds: string[], bookingId?: string): Promise<EventSeatReservation[]>;
   releaseExpiredReservations(eventId: string): Promise<void>;
@@ -2000,6 +2001,7 @@ export class DatabaseStorage implements IStorage {
     section: SeatSection;
     status: string;
     reservedUntil?: Date;
+    price: number;
   }>> {
     // Get event to find venue
     const [event] = await db.select().from(events).where(eq(events.id, eventId));
@@ -2022,11 +2024,20 @@ export class DatabaseStorage implements IStorage {
 
     return seatsWithSections.map(row => {
       const reservation = reservationMap.get(row.seats.id);
+      const section = row.seat_sections!;
+      const seat = row.seats;
+      
+      // Calculate price: use seat's price override if exists, otherwise use section base price
+      const price = seat.priceOverride 
+        ? parseFloat(seat.priceOverride) 
+        : parseFloat(section.basePrice);
+      
       return {
-        seat: row.seats,
-        section: row.seat_sections!,
+        seat: seat,
+        section: section,
         status: reservation?.status || 'available',
         reservedUntil: reservation?.reservedUntil || undefined,
+        price: price,
       };
     });
   }
