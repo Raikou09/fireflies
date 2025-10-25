@@ -177,10 +177,10 @@ export default function EventDetails() {
         </div>
       </div>
 
-      <div className="max-w-6xl mx-auto px-4 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="max-w-7xl mx-auto px-6 py-10">
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-12">
           {/* Event Details - Left Column */}
-          <div className="lg:col-span-2 space-y-6">
+          <div className="lg:col-span-3 space-y-8">
             {/* Event Poster */}
             {event.posterImageUrl && (
               <div className="w-full h-96 bg-gradient-to-br from-orange-100 to-pink-100 rounded-lg overflow-hidden">
@@ -195,10 +195,10 @@ export default function EventDetails() {
 
             {/* Event Info Card */}
             <Card>
-              <CardHeader>
+              <CardHeader className="p-6">
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
-                    <CardTitle className="text-3xl mb-2" data-testid="text-event-name">
+                    <CardTitle className="text-3xl mb-3" data-testid="text-event-name">
                       {event.name}
                     </CardTitle>
                     <Badge className="bg-gradient-to-r from-orange-600 to-pink-600 text-white" data-testid="badge-event-category">
@@ -209,9 +209,9 @@ export default function EventDetails() {
                 </div>
               </CardHeader>
 
-              <CardContent className="space-y-4">
+              <CardContent className="space-y-6 p-6">
                 {/* Date & Time */}
-                <div className="space-y-3">
+                <div className="space-y-4">
                   <div className="flex items-center text-gray-700">
                     <Calendar className="w-5 h-5 mr-3 text-orange-600" />
                     <div>
@@ -270,15 +270,15 @@ export default function EventDetails() {
                 )}
 
                 {/* Event Stats */}
-                <div className="grid grid-cols-2 gap-4 pt-4">
-                  <div className="bg-orange-50 rounded-lg p-4 text-center">
+                <div className="grid grid-cols-2 gap-6 pt-4">
+                  <div className="bg-orange-50 rounded-lg p-6 text-center">
                     <Users className="w-6 h-6 mx-auto text-orange-600 mb-2" />
                     <p className="text-2xl font-bold text-gray-900" data-testid="text-available-seats">
                       {event.availableSeats}
                     </p>
                     <p className="text-sm text-gray-600">Seats Available</p>
                   </div>
-                  <div className="bg-pink-50 rounded-lg p-4 text-center">
+                  <div className="bg-pink-50 rounded-lg p-6 text-center">
                     <Ticket className="w-6 h-6 mx-auto text-pink-600 mb-2" />
                     <p className="text-2xl font-bold text-gray-900" data-testid="text-total-seats">
                       {event.totalSeats}
@@ -291,16 +291,16 @@ export default function EventDetails() {
           </div>
 
           {/* Ticket/Seat Selection - Right Column */}
-          <div className="lg:col-span-1">
+          <div className="lg:col-span-2">
             <Card className="sticky top-4">
-              <CardHeader>
-                <CardTitle className="flex items-center">
+              <CardHeader className="p-6">
+                <CardTitle className="flex items-center text-xl">
                   <Ticket className="w-5 h-5 mr-2 text-orange-600" />
                   {event.venue?.hasSeatMap ? "Select Your Seats" : "Select Tickets"}
                 </CardTitle>
               </CardHeader>
 
-              <CardContent className="space-y-4">
+              <CardContent className="space-y-6 p-6">
                 {event.venue?.hasSeatMap ? (
                   <>
                     <SeatSelector 
@@ -325,7 +325,7 @@ export default function EventDetails() {
                     {event.ticketTiers.map((tier) => (
                       <div 
                         key={tier.id} 
-                        className="border rounded-lg p-4"
+                        className="border rounded-lg p-5"
                         data-testid={`ticket-tier-${tier.id}`}
                       >
                         <div className="flex justify-between items-start mb-2">
