@@ -522,12 +522,16 @@ export const insertEventSchema = createInsertSchema(events).omit({
   adminNotes: true,
   createdAt: true,
   updatedAt: true,
+}).extend({
+  eventDate: z.coerce.date(),
 });
 
 export const insertTicketTierSchema = createInsertSchema(ticketTiers).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
+}).extend({
+  price: z.coerce.string(),
 });
 
 export const insertEventBookingSchema = createInsertSchema(eventBookings).omit({

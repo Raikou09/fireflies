@@ -44,8 +44,6 @@ const EVENT_CATEGORIES = [
   "Other"
 ];
 
-const TIER_TYPES = ["VIP", "General", "Early Bird", "Student", "Other"];
-
 // Ticket tier schema for form (without eventId since it doesn't exist yet)
 const formTicketTierSchema = insertTicketTierSchema.omit({ eventId: true });
 
@@ -81,7 +79,7 @@ export default function AddEventModal({ isOpen, onClose }: AddEventModalProps) {
         name: "",
         description: "",
         category: "Concert",
-        eventDate: new Date().toISOString().split('T')[0],
+        eventDate: new Date().toISOString().split('T')[0] as any,
         eventTime: "19:00",
         duration: 120,
         posterImageUrl: "",
@@ -92,10 +90,9 @@ export default function AddEventModal({ isOpen, onClose }: AddEventModalProps) {
       ticketTiers: [
         {
           name: "General Admission",
-          tierType: "General",
-          price: 1000,
+          price: 1000 as any,
           description: "",
-          totalQuantity: 100,
+          quantity: 100,
           availableQuantity: 100,
         },
       ],
@@ -111,13 +108,15 @@ export default function AddEventModal({ isOpen, onClose }: AddEventModalProps) {
     mutationFn: async (data: EventWithTiers) => {
       const eventData = {
         ...data.event,
-        eventDate: new Date(data.event.eventDate as string).toISOString(),
+        eventDate: data.event.eventDate instanceof Date 
+          ? data.event.eventDate.toISOString() 
+          : new Date(data.event.eventDate).toISOString(),
       };
       const payload = {
         event: eventData,
         ticketTiers: data.ticketTiers,
       };
-      return await apiRequest<any>("/api/events", {
+      return await apiRequest("/api/events", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -282,7 +281,13 @@ export default function AddEventModal({ isOpen, onClose }: AddEventModalProps) {
                         <Input
                           type="date"
                           {...field}
-                          value={typeof field.value === 'string' ? field.value.split('T')[0] : ''}
+                          value={
+                            field.value instanceof Date 
+                              ? field.value.toISOString().split('T')[0]
+                              : typeof field.value === 'string' 
+                                ? field.value.split('T')[0] 
+                                : ''
+                          }
                           data-testid="input-event-date"
                         />
                       </FormControl>
@@ -406,10 +411,9 @@ export default function AddEventModal({ isOpen, onClose }: AddEventModalProps) {
                   size="sm"
                   onClick={() => append({
                     name: "",
-                    tierType: "General",
-                    price: 0,
+                    price: 0 as any,
                     description: "",
-                    totalQuantity: 0,
+                    quantity: 0,
                     availableQuantity: 0,
                   })}
                   data-testid="button-add-ticket-tier"
@@ -434,50 +438,23 @@ export default function AddEventModal({ isOpen, onClose }: AddEventModalProps) {
                     </Button>
                   )}
 
-                  <div className="grid grid-cols-2 gap-4">
-                    <FormField
-                      control={form.control}
-                      name={`ticketTiers.${index}.name`}
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Tier Name *</FormLabel>
-                          <FormControl>
-                            <Input
-                              placeholder="e.g., VIP Pass"
-                              {...field}
-                              data-testid={`input-tier-name-${index}`}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name={`ticketTiers.${index}.tierType`}
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Tier Type *</FormLabel>
-                          <Select onValueChange={field.onChange} defaultValue={field.value}>
-                            <FormControl>
-                              <SelectTrigger data-testid={`select-tier-type-${index}`}>
-                                <SelectValue placeholder="Select type" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {TIER_TYPES.map((type) => (
-                                <SelectItem key={type} value={type}>
-                                  {type}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
+                  <FormField
+                    control={form.control}
+                    name={`ticketTiers.${index}.name`}
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Tier Name *</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder="e.g., VIP Pass, General Admission, Student"
+                            {...field}
+                            data-testid={`input-tier-name-${index}`}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
 
                   <FormField
                     control={form.control}
@@ -521,7 +498,7 @@ export default function AddEventModal({ isOpen, onClose }: AddEventModalProps) {
 
                     <FormField
                       control={form.control}
-                      name={`ticketTiers.${index}.totalQuantity`}
+                      name={`ticketTiers.${index}.quantity`}
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Quantity *</FormLabel>
