@@ -69,6 +69,48 @@ interface PendingVendor {
   createdAt: string;
 }
 
+interface PendingVenue {
+  id: string;
+  name: string;
+  city: string;
+  area: string;
+  address?: string;
+  description?: string;
+  capacity: number;
+  imageUrl?: string;
+  amenities?: string[];
+  vendor: {
+    id: string;
+    firstName?: string;
+    lastName?: string;
+    email?: string;
+  };
+  createdAt: string;
+}
+
+interface PendingEvent {
+  id: string;
+  name: string;
+  category: string;
+  eventDate: string;
+  eventTime: string;
+  duration?: number;
+  description?: string;
+  posterImageUrl?: string;
+  venue: {
+    id: string;
+    name: string;
+    city: string;
+  };
+  vendor: {
+    id: string;
+    firstName?: string;
+    lastName?: string;
+    email?: string;
+  };
+  createdAt: string;
+}
+
 export default function AdminInterface() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -88,6 +130,16 @@ export default function AdminInterface() {
 
   const { data: pendingVendors, isLoading: vendorsLoading } = useQuery({
     queryKey: ["/api/admin/pending-vendors"],
+    retry: false,
+  });
+
+  const { data: pendingVenues, isLoading: venuesLoading } = useQuery({
+    queryKey: ["/api/admin/pending-venues"],
+    retry: false,
+  });
+
+  const { data: pendingEvents, isLoading: eventsLoading } = useQuery({
+    queryKey: ["/api/admin/pending-events"],
     retry: false,
   });
 
@@ -195,6 +247,64 @@ export default function AdminInterface() {
         description: "Failed to delete court. Please try again.",
         variant: "destructive",
       });
+    },
+  });
+
+  // Venue approval mutations
+  const approveVenueMutation = useMutation({
+    mutationFn: async ({ venueId, adminNotes }: { venueId: string; adminNotes?: string }) => {
+      await apiRequest(`/api/admin/venues/${venueId}/approve`, "PUT", { adminNotes });
+    },
+    onSuccess: () => {
+      toast({
+        title: "Venue Approved",
+        description: "The venue has been approved and is now live.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/pending-venues"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/venues"] });
+    },
+  });
+
+  const rejectVenueMutation = useMutation({
+    mutationFn: async ({ venueId, adminNotes }: { venueId: string; adminNotes?: string }) => {
+      await apiRequest(`/api/admin/venues/${venueId}/reject`, "PUT", { adminNotes });
+    },
+    onSuccess: () => {
+      toast({
+        title: "Venue Rejected",
+        description: "The venue submission has been rejected.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/pending-venues"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/venues"] });
+    },
+  });
+
+  // Event approval mutations
+  const approveEventMutation = useMutation({
+    mutationFn: async ({ eventId, adminNotes }: { eventId: string; adminNotes?: string }) => {
+      await apiRequest(`/api/admin/events/${eventId}/approve`, "PUT", { adminNotes });
+    },
+    onSuccess: () => {
+      toast({
+        title: "Event Approved",
+        description: "The event has been approved and is now live.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/pending-events"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/events"] });
+    },
+  });
+
+  const rejectEventMutation = useMutation({
+    mutationFn: async ({ eventId, adminNotes }: { eventId: string; adminNotes?: string }) => {
+      await apiRequest(`/api/admin/events/${eventId}/reject`, "PUT", { adminNotes });
+    },
+    onSuccess: () => {
+      toast({
+        title: "Event Rejected",
+        description: "The event submission has been rejected.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/pending-events"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/events"] });
     },
   });
 
@@ -322,22 +432,30 @@ export default function AdminInterface() {
       </div>
 
       <Tabs defaultValue="vendor-approvals" className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="vendor-approvals" className="flex items-center gap-2">
             <Users className="h-4 w-4" />
-            Vendor Approvals ({(pendingVendors as PendingVendor[])?.length || 0} pending)
+            Vendors ({(pendingVendors as PendingVendor[])?.length || 0})
           </TabsTrigger>
           <TabsTrigger value="approvals" className="flex items-center gap-2">
             <Clock className="h-4 w-4" />
-            Court Approvals ({courts.length} pending)
+            Courts ({courts.length})
+          </TabsTrigger>
+          <TabsTrigger value="venue-approvals" className="flex items-center gap-2">
+            <Building className="h-4 w-4" />
+            Venues ({(pendingVenues as PendingVenue[])?.length || 0})
+          </TabsTrigger>
+          <TabsTrigger value="event-approvals" className="flex items-center gap-2">
+            <Calendar className="h-4 w-4" />
+            Events ({(pendingEvents as PendingEvent[])?.length || 0})
           </TabsTrigger>
           <TabsTrigger value="management" className="flex items-center gap-2">
             <Database className="h-4 w-4" />
-            All Courts & Commissions
+            Management
           </TabsTrigger>
           <TabsTrigger value="analytics" className="flex items-center gap-2">
             <BarChart3 className="h-4 w-4" />
-            Analytics & Performance
+            Analytics
           </TabsTrigger>
         </TabsList>
 
@@ -610,6 +728,146 @@ export default function AdminInterface() {
             </Card>
           ))}
         </div>
+          )}
+        </TabsContent>
+
+        {/* Venue Approvals Tab */}
+        <TabsContent value="venue-approvals" className="mt-6">
+          {venuesLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+            </div>
+          ) : (pendingVenues as PendingVenue[])?.length === 0 ? (
+            <Card>
+              <CardContent className="text-center py-12">
+                <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-4" />
+                <h3 className="text-xl font-semibold mb-2">All Caught Up!</h3>
+                <p className="text-gray-600">No pending venues to review.</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid gap-6">
+              {(pendingVenues as PendingVenue[])?.map((venue) => (
+                <Card key={venue.id} data-testid={`venue-card-${venue.id}`}>
+                  <CardHeader>
+                    <CardTitle className="flex items-center justify-between">
+                      <span>{venue.name}</span>
+                      <Badge variant="outline">{venue.city}</Badge>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <span className="text-gray-600">Area:</span> {venue.area}
+                      </div>
+                      <div>
+                        <span className="text-gray-600">Capacity:</span> {venue.capacity}
+                      </div>
+                      <div>
+                        <span className="text-gray-600">Vendor:</span> {venue.vendor.firstName} {venue.vendor.lastName}
+                      </div>
+                      <div>
+                        <span className="text-gray-600">Email:</span> {venue.vendor.email}
+                      </div>
+                    </div>
+                    {venue.description && (
+                      <p className="text-sm text-gray-600">{venue.description}</p>
+                    )}
+                    <div className="flex gap-3 pt-4">
+                      <Button
+                        onClick={() => approveVenueMutation.mutate({ venueId: venue.id })}
+                        className="flex-1"
+                        disabled={approveVenueMutation.isPending || rejectVenueMutation.isPending}
+                        data-testid={`button-approve-venue-${venue.id}`}
+                      >
+                        <CheckCircle className="w-4 h-4 mr-2" />
+                        Approve
+                      </Button>
+                      <Button
+                        onClick={() => rejectVenueMutation.mutate({ venueId: venue.id })}
+                        variant="destructive"
+                        className="flex-1"
+                        disabled={approveVenueMutation.isPending || rejectVenueMutation.isPending}
+                        data-testid={`button-reject-venue-${venue.id}`}
+                      >
+                        <XCircle className="w-4 h-4 mr-2" />
+                        Reject
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </TabsContent>
+
+        {/* Event Approvals Tab */}
+        <TabsContent value="event-approvals" className="mt-6">
+          {eventsLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+            </div>
+          ) : (pendingEvents as PendingEvent[])?.length === 0 ? (
+            <Card>
+              <CardContent className="text-center py-12">
+                <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-4" />
+                <h3 className="text-xl font-semibold mb-2">All Caught Up!</h3>
+                <p className="text-gray-600">No pending events to review.</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid gap-6">
+              {(pendingEvents as PendingEvent[])?.map((event) => (
+                <Card key={event.id} data-testid={`event-card-${event.id}`}>
+                  <CardHeader>
+                    <CardTitle className="flex items-center justify-between">
+                      <span>{event.name}</span>
+                      <Badge variant="outline">{event.category}</Badge>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <span className="text-gray-600">Date:</span> {new Date(event.eventDate).toLocaleDateString()}
+                      </div>
+                      <div>
+                        <span className="text-gray-600">Time:</span> {event.eventTime}
+                      </div>
+                      <div>
+                        <span className="text-gray-600">Venue:</span> {event.venue.name} ({event.venue.city})
+                      </div>
+                      <div>
+                        <span className="text-gray-600">Vendor:</span> {event.vendor.firstName} {event.vendor.lastName}
+                      </div>
+                    </div>
+                    {event.description && (
+                      <p className="text-sm text-gray-600">{event.description}</p>
+                    )}
+                    <div className="flex gap-3 pt-4">
+                      <Button
+                        onClick={() => approveEventMutation.mutate({ eventId: event.id })}
+                        className="flex-1"
+                        disabled={approveEventMutation.isPending || rejectEventMutation.isPending}
+                        data-testid={`button-approve-event-${event.id}`}
+                      >
+                        <CheckCircle className="w-4 h-4 mr-2" />
+                        Approve
+                      </Button>
+                      <Button
+                        onClick={() => rejectEventMutation.mutate({ eventId: event.id })}
+                        variant="destructive"
+                        className="flex-1"
+                        disabled={approveEventMutation.isPending || rejectEventMutation.isPending}
+                        data-testid={`button-reject-event-${event.id}`}
+                      >
+                        <XCircle className="w-4 h-4 mr-2" />
+                        Reject
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
           )}
         </TabsContent>
 
