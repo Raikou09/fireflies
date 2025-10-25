@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
+import { SeatSelector } from '@/components/SeatSelector';
 import { 
   MapPin, 
   Calendar,
@@ -37,6 +38,8 @@ export default function EventDetails() {
   const { user, isAuthenticated } = useAuth();
   const { toast } = useToast();
   const [ticketSelections, setTicketSelections] = useState<Record<string, number>>({});
+  const [selectedSeats, setSelectedSeats] = useState<{ seatId: string; price: number }[]>([]);
+  const [seatsTotalPrice, setSeatsTotalPrice] = useState(0);
 
   const eventId = params?.id;
 
@@ -112,6 +115,11 @@ export default function EventDetails() {
     }, 0);
   };
 
+  const handleSeatsSelected = (seats: { seatId: string; price: number }[], totalPrice: number) => {
+    setSelectedSeats(seats);
+    setSeatsTotalPrice(totalPrice);
+  };
+
   const handleProceedToCheckout = () => {
     if (!isAuthenticated) {
       toast({
@@ -122,13 +130,26 @@ export default function EventDetails() {
       return;
     }
 
-    if (getTotalTickets() === 0) {
-      toast({
-        title: "Select tickets",
-        description: "Please select at least one ticket to proceed.",
-        variant: "destructive",
-      });
-      return;
+    const usesSeatMap = event?.venue?.hasSeatMap;
+    
+    if (usesSeatMap) {
+      if (selectedSeats.length === 0) {
+        toast({
+          title: "Select seats",
+          description: "Please select at least one seat to proceed.",
+          variant: "destructive",
+        });
+        return;
+      }
+    } else {
+      if (getTotalTickets() === 0) {
+        toast({
+          title: "Select tickets",
+          description: "Please select at least one ticket to proceed.",
+          variant: "destructive",
+        });
+        return;
+      }
     }
 
     // TODO: Implement checkout flow
@@ -269,18 +290,37 @@ export default function EventDetails() {
             </Card>
           </div>
 
-          {/* Ticket Selection - Right Column */}
+          {/* Ticket/Seat Selection - Right Column */}
           <div className="lg:col-span-1">
             <Card className="sticky top-4">
               <CardHeader>
                 <CardTitle className="flex items-center">
                   <Ticket className="w-5 h-5 mr-2 text-orange-600" />
-                  Select Tickets
+                  {event.venue?.hasSeatMap ? "Select Your Seats" : "Select Tickets"}
                 </CardTitle>
               </CardHeader>
 
               <CardContent className="space-y-4">
-                {event.ticketTiers && event.ticketTiers.length > 0 ? (
+                {event.venue?.hasSeatMap ? (
+                  <>
+                    <SeatSelector 
+                      eventId={eventId!} 
+                      onSeatsSelected={handleSeatsSelected}
+                      selectedSeats={selectedSeats.map(s => s.seatId)}
+                    />
+                    <div className="mt-6 pt-6 border-t">
+                      <Button
+                        className="w-full bg-gradient-to-r from-orange-600 to-pink-600 hover:from-orange-700 hover:to-pink-700"
+                        onClick={handleProceedToCheckout}
+                        disabled={selectedSeats.length === 0}
+                        data-testid="button-checkout"
+                      >
+                        <Ticket className="w-4 h-4 mr-2" />
+                        Proceed to Checkout (KES {seatsTotalPrice.toLocaleString()})
+                      </Button>
+                    </div>
+                  </>
+                ) : (event.ticketTiers && event.ticketTiers.length > 0 ? (
                   <>
                     {event.ticketTiers.map((tier) => (
                       <div 
@@ -372,7 +412,12 @@ export default function EventDetails() {
                     <Ticket className="w-12 h-12 mx-auto text-gray-400 mb-3" />
                     <p className="text-gray-600">No tickets available for this event.</p>
                   </div>
-                )}
+                ) : (
+                  <div className="text-center py-8">
+                    <Ticket className="w-12 h-12 mx-auto text-gray-400 mb-3" />
+                    <p className="text-gray-600">No tickets available for this event.</p>
+                  </div>
+                ))}
               </CardContent>
             </Card>
           </div>

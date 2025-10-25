@@ -30,7 +30,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Loader2 } from "lucide-react";
+import { Loader2, ChevronLeft, ChevronRight } from "lucide-react";
+import { SeatMapBuilder } from "./SeatMapBuilder";
 
 const CITIES = ["Nairobi", "Mombasa", "Kisumu", "Nakuru", "Eldoret"];
 
@@ -42,6 +43,8 @@ interface AddVenueModalProps {
 export default function AddVenueModal({ isOpen, onClose }: AddVenueModalProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [step, setStep] = useState<"basic" | "seatmap">("basic");
+  const [createdVenueId, setCreatedVenueId] = useState<string | null>(null);
 
   const form = useForm<InsertVenue>({
     resolver: zodResolver(insertVenueSchema),
@@ -61,20 +64,17 @@ export default function AddVenueModal({ isOpen, onClose }: AddVenueModalProps) {
 
   const createVenueMutation = useMutation({
     mutationFn: async (data: InsertVenue) => {
-      return await apiRequest<any>("/api/venues", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      });
+      const res = await apiRequest("/api/venues", "POST", data);
+      return await res.json();
     },
-    onSuccess: () => {
+    onSuccess: (data: any) => {
+      setCreatedVenueId(data.id);
       toast({
-        title: "Success!",
-        description: "Your venue has been submitted for admin approval.",
+        title: "Venue Created!",
+        description: "Now you can optionally add a seat map for this venue.",
       });
       queryClient.invalidateQueries({ queryKey: ["/api/vendor/venues"] });
-      form.reset();
-      onClose();
+      setStep("seatmap");
     },
     onError: (error: any) => {
       toast({
@@ -85,22 +85,69 @@ export default function AddVenueModal({ isOpen, onClose }: AddVenueModalProps) {
     },
   });
 
+  const saveSeatMapMutation = useMutation({
+    mutationFn: async ({ sections, seats }: { sections: any[]; seats: any[] }) => {
+      if (!createdVenueId) throw new Error("No venue ID");
+      const res = await apiRequest(`/api/venues/${createdVenueId}/seat-map`, "POST", { sections, seats });
+      return await res.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Seat Map Saved!",
+        description: "Your venue seat map has been configured successfully.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/vendor/venues"] });
+      handleClose();
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to save seat map. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleClose = () => {
+    form.reset();
+    setStep("basic");
+    setCreatedVenueId(null);
+    onClose();
+  };
+
+  const handleSkipSeatMap = () => {
+    toast({
+      title: "Venue Submitted",
+      description: "Your venue has been submitted for admin approval.",
+    });
+    handleClose();
+  };
+
+  const handleSaveSeatMap = async (sections: any[], seats: any[]) => {
+    await saveSeatMapMutation.mutateAsync({ sections, seats });
+  };
+
   const onSubmit = (data: InsertVenue) => {
     createVenueMutation.mutate(data);
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+    <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
+      <DialogContent className={`${step === "seatmap" ? "max-w-7xl max-h-[95vh]" : "max-w-2xl max-h-[90vh]"} overflow-y-auto`}>
         <DialogHeader>
-          <DialogTitle>Add New Venue</DialogTitle>
+          <DialogTitle>
+            {step === "basic" ? "Add New Venue" : "Configure Seat Map (Optional)"}
+          </DialogTitle>
           <DialogDescription>
-            Submit your venue details for admin approval
+            {step === "basic" 
+              ? "Submit your venue details for admin approval"
+              : "Design a visual seat layout for your venue. This step is optional and can be skipped."}
           </DialogDescription>
         </DialogHeader>
 
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+        {step === "basic" ? (
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
             <FormField
               control={form.control}
               name="name"
@@ -214,6 +261,7 @@ export default function AddVenueModal({ isOpen, onClose }: AddVenueModalProps) {
                     <Input
                       placeholder="e.g., City Hall Way, Nairobi"
                       {...field}
+                      value={field.value || ""}
                       data-testid="input-venue-address"
                     />
                   </FormControl>
@@ -291,7 +339,7 @@ export default function AddVenueModal({ isOpen, onClose }: AddVenueModalProps) {
               <Button
                 type="button"
                 variant="outline"
-                onClick={onClose}
+                onClick={handleClose}
                 disabled={createVenueMutation.isPending}
                 data-testid="button-cancel"
               >
@@ -311,6 +359,21 @@ export default function AddVenueModal({ isOpen, onClose }: AddVenueModalProps) {
             </div>
           </form>
         </Form>
+        ) : (
+          <div className="space-y-6">
+            <SeatMapBuilder onSave={handleSaveSeatMap} />
+            <div className="flex justify-end gap-3 pt-4 border-t">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleSkipSeatMap}
+                data-testid="button-skip-seat-map"
+              >
+                Skip for Now
+              </Button>
+            </div>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );
