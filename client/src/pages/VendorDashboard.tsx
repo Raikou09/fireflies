@@ -154,6 +154,12 @@ export default function VendorDashboard() {
     enabled: isAuthenticated && isVendor,
   });
 
+  // Fetch vendor event bookings
+  const { data: vendorEventBookings = [] } = useQuery<any[]>({
+    queryKey: ['/api/vendor/event-bookings'],
+    enabled: isAuthenticated && isVendor,
+  });
+
   const handleGoogleLogin = () => {
     window.location.href = '/api/login';
   };
@@ -343,12 +349,13 @@ export default function VendorDashboard() {
 
         {/* Detailed Analytics */}
         <Tabs defaultValue="courts" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-7">
+          <TabsList className="grid w-full grid-cols-8">
             <TabsTrigger value="courts">Court Analytics</TabsTrigger>
             <TabsTrigger value="manage">Manage Courts</TabsTrigger>
             <TabsTrigger value="equipment">Equipment</TabsTrigger>
             <TabsTrigger value="cities">City Performance</TabsTrigger>
             <TabsTrigger value="bookings">View Bookings</TabsTrigger>
+            <TabsTrigger value="events">Event Bookings</TabsTrigger>
             <TabsTrigger value="overview">Business Overview</TabsTrigger>
             <TabsTrigger value="notifications">Notifications</TabsTrigger>
           </TabsList>
@@ -802,6 +809,203 @@ export default function VendorDashboard() {
                 </CardContent>
               </Card>
             </div>
+          </TabsContent>
+
+          {/* Event Bookings Tab */}
+          <TabsContent value="events" className="space-y-6">
+            {/* Event Analytics Summary Cards */}
+            <div className="grid gap-4 md:grid-cols-4">
+              <Card data-testid="card-total-event-bookings">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Total Event Bookings</CardTitle>
+                  <Calendar className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{vendorEventBookings.length}</div>
+                  <p className="text-xs text-muted-foreground">All time bookings</p>
+                </CardContent>
+              </Card>
+              
+              <Card data-testid="card-event-revenue">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Event Revenue</CardTitle>
+                  <DollarSign className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">
+                    KSh {vendorEventBookings.reduce((sum: number, b: any) => sum + Number(b.totalAmount || 0), 0).toLocaleString()}
+                  </div>
+                  <p className="text-xs text-muted-foreground">Total from event tickets</p>
+                </CardContent>
+              </Card>
+              
+              <Card data-testid="card-tickets-sold">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Tickets Sold</CardTitle>
+                  <Trophy className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">
+                    {vendorEventBookings.reduce((sum: number, b: any) => sum + Number(b.numberOfTickets || 0), 0)}
+                  </div>
+                  <p className="text-xs text-muted-foreground">Total tickets across all events</p>
+                </CardContent>
+              </Card>
+              
+              <Card data-testid="card-confirmed-bookings">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Confirmed</CardTitle>
+                  <BarChart3 className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">
+                    {vendorEventBookings.filter((b: any) => b.status === 'confirmed').length}
+                  </div>
+                  <p className="text-xs text-muted-foreground">Confirmed bookings</p>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Event-Level Breakdown */}
+            <Card data-testid="card-event-analytics">
+              <CardHeader>
+                <CardTitle>Event Performance Breakdown</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {(() => {
+                  // Group bookings by event
+                  const eventBreakdown = vendorEventBookings.reduce((acc: any, booking: any) => {
+                    const eventId = booking.event?.id;
+                    if (!eventId) return acc;
+                    
+                    if (!acc[eventId]) {
+                      acc[eventId] = {
+                        eventName: booking.event?.name,
+                        venueName: booking.event?.venue?.name,
+                        eventDate: booking.event?.eventDate,
+                        bookings: 0,
+                        tickets: 0,
+                        revenue: 0,
+                        confirmedCount: 0,
+                      };
+                    }
+                    
+                    acc[eventId].bookings += 1;
+                    acc[eventId].tickets += Number(booking.numberOfTickets || 0);
+                    acc[eventId].revenue += Number(booking.totalAmount || 0);
+                    if (booking.status === 'confirmed') acc[eventId].confirmedCount += 1;
+                    
+                    return acc;
+                  }, {});
+                  
+                  const breakdownArray = Object.values(eventBreakdown);
+                  
+                  return breakdownArray.length === 0 ? (
+                    <div className="text-center py-8">
+                      <Calendar className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                      <p className="text-gray-500">No event bookings to analyze</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {breakdownArray.map((event: any, index: number) => (
+                        <div key={index} className="border border-gray-200 rounded-lg p-4" data-testid={`event-analytics-${index}`}>
+                          <div className="flex justify-between items-start mb-3">
+                            <div>
+                              <h4 className="font-semibold text-lg">{event.eventName}</h4>
+                              <p className="text-sm text-gray-600">
+                                {event.venueName} • {new Date(event.eventDate).toLocaleDateString()}
+                              </p>
+                            </div>
+                            <Badge variant="outline">
+                              KSh {event.revenue.toLocaleString()}
+                            </Badge>
+                          </div>
+                          <div className="grid grid-cols-4 gap-4 text-sm">
+                            <div>
+                              <p className="text-gray-600">Bookings</p>
+                              <p className="text-xl font-bold">{event.bookings}</p>
+                            </div>
+                            <div>
+                              <p className="text-gray-600">Tickets Sold</p>
+                              <p className="text-xl font-bold">{event.tickets}</p>
+                            </div>
+                            <div>
+                              <p className="text-gray-600">Revenue</p>
+                              <p className="text-xl font-bold text-primary">KSh {event.revenue.toLocaleString()}</p>
+                            </div>
+                            <div>
+                              <p className="text-gray-600">Confirmed</p>
+                              <p className="text-xl font-bold text-green-600">{event.confirmedCount}</p>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
+              </CardContent>
+            </Card>
+
+            {/* Individual Bookings List */}
+            <Card data-testid="card-event-bookings">
+              <CardHeader>
+                <CardTitle>All Event Bookings</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {vendorEventBookings.length === 0 ? (
+                  <div className="text-center py-8">
+                    <Calendar className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                    <p className="text-gray-500">No event bookings found</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {vendorEventBookings.map((booking: any) => (
+                      <div key={booking.id} className="border border-gray-200 rounded-lg p-4" data-testid={`event-booking-${booking.id}`}>
+                        <div className="flex justify-between items-start mb-3">
+                          <div>
+                            <h4 className="font-semibold text-lg">{booking.event?.name}</h4>
+                            <p className="text-gray-600 flex items-center">
+                              <MapPin className="h-4 w-4 mr-1" />
+                              {booking.event?.venue?.name} - {booking.event?.venue?.city}
+                            </p>
+                          </div>
+                          <Badge 
+                            variant={booking.status === 'confirmed' ? 'default' : booking.status === 'attended' ? 'secondary' : 'destructive'}
+                            data-testid={`badge-status-${booking.id}`}
+                          >
+                            {booking.status}
+                          </Badge>
+                        </div>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                          <div>
+                            <p className="text-gray-600">Event Date</p>
+                            <p className="font-medium">{new Date(booking.event?.eventDate).toLocaleDateString()}</p>
+                            <p className="text-gray-500">{booking.event?.eventTime}</p>
+                          </div>
+                          <div>
+                            <p className="text-gray-600">Customer</p>
+                            <p className="font-medium">{booking.customer?.firstName} {booking.customer?.lastName}</p>
+                            <p className="text-gray-500">{booking.customer?.email}</p>
+                          </div>
+                          <div>
+                            <p className="text-gray-600">Booking Details</p>
+                            <p className="font-medium text-primary">KSh {Number(booking.totalAmount).toLocaleString()}</p>
+                            <p className="text-gray-500">{booking.numberOfTickets} ticket(s)</p>
+                          </div>
+                        </div>
+                        {booking.specialRequests && (
+                          <div className="mt-3 pt-3 border-t border-gray-200">
+                            <p className="text-sm text-gray-600">Special Requests:</p>
+                            <p className="text-sm">{booking.specialRequests}</p>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </TabsContent>
 
           {/* Notifications Testing Tab */}

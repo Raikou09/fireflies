@@ -1819,6 +1819,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Vendor event bookings with Google auth
+  app.get("/api/vendor/event-bookings", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub || req.user?.id;
+      const user = await storage.getUser(userId);
+      
+      if (!user || user.userType !== "vendor") {
+        return res.status(403).json({ message: "Access denied. Vendor account required." });
+      }
+
+      const eventBookings = await storage.getEventBookingsByVendor(userId);
+      res.json(eventBookings);
+    } catch (error) {
+      console.error("Error fetching vendor event bookings:", error);
+      res.status(500).json({ message: "Failed to fetch event bookings" });
+    }
+  });
+
   // Notification API routes
   app.get("/api/notifications", isAuthenticated, async (req, res) => {
     try {
