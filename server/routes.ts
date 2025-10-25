@@ -13,6 +13,10 @@ import {
   insertEquipmentSchema,
   insertBookingSchema,
   insertUserNotificationPreferencesSchema,
+  insertVenueSchema,
+  insertEventSchema,
+  insertTicketTierSchema,
+  insertEventBookingSchema,
 } from "@shared/schema";
 import { notificationService } from "./notificationService";
 import { EnhancedNotificationService } from "./enhancedNotificationService";
@@ -27,6 +31,42 @@ const requireAdminAuth = (req: any, res: any, next: any) => {
   } else {
     res.status(401).json({ message: "Admin authentication required" });
   }
+};
+
+// Helper function to verify vendor status
+const verifyVendorStatus = async (userId: string) => {
+  const vendor = await storage.getUser(userId);
+  if (!vendor) {
+    return { error: { status: 404, message: "User not found" } };
+  }
+  
+  if (vendor.userType !== "vendor") {
+    return { 
+      error: { 
+        status: 403, 
+        message: "Access denied. Only verified vendors can perform this action.",
+        code: "NOT_VENDOR"
+      } 
+    };
+  }
+  
+  if (vendor.vendorVerificationStatus !== "verified") {
+    const statusMessages = {
+      pending: "Your vendor application is still under review. You cannot perform this action until verified.",
+      rejected: "Your vendor application was rejected. Please contact support for assistance."
+    };
+    
+    return { 
+      error: { 
+        status: 403,
+        message: statusMessages[vendor.vendorVerificationStatus as keyof typeof statusMessages] || "Vendor verification required.",
+        code: "NOT_VERIFIED",
+        verificationStatus: vendor.vendorVerificationStatus
+      } 
+    };
+  }
+  
+  return { vendor };
 };
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -1006,6 +1046,365 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json({ success: true, message: "Admin logged out" });
   });
 
+  // ============================================
+  // FIREFLIES EVENT BOOKING SYSTEM ROUTES
+  // ============================================
+
+  // Venue routes
+  app.get("/api/venues", async (req, res) => {
+    try {
+      const { city, search, lat, lng, maxDistance, sortByDistance } = req.query;
+      const venues = await storage.getVenues({
+        city: city as string,
+        search: search as string,
+        userLatitude: lat ? parseFloat(lat as string) : undefined,
+        userLongitude: lng ? parseFloat(lng as string) : undefined,
+        maxDistance: maxDistance ? parseFloat(maxDistance as string) : undefined,
+        sortByDistance: sortByDistance === 'true',
+      });
+      res.json(venues);
+    } catch (error) {
+      console.error("Error fetching venues:", error);
+      res.status(500).json({ message: "Failed to fetch venues" });
+    }
+  });
+
+  app.get("/api/venues/:id", async (req, res) => {
+    try {
+      const venue = await storage.getVenueById(req.params.id);
+      if (!venue) {
+        return res.status(404).json({ message: "Venue not found" });
+      }
+      res.json(venue);
+    } catch (error) {
+      console.error("Error fetching venue:", error);
+      res.status(500).json({ message: "Failed to fetch venue" });
+    }
+  });
+
+  app.post("/api/venues", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.user?.claims?.sub || req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+      
+      // Verify vendor status
+      const verification = await verifyVendorStatus(userId);
+      if (verification.error) {
+        return res.status(verification.error.status).json(verification.error);
+      }
+      
+      const validatedData = insertVenueSchema.parse(req.body);
+      const venue = await storage.createVenue(userId, validatedData);
+      res.json(venue);
+    } catch (error) {
+      console.error("Error creating venue:", error);
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ message: "Invalid venue data", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to create venue" });
+    }
+  });
+
+  app.put("/api/venues/:id", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.user?.claims?.sub || req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+      
+      // Verify vendor status
+      const verification = await verifyVendorStatus(userId);
+      if (verification.error) {
+        return res.status(verification.error.status).json(verification.error);
+      }
+      
+      const validatedData = insertVenueSchema.partial().parse(req.body);
+      const venue = await storage.updateVenue(req.params.id, userId, validatedData);
+      if (!venue) {
+        return res.status(404).json({ message: "Venue not found or unauthorized" });
+      }
+      res.json(venue);
+    } catch (error) {
+      console.error("Error updating venue:", error);
+      res.status(500).json({ message: "Failed to update venue" });
+    }
+  });
+
+  app.delete("/api/venues/:id", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.user?.claims?.sub || req.user?.id;
+      const deleted = await storage.deleteVenue(req.params.id, userId);
+      if (!deleted) {
+        return res.status(404).json({ message: "Venue not found or unauthorized" });
+      }
+      res.json({ message: "Venue deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting venue:", error);
+      res.status(500).json({ message: "Failed to delete venue" });
+    }
+  });
+
+  app.get("/api/vendor/venues", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.user?.claims?.sub || req.user?.id;
+      const venues = await storage.getVenuesByVendor(userId);
+      res.json(venues);
+    } catch (error) {
+      console.error("Error fetching vendor venues:", error);
+      res.status(500).json({ message: "Failed to fetch vendor venues" });
+    }
+  });
+
+  // Event routes
+  app.get("/api/events", async (req, res) => {
+    try {
+      const { city, category, search, dateFrom, dateTo, lat, lng, maxDistance, sortByDistance } = req.query;
+      const events = await storage.getEvents({
+        city: city as string,
+        category: category as string,
+        search: search as string,
+        dateFrom: dateFrom ? new Date(dateFrom as string) : undefined,
+        dateTo: dateTo ? new Date(dateTo as string) : undefined,
+        userLatitude: lat ? parseFloat(lat as string) : undefined,
+        userLongitude: lng ? parseFloat(lng as string) : undefined,
+        maxDistance: maxDistance ? parseFloat(maxDistance as string) : undefined,
+        sortByDistance: sortByDistance === 'true',
+      });
+      res.json(events);
+    } catch (error) {
+      console.error("Error fetching events:", error);
+      res.status(500).json({ message: "Failed to fetch events" });
+    }
+  });
+
+  app.get("/api/events/:id", async (req, res) => {
+    try {
+      const event = await storage.getEventById(req.params.id);
+      if (!event) {
+        return res.status(404).json({ message: "Event not found" });
+      }
+      res.json(event);
+    } catch (error) {
+      console.error("Error fetching event:", error);
+      res.status(500).json({ message: "Failed to fetch event" });
+    }
+  });
+
+  app.post("/api/events", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.user?.claims?.sub || req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+      
+      // Verify vendor status
+      const verification = await verifyVendorStatus(userId);
+      if (verification.error) {
+        return res.status(verification.error.status).json(verification.error);
+      }
+      
+      const validatedData = insertEventSchema.parse(req.body);
+      
+      // Verify vendor owns the venue
+      const venue = await storage.getVenueById(validatedData.venueId);
+      if (!venue || venue.vendorId !== userId) {
+        return res.status(403).json({ 
+          message: "Access denied. You can only create events at your own venues.",
+          code: "VENUE_NOT_OWNED"
+        });
+      }
+      
+      const event = await storage.createEvent(userId, validatedData);
+      res.json(event);
+    } catch (error) {
+      console.error("Error creating event:", error);
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ message: "Invalid event data", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to create event" });
+    }
+  });
+
+  app.put("/api/events/:id", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.user?.claims?.sub || req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+      
+      // Verify vendor status
+      const verification = await verifyVendorStatus(userId);
+      if (verification.error) {
+        return res.status(verification.error.status).json(verification.error);
+      }
+      
+      const validatedData = insertEventSchema.partial().parse(req.body);
+      const event = await storage.updateEvent(req.params.id, userId, validatedData);
+      if (!event) {
+        return res.status(404).json({ message: "Event not found or unauthorized" });
+      }
+      res.json(event);
+    } catch (error) {
+      console.error("Error updating event:", error);
+      res.status(500).json({ message: "Failed to update event" });
+    }
+  });
+
+  app.delete("/api/events/:id", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.user?.claims?.sub || req.user?.id;
+      const deleted = await storage.deleteEvent(req.params.id, userId);
+      if (!deleted) {
+        return res.status(404).json({ message: "Event not found or unauthorized" });
+      }
+      res.json({ message: "Event deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting event:", error);
+      res.status(500).json({ message: "Failed to delete event" });
+    }
+  });
+
+  app.get("/api/vendor/events", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.user?.claims?.sub || req.user?.id;
+      const events = await storage.getEventsByVendor(userId);
+      res.json(events);
+    } catch (error) {
+      console.error("Error fetching vendor events:", error);
+      res.status(500).json({ message: "Failed to fetch vendor events" });
+    }
+  });
+
+  // Ticket tier routes
+  app.get("/api/events/:eventId/ticket-tiers", async (req, res) => {
+    try {
+      const ticketTiers = await storage.getTicketTiersByEvent(req.params.eventId);
+      res.json(ticketTiers);
+    } catch (error) {
+      console.error("Error fetching ticket tiers:", error);
+      res.status(500).json({ message: "Failed to fetch ticket tiers" });
+    }
+  });
+
+  app.post("/api/ticket-tiers", isAuthenticated, async (req, res) => {
+    try {
+      const validatedData = insertTicketTierSchema.parse(req.body);
+      const ticketTier = await storage.createTicketTier(validatedData);
+      res.json(ticketTier);
+    } catch (error) {
+      console.error("Error creating ticket tier:", error);
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ message: "Invalid ticket tier data", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to create ticket tier" });
+    }
+  });
+
+  app.put("/api/ticket-tiers/:id", isAuthenticated, async (req, res) => {
+    try {
+      const validatedData = insertTicketTierSchema.partial().parse(req.body);
+      const ticketTier = await storage.updateTicketTier(req.params.id, validatedData);
+      if (!ticketTier) {
+        return res.status(404).json({ message: "Ticket tier not found" });
+      }
+      res.json(ticketTier);
+    } catch (error) {
+      console.error("Error updating ticket tier:", error);
+      res.status(500).json({ message: "Failed to update ticket tier" });
+    }
+  });
+
+  app.delete("/api/ticket-tiers/:id", isAuthenticated, async (req, res) => {
+    try {
+      const deleted = await storage.deleteTicketTier(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ message: "Ticket tier not found" });
+      }
+      res.json({ message: "Ticket tier deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting ticket tier:", error);
+      res.status(500).json({ message: "Failed to delete ticket tier" });
+    }
+  });
+
+  // Event booking routes
+  app.post("/api/event-bookings", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.user?.claims?.sub || req.user?.id;
+      const validatedData = insertEventBookingSchema.parse({
+        ...req.body,
+        customerId: userId,
+      });
+      
+      // Generate unique booking code
+      const bookingCode = `FB${Date.now()}${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
+      
+      const booking = await storage.createEventBooking({
+        ...validatedData,
+        bookingCode,
+      });
+      
+      res.json(booking);
+    } catch (error) {
+      console.error("Error creating event booking:", error);
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ message: "Invalid booking data", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to create event booking" });
+    }
+  });
+
+  app.get("/api/event-bookings/customer", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.user?.claims?.sub || req.user?.id;
+      const bookings = await storage.getEventBookingsByCustomer(userId);
+      res.json(bookings);
+    } catch (error) {
+      console.error("Error fetching customer event bookings:", error);
+      res.status(500).json({ message: "Failed to fetch customer event bookings" });
+    }
+  });
+
+  app.get("/api/event-bookings/vendor", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.user?.claims?.sub || req.user?.id;
+      const bookings = await storage.getEventBookingsByVendor(userId);
+      res.json(bookings);
+    } catch (error) {
+      console.error("Error fetching vendor event bookings:", error);
+      res.status(500).json({ message: "Failed to fetch vendor event bookings" });
+    }
+  });
+
+  app.get("/api/event-bookings/:id", isAuthenticated, async (req, res) => {
+    try {
+      const booking = await storage.getEventBookingById(req.params.id);
+      if (!booking) {
+        return res.status(404).json({ message: "Event booking not found" });
+      }
+      res.json(booking);
+    } catch (error) {
+      console.error("Error fetching event booking:", error);
+      res.status(500).json({ message: "Failed to fetch event booking" });
+    }
+  });
+
+  app.put("/api/event-bookings/:id/status", isAuthenticated, async (req, res) => {
+    try {
+      const { status } = req.body;
+      const booking = await storage.updateEventBookingStatus(req.params.id, status);
+      if (!booking) {
+        return res.status(404).json({ message: "Event booking not found" });
+      }
+      res.json(booking);
+    } catch (error) {
+      console.error("Error updating event booking status:", error);
+      res.status(500).json({ message: "Failed to update event booking status" });
+    }
+  });
+
   // Admin routes (protected with middleware)
   
   // Get all courts data for admin (with detailed information)
@@ -1150,6 +1549,83 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error rejecting court:", error);
       res.status(500).json({ message: "Failed to reject court" });
+    }
+  });
+
+  // Fireflies Admin Routes - Venue and Event Approval
+  app.get("/api/admin/pending-venues", requireAdminAuth, async (req: any, res) => {
+    try {
+      const pendingVenues = await storage.getPendingVenues();
+      res.json(pendingVenues);
+    } catch (error) {
+      console.error("Error fetching pending venues:", error);
+      res.status(500).json({ message: "Failed to fetch pending venues" });
+    }
+  });
+
+  app.put("/api/admin/venues/:id/approve", requireAdminAuth, async (req: any, res) => {
+    try {
+      const { adminNotes } = req.body;
+      const venue = await storage.approveVenue(req.params.id, adminNotes);
+      if (!venue) {
+        return res.status(404).json({ message: "Venue not found" });
+      }
+      res.json(venue);
+    } catch (error) {
+      console.error("Error approving venue:", error);
+      res.status(500).json({ message: "Failed to approve venue" });
+    }
+  });
+
+  app.put("/api/admin/venues/:id/reject", requireAdminAuth, async (req: any, res) => {
+    try {
+      const { adminNotes } = req.body;
+      const venue = await storage.rejectVenue(req.params.id, adminNotes);
+      if (!venue) {
+        return res.status(404).json({ message: "Venue not found" });
+      }
+      res.json(venue);
+    } catch (error) {
+      console.error("Error rejecting venue:", error);
+      res.status(500).json({ message: "Failed to reject venue" });
+    }
+  });
+
+  app.get("/api/admin/pending-events", requireAdminAuth, async (req: any, res) => {
+    try {
+      const pendingEvents = await storage.getPendingEvents();
+      res.json(pendingEvents);
+    } catch (error) {
+      console.error("Error fetching pending events:", error);
+      res.status(500).json({ message: "Failed to fetch pending events" });
+    }
+  });
+
+  app.put("/api/admin/events/:id/approve", requireAdminAuth, async (req: any, res) => {
+    try {
+      const { adminNotes } = req.body;
+      const event = await storage.approveEvent(req.params.id, adminNotes);
+      if (!event) {
+        return res.status(404).json({ message: "Event not found" });
+      }
+      res.json(event);
+    } catch (error) {
+      console.error("Error approving event:", error);
+      res.status(500).json({ message: "Failed to approve event" });
+    }
+  });
+
+  app.put("/api/admin/events/:id/reject", requireAdminAuth, async (req: any, res) => {
+    try {
+      const { adminNotes } = req.body;
+      const event = await storage.rejectEvent(req.params.id, adminNotes);
+      if (!event) {
+        return res.status(404).json({ message: "Event not found" });
+      }
+      res.json(event);
+    } catch (error) {
+      console.error("Error rejecting event:", error);
+      res.status(500).json({ message: "Failed to reject event" });
     }
   });
 
