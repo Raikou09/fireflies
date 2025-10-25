@@ -6,6 +6,10 @@ import {
   reviews,
   notifications,
   userNotificationPreferences,
+  venues,
+  events,
+  ticketTiers,
+  eventBookings,
   type User,
   type UpsertUser,
   type Court,
@@ -23,6 +27,17 @@ import {
   type CourtWithDetails,
   type BookingWithDetails,
   type ReviewWithDetails,
+  type Venue,
+  type InsertVenue,
+  type Event,
+  type InsertEvent,
+  type TicketTier,
+  type InsertTicketTier,
+  type EventBooking,
+  type InsertEventBooking,
+  type VenueWithDetails,
+  type EventWithDetails,
+  type EventBookingWithDetails,
 } from "@shared/schema";
 import { db, pool } from "./db";
 import { eq, and, desc, sql, gte, lte } from "drizzle-orm";
@@ -112,6 +127,62 @@ export interface IStorage {
   setCourtCommission(id: string, commissionRate: number): Promise<Court | undefined>;
   approveCourt(courtId: string, adminNotes?: string): Promise<Court | undefined>;
   rejectCourt(courtId: string, adminNotes?: string): Promise<Court | undefined>;
+
+  // FIREFLIES EVENT OPERATIONS
+  
+  // Venue operations
+  getVenues(filters?: {
+    city?: string;
+    search?: string;
+    userLatitude?: number;
+    userLongitude?: number;
+    maxDistance?: number;
+    sortByDistance?: boolean;
+  }): Promise<VenueWithDetails[]>;
+  getVenueById(id: string): Promise<VenueWithDetails | undefined>;
+  getVenuesByVendor(vendorId: string): Promise<VenueWithDetails[]>;
+  createVenue(vendorId: string, venue: InsertVenue): Promise<Venue>;
+  updateVenue(id: string, vendorId: string, venue: Partial<InsertVenue>): Promise<Venue | undefined>;
+  deleteVenue(id: string, vendorId: string): Promise<boolean>;
+
+  // Event operations
+  getEvents(filters?: {
+    city?: string;
+    category?: string;
+    search?: string;
+    dateFrom?: Date;
+    dateTo?: Date;
+    userLatitude?: number;
+    userLongitude?: number;
+    maxDistance?: number;
+    sortByDistance?: boolean;
+  }): Promise<EventWithDetails[]>;
+  getEventById(id: string): Promise<EventWithDetails | undefined>;
+  getEventsByVendor(vendorId: string): Promise<EventWithDetails[]>;
+  createEvent(vendorId: string, event: InsertEvent): Promise<Event>;
+  updateEvent(id: string, vendorId: string, event: Partial<InsertEvent>): Promise<Event | undefined>;
+  deleteEvent(id: string, vendorId: string): Promise<boolean>;
+
+  // Ticket tier operations
+  getTicketTiersByEvent(eventId: string): Promise<TicketTier[]>;
+  createTicketTier(ticketTier: InsertTicketTier): Promise<TicketTier>;
+  updateTicketTier(id: string, ticketTier: Partial<InsertTicketTier>): Promise<TicketTier | undefined>;
+  deleteTicketTier(id: string): Promise<boolean>;
+
+  // Event booking operations
+  createEventBooking(booking: InsertEventBooking): Promise<EventBooking>;
+  getEventBookingsByCustomer(customerId: string): Promise<EventBookingWithDetails[]>;
+  getEventBookingsByVendor(vendorId: string): Promise<EventBookingWithDetails[]>;
+  getEventBookingById(id: string): Promise<EventBookingWithDetails | undefined>;
+  updateEventBookingStatus(id: string, status: string): Promise<EventBooking | undefined>;
+
+  // Event admin operations
+  getPendingVenues(): Promise<VenueWithDetails[]>;
+  getPendingEvents(): Promise<EventWithDetails[]>;
+  approveVenue(venueId: string, adminNotes?: string): Promise<Venue | undefined>;
+  rejectVenue(venueId: string, adminNotes?: string): Promise<Venue | undefined>;
+  approveEvent(eventId: string, adminNotes?: string): Promise<Event | undefined>;
+  rejectEvent(eventId: string, adminNotes?: string): Promise<Event | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -422,7 +493,7 @@ export class DatabaseStorage implements IStorage {
   async createBooking(booking: InsertBooking): Promise<Booking> {
     const [newBooking] = await db
       .insert(bookings)
-      .values(booking)
+      .values(booking as typeof bookings.$inferInsert)
       .returning();
     return newBooking;
   }
@@ -1261,6 +1332,538 @@ export class DatabaseStorage implements IStorage {
       ...result.reviews,
       customer: result.users
     }));
+  }
+
+  // ===========================================
+  // FIREFLIES EVENT OPERATIONS IMPLEMENTATIONS
+  // ===========================================
+
+  // Venue operations
+  async getVenues(filters?: {
+    city?: string;
+    search?: string;
+    userLatitude?: number;
+    userLongitude?: number;
+    maxDistance?: number;
+    sortByDistance?: boolean;
+  }): Promise<VenueWithDetails[]> {
+    let whereConditions = [eq(venues.isActive, true), eq(venues.approvalStatus, "approved")];
+
+    if (filters?.city) {
+      whereConditions.push(eq(venues.city, filters.city));
+    }
+
+    if (filters?.search) {
+      whereConditions.push(sql`(
+        ${venues.name} ILIKE ${`%${filters.search}%`} OR
+        ${venues.area} ILIKE ${`%${filters.search}%`} OR
+        ${venues.address} ILIKE ${`%${filters.search}%`}
+      )`);
+    }
+
+    const results = await db
+      .select()
+      .from(venues)
+      .leftJoin(users, eq(venues.vendorId, users.id))
+      .leftJoin(events, eq(events.venueId, venues.id))
+      .where(and(...whereConditions));
+
+    // Group results by venue
+    const venuesMap = new Map<string, VenueWithDetails>();
+    
+    for (const row of results) {
+      if (!row.venues) continue;
+      
+      let venue = venuesMap.get(row.venues.id);
+      if (!venue) {
+        venue = {
+          ...row.venues,
+          vendor: row.users!,
+          events: [],
+        };
+        venuesMap.set(row.venues.id, venue);
+      }
+      
+      if (row.events) {
+        venue.events.push(row.events);
+      }
+    }
+
+    return Array.from(venuesMap.values());
+  }
+
+  async getVenueById(id: string): Promise<VenueWithDetails | undefined> {
+    const results = await db
+      .select()
+      .from(venues)
+      .leftJoin(users, eq(venues.vendorId, users.id))
+      .leftJoin(events, eq(events.venueId, venues.id))
+      .where(eq(venues.id, id));
+
+    if (results.length === 0 || !results[0].venues) return undefined;
+
+    const venue: VenueWithDetails = {
+      ...results[0].venues,
+      vendor: results[0].users!,
+      events: results.filter(r => r.events).map(r => r.events!),
+    };
+
+    return venue;
+  }
+
+  async getVenuesByVendor(vendorId: string): Promise<VenueWithDetails[]> {
+    const results = await db
+      .select()
+      .from(venues)
+      .leftJoin(users, eq(venues.vendorId, users.id))
+      .leftJoin(events, eq(events.venueId, venues.id))
+      .where(eq(venues.vendorId, vendorId));
+
+    const venuesMap = new Map<string, VenueWithDetails>();
+    
+    for (const row of results) {
+      if (!row.venues) continue;
+      
+      let venue = venuesMap.get(row.venues.id);
+      if (!venue) {
+        venue = {
+          ...row.venues,
+          vendor: row.users!,
+          events: [],
+        };
+        venuesMap.set(row.venues.id, venue);
+      }
+      
+      if (row.events) {
+        venue.events.push(row.events);
+      }
+    }
+
+    return Array.from(venuesMap.values());
+  }
+
+  async createVenue(vendorId: string, venueData: InsertVenue): Promise<Venue> {
+    const [venue] = await db
+      .insert(venues)
+      .values({ ...venueData, vendorId })
+      .returning();
+    return venue;
+  }
+
+  async updateVenue(id: string, vendorId: string, venueData: Partial<InsertVenue>): Promise<Venue | undefined> {
+    const [venue] = await db
+      .update(venues)
+      .set({ ...venueData, updatedAt: new Date() })
+      .where(and(eq(venues.id, id), eq(venues.vendorId, vendorId)))
+      .returning();
+    return venue;
+  }
+
+  async deleteVenue(id: string, vendorId: string): Promise<boolean> {
+    const result = await db
+      .delete(venues)
+      .where(and(eq(venues.id, id), eq(venues.vendorId, vendorId)));
+    return result.rowCount ? result.rowCount > 0 : false;
+  }
+
+  // Event operations
+  async getEvents(filters?: {
+    city?: string;
+    category?: string;
+    search?: string;
+    dateFrom?: Date;
+    dateTo?: Date;
+    userLatitude?: number;
+    userLongitude?: number;
+    maxDistance?: number;
+    sortByDistance?: boolean;
+  }): Promise<EventWithDetails[]> {
+    let whereConditions = [eq(events.isActive, true), eq(events.approvalStatus, "approved")];
+
+    if (filters?.city) {
+      whereConditions.push(sql`${venues.city} = ${filters.city}`);
+    }
+
+    if (filters?.category && filters.category !== "All Categories") {
+      whereConditions.push(eq(events.category, filters.category));
+    }
+
+    if (filters?.search) {
+      whereConditions.push(sql`(
+        ${events.name} ILIKE ${`%${filters.search}%`} OR
+        ${events.description} ILIKE ${`%${filters.search}%`}
+      )`);
+    }
+
+    if (filters?.dateFrom) {
+      whereConditions.push(gte(events.eventDate, filters.dateFrom));
+    }
+
+    if (filters?.dateTo) {
+      whereConditions.push(lte(events.eventDate, filters.dateTo));
+    }
+
+    const results = await db
+      .select()
+      .from(events)
+      .leftJoin(users, eq(events.vendorId, users.id))
+      .leftJoin(venues, eq(events.venueId, venues.id))
+      .leftJoin(ticketTiers, eq(ticketTiers.eventId, events.id))
+      .where(and(...whereConditions))
+      .orderBy(events.eventDate);
+
+    // Group results by event
+    const eventsMap = new Map<string, EventWithDetails>();
+    
+    for (const row of results) {
+      if (!row.events) continue;
+      
+      let event = eventsMap.get(row.events.id);
+      if (!event) {
+        event = {
+          ...row.events,
+          vendor: row.users!,
+          venue: row.venues!,
+          ticketTiers: [],
+        };
+        eventsMap.set(row.events.id, event);
+      }
+      
+      if (row.ticket_tiers) {
+        event.ticketTiers.push(row.ticket_tiers);
+      }
+    }
+
+    return Array.from(eventsMap.values());
+  }
+
+  async getEventById(id: string): Promise<EventWithDetails | undefined> {
+    const results = await db
+      .select()
+      .from(events)
+      .leftJoin(users, eq(events.vendorId, users.id))
+      .leftJoin(venues, eq(events.venueId, venues.id))
+      .leftJoin(ticketTiers, eq(ticketTiers.eventId, events.id))
+      .where(eq(events.id, id));
+
+    if (results.length === 0 || !results[0].events) return undefined;
+
+    const event: EventWithDetails = {
+      ...results[0].events,
+      vendor: results[0].users!,
+      venue: results[0].venues!,
+      ticketTiers: results.filter(r => r.ticket_tiers).map(r => r.ticket_tiers!),
+    };
+
+    return event;
+  }
+
+  async getEventsByVendor(vendorId: string): Promise<EventWithDetails[]> {
+    const results = await db
+      .select()
+      .from(events)
+      .leftJoin(users, eq(events.vendorId, users.id))
+      .leftJoin(venues, eq(events.venueId, venues.id))
+      .leftJoin(ticketTiers, eq(ticketTiers.eventId, events.id))
+      .where(eq(events.vendorId, vendorId))
+      .orderBy(desc(events.eventDate));
+
+    const eventsMap = new Map<string, EventWithDetails>();
+    
+    for (const row of results) {
+      if (!row.events) continue;
+      
+      let event = eventsMap.get(row.events.id);
+      if (!event) {
+        event = {
+          ...row.events,
+          vendor: row.users!,
+          venue: row.venues!,
+          ticketTiers: [],
+        };
+        eventsMap.set(row.events.id, event);
+      }
+      
+      if (row.ticket_tiers) {
+        event.ticketTiers.push(row.ticket_tiers);
+      }
+    }
+
+    return Array.from(eventsMap.values());
+  }
+
+  async createEvent(vendorId: string, eventData: InsertEvent): Promise<Event> {
+    const [event] = await db
+      .insert(events)
+      .values({ 
+        ...eventData, 
+        vendorId,
+        availableSeats: eventData.totalSeats,
+      })
+      .returning();
+    return event;
+  }
+
+  async updateEvent(id: string, vendorId: string, eventData: Partial<InsertEvent>): Promise<Event | undefined> {
+    const [event] = await db
+      .update(events)
+      .set({ ...eventData, updatedAt: new Date() })
+      .where(and(eq(events.id, id), eq(events.vendorId, vendorId)))
+      .returning();
+    return event;
+  }
+
+  async deleteEvent(id: string, vendorId: string): Promise<boolean> {
+    const result = await db
+      .delete(events)
+      .where(and(eq(events.id, id), eq(events.vendorId, vendorId)));
+    return result.rowCount ? result.rowCount > 0 : false;
+  }
+
+  // Ticket tier operations
+  async getTicketTiersByEvent(eventId: string): Promise<TicketTier[]> {
+    return await db
+      .select()
+      .from(ticketTiers)
+      .where(eq(ticketTiers.eventId, eventId))
+      .orderBy(ticketTiers.price);
+  }
+
+  async createTicketTier(ticketTierData: InsertTicketTier): Promise<TicketTier> {
+    const [ticketTier] = await db
+      .insert(ticketTiers)
+      .values({
+        ...ticketTierData,
+        availableQuantity: ticketTierData.quantity,
+      })
+      .returning();
+    return ticketTier;
+  }
+
+  async updateTicketTier(id: string, ticketTierData: Partial<InsertTicketTier>): Promise<TicketTier | undefined> {
+    const [ticketTier] = await db
+      .update(ticketTiers)
+      .set({ ...ticketTierData, updatedAt: new Date() })
+      .where(eq(ticketTiers.id, id))
+      .returning();
+    return ticketTier;
+  }
+
+  async deleteTicketTier(id: string): Promise<boolean> {
+    const result = await db
+      .delete(ticketTiers)
+      .where(eq(ticketTiers.id, id));
+    return result.rowCount ? result.rowCount > 0 : false;
+  }
+
+  // Event booking operations
+  async createEventBooking(bookingData: InsertEventBooking): Promise<EventBooking> {
+    const [booking] = await db
+      .insert(eventBookings)
+      .values(bookingData as typeof eventBookings.$inferInsert)
+      .returning();
+
+    // Update available seats
+    await db
+      .update(ticketTiers)
+      .set({
+        availableQuantity: sql`${ticketTiers.availableQuantity} - ${bookingData.quantity}`,
+      })
+      .where(eq(ticketTiers.id, bookingData.ticketTierId));
+
+    await db
+      .update(events)
+      .set({
+        availableSeats: sql`${events.availableSeats} - ${bookingData.quantity}`,
+        totalBookings: sql`${events.totalBookings} + 1`,
+      })
+      .where(eq(events.id, bookingData.eventId));
+
+    return booking;
+  }
+
+  async getEventBookingsByCustomer(customerId: string): Promise<EventBookingWithDetails[]> {
+    const results = await db
+      .select()
+      .from(eventBookings)
+      .leftJoin(users, eq(eventBookings.customerId, users.id))
+      .leftJoin(events, eq(eventBookings.eventId, events.id))
+      .leftJoin(ticketTiers, eq(eventBookings.ticketTierId, ticketTiers.id))
+      .where(eq(eventBookings.customerId, customerId))
+      .orderBy(desc(eventBookings.createdAt));
+
+    return results.map(result => ({
+      ...result.event_bookings,
+      customer: result.users!,
+      event: result.events!,
+      ticketTier: result.ticket_tiers!,
+    }));
+  }
+
+  async getEventBookingsByVendor(vendorId: string): Promise<EventBookingWithDetails[]> {
+    const results = await db
+      .select()
+      .from(eventBookings)
+      .leftJoin(users, eq(eventBookings.customerId, users.id))
+      .leftJoin(events, eq(eventBookings.eventId, events.id))
+      .leftJoin(ticketTiers, eq(eventBookings.ticketTierId, ticketTiers.id))
+      .where(eq(events.vendorId, vendorId))
+      .orderBy(desc(eventBookings.createdAt));
+
+    return results.map(result => ({
+      ...result.event_bookings,
+      customer: result.users!,
+      event: result.events!,
+      ticketTier: result.ticket_tiers!,
+    }));
+  }
+
+  async getEventBookingById(id: string): Promise<EventBookingWithDetails | undefined> {
+    const results = await db
+      .select()
+      .from(eventBookings)
+      .leftJoin(users, eq(eventBookings.customerId, users.id))
+      .leftJoin(events, eq(eventBookings.eventId, events.id))
+      .leftJoin(ticketTiers, eq(eventBookings.ticketTierId, ticketTiers.id))
+      .where(eq(eventBookings.id, id));
+
+    if (results.length === 0) return undefined;
+
+    const result = results[0];
+    return {
+      ...result.event_bookings,
+      customer: result.users!,
+      event: result.events!,
+      ticketTier: result.ticket_tiers!,
+    };
+  }
+
+  async updateEventBookingStatus(id: string, status: string): Promise<EventBooking | undefined> {
+    const [booking] = await db
+      .update(eventBookings)
+      .set({ status: status as any, updatedAt: new Date() })
+      .where(eq(eventBookings.id, id))
+      .returning();
+    return booking;
+  }
+
+  // Event admin operations
+  async getPendingVenues(): Promise<VenueWithDetails[]> {
+    const results = await db
+      .select()
+      .from(venues)
+      .leftJoin(users, eq(venues.vendorId, users.id))
+      .leftJoin(events, eq(events.venueId, venues.id))
+      .where(eq(venues.approvalStatus, "pending"))
+      .orderBy(desc(venues.createdAt));
+
+    const venuesMap = new Map<string, VenueWithDetails>();
+    
+    for (const row of results) {
+      if (!row.venues) continue;
+      
+      let venue = venuesMap.get(row.venues.id);
+      if (!venue) {
+        venue = {
+          ...row.venues,
+          vendor: row.users!,
+          events: [],
+        };
+        venuesMap.set(row.venues.id, venue);
+      }
+      
+      if (row.events) {
+        venue.events.push(row.events);
+      }
+    }
+
+    return Array.from(venuesMap.values());
+  }
+
+  async getPendingEvents(): Promise<EventWithDetails[]> {
+    const results = await db
+      .select()
+      .from(events)
+      .leftJoin(users, eq(events.vendorId, users.id))
+      .leftJoin(venues, eq(events.venueId, venues.id))
+      .leftJoin(ticketTiers, eq(ticketTiers.eventId, events.id))
+      .where(eq(events.approvalStatus, "pending"))
+      .orderBy(desc(events.createdAt));
+
+    const eventsMap = new Map<string, EventWithDetails>();
+    
+    for (const row of results) {
+      if (!row.events) continue;
+      
+      let event = eventsMap.get(row.events.id);
+      if (!event) {
+        event = {
+          ...row.events,
+          vendor: row.users!,
+          venue: row.venues!,
+          ticketTiers: [],
+        };
+        eventsMap.set(row.events.id, event);
+      }
+      
+      if (row.ticket_tiers) {
+        event.ticketTiers.push(row.ticket_tiers);
+      }
+    }
+
+    return Array.from(eventsMap.values());
+  }
+
+  async approveVenue(venueId: string, adminNotes?: string): Promise<Venue | undefined> {
+    const [venue] = await db
+      .update(venues)
+      .set({
+        approvalStatus: "approved",
+        adminNotes,
+        updatedAt: new Date(),
+      })
+      .where(eq(venues.id, venueId))
+      .returning();
+    return venue;
+  }
+
+  async rejectVenue(venueId: string, adminNotes?: string): Promise<Venue | undefined> {
+    const [venue] = await db
+      .update(venues)
+      .set({
+        approvalStatus: "rejected",
+        adminNotes,
+        updatedAt: new Date(),
+      })
+      .where(eq(venues.id, venueId))
+      .returning();
+    return venue;
+  }
+
+  async approveEvent(eventId: string, adminNotes?: string): Promise<Event | undefined> {
+    const [event] = await db
+      .update(events)
+      .set({
+        approvalStatus: "approved",
+        adminNotes,
+        updatedAt: new Date(),
+      })
+      .where(eq(events.id, eventId))
+      .returning();
+    return event;
+  }
+
+  async rejectEvent(eventId: string, adminNotes?: string): Promise<Event | undefined> {
+    const [event] = await db
+      .update(events)
+      .set({
+        approvalStatus: "rejected",
+        adminNotes,
+        updatedAt: new Date(),
+      })
+      .where(eq(events.id, eventId))
+      .returning();
+    return event;
   }
 }
 
