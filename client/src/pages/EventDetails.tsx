@@ -177,24 +177,23 @@ export default function EventDetails() {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-6 py-10">
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-12">
-          {/* Event Details - Left Column */}
-          <div className="lg:col-span-3 space-y-8">
-            {/* Event Poster */}
-            {event.posterImageUrl && (
-              <div className="w-full h-96 bg-gradient-to-br from-orange-100 to-pink-100 rounded-lg overflow-hidden">
-                <img
-                  src={event.posterImageUrl}
-                  alt={event.name}
-                  className="w-full h-full object-cover"
-                  data-testid="img-event-poster"
-                />
-              </div>
-            )}
+      <div className="max-w-5xl mx-auto px-6 py-10 pb-32">
+        {/* Vertical Stack Layout */}
+        <div className="space-y-10">
+          {/* Event Poster */}
+          {event.posterImageUrl && (
+            <div className="w-full h-96 bg-gradient-to-br from-orange-100 to-pink-100 rounded-lg overflow-hidden">
+              <img
+                src={event.posterImageUrl}
+                alt={event.name}
+                className="w-full h-full object-cover"
+                data-testid="img-event-poster"
+              />
+            </div>
+          )}
 
-            {/* Event Info Card */}
-            <Card>
+          {/* Event Info Card */}
+          <Card>
               <CardHeader className="p-6">
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
@@ -288,38 +287,23 @@ export default function EventDetails() {
                 </div>
               </CardContent>
             </Card>
-          </div>
 
-          {/* Ticket/Seat Selection - Right Column */}
-          <div className="lg:col-span-2">
-            <Card className="sticky top-4">
-              <CardHeader className="p-6">
-                <CardTitle className="flex items-center text-xl">
-                  <Ticket className="w-5 h-5 mr-2 text-orange-600" />
-                  {event.venue?.hasSeatMap ? "Select Your Seats" : "Select Tickets"}
-                </CardTitle>
-              </CardHeader>
+          {/* Ticket/Seat Selection - Full Width Below */}
+          <Card>
+            <CardHeader className="p-6">
+              <CardTitle className="flex items-center text-2xl">
+                <Ticket className="w-6 h-6 mr-3 text-orange-600" />
+                {event.venue?.hasSeatMap ? "Select Your Seats" : "Select Tickets"}
+              </CardTitle>
+            </CardHeader>
 
-              <CardContent className="space-y-6 p-6">
+            <CardContent className="space-y-6 p-6">
                 {event.venue?.hasSeatMap ? (
-                  <>
-                    <SeatSelector 
-                      eventId={eventId!} 
-                      onSeatsSelected={handleSeatsSelected}
-                      selectedSeats={selectedSeats.map(s => s.seatId)}
-                    />
-                    <div className="mt-6 pt-6 border-t">
-                      <Button
-                        className="w-full bg-gradient-to-r from-orange-600 to-pink-600 hover:from-orange-700 hover:to-pink-700"
-                        onClick={handleProceedToCheckout}
-                        disabled={selectedSeats.length === 0}
-                        data-testid="button-checkout"
-                      >
-                        <Ticket className="w-4 h-4 mr-2" />
-                        Proceed to Checkout (KES {seatsTotalPrice.toLocaleString()})
-                      </Button>
-                    </div>
-                  </>
+                  <SeatSelector 
+                    eventId={eventId!} 
+                    onSeatsSelected={handleSeatsSelected}
+                    selectedSeats={selectedSeats.map(s => s.seatId)}
+                  />
                 ) : (event.ticketTiers && event.ticketTiers.length > 0 ? (
                   <>
                     {event.ticketTiers.map((tier) => (
@@ -380,32 +364,6 @@ export default function EventDetails() {
                       </div>
                     ))}
 
-                    <Separator />
-
-                    {/* Order Summary */}
-                    <div className="space-y-2">
-                      <h4 className="font-semibold text-gray-900">Order Summary</h4>
-                      <div className="flex justify-between text-sm">
-                        <span className="text-gray-600">Total Tickets:</span>
-                        <span className="font-medium" data-testid="text-total-tickets">{getTotalTickets()}</span>
-                      </div>
-                      <div className="flex justify-between text-lg font-bold">
-                        <span>Total:</span>
-                        <span className="text-orange-600" data-testid="text-total-price">
-                          KSh {getTotalPrice().toLocaleString()}
-                        </span>
-                      </div>
-                    </div>
-
-                    <Button
-                      className="w-full bg-gradient-to-r from-orange-600 to-pink-600 hover:from-orange-700 hover:to-pink-700"
-                      onClick={handleProceedToCheckout}
-                      disabled={getTotalTickets() === 0}
-                      data-testid="button-checkout"
-                    >
-                      <Ticket className="w-4 h-4 mr-2" />
-                      Proceed to Checkout
-                    </Button>
                   </>
                 ) : (
                   <div className="text-center py-8">
@@ -413,8 +371,72 @@ export default function EventDetails() {
                     <p className="text-gray-600">No tickets available for this event.</p>
                   </div>
                 ))}
-              </CardContent>
-            </Card>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+
+      {/* Sticky Checkout Bar at Bottom */}
+      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg z-50">
+        <div className="max-w-5xl mx-auto px-6 py-4">
+          <div className="flex items-center justify-between gap-4">
+            {event.venue?.hasSeatMap ? (
+              <>
+                <div className="flex items-center gap-6">
+                  <div>
+                    <p className="text-sm text-gray-600">Selected Seats</p>
+                    <p className="text-xl font-bold text-gray-900" data-testid="text-selected-seats-count">
+                      {selectedSeats.length}
+                    </p>
+                  </div>
+                  <Separator orientation="vertical" className="h-12" />
+                  <div>
+                    <p className="text-sm text-gray-600">Total Price</p>
+                    <p className="text-xl font-bold text-orange-600" data-testid="text-checkout-total-price">
+                      KES {seatsTotalPrice.toLocaleString()}
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  size="lg"
+                  className="bg-gradient-to-r from-orange-600 to-pink-600 hover:from-orange-700 hover:to-pink-700 px-8"
+                  onClick={handleProceedToCheckout}
+                  disabled={selectedSeats.length === 0}
+                  data-testid="button-checkout"
+                >
+                  <Ticket className="w-5 h-5 mr-2" />
+                  Proceed to Checkout
+                </Button>
+              </>
+            ) : (
+              <>
+                <div className="flex items-center gap-6">
+                  <div>
+                    <p className="text-sm text-gray-600">Total Tickets</p>
+                    <p className="text-xl font-bold text-gray-900" data-testid="text-total-tickets">
+                      {getTotalTickets()}
+                    </p>
+                  </div>
+                  <Separator orientation="vertical" className="h-12" />
+                  <div>
+                    <p className="text-sm text-gray-600">Total Price</p>
+                    <p className="text-xl font-bold text-orange-600" data-testid="text-total-price">
+                      KSh {getTotalPrice().toLocaleString()}
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  size="lg"
+                  className="bg-gradient-to-r from-orange-600 to-pink-600 hover:from-orange-700 hover:to-pink-700 px-8"
+                  onClick={handleProceedToCheckout}
+                  disabled={getTotalTickets() === 0}
+                  data-testid="button-checkout"
+                >
+                  <Ticket className="w-5 h-5 mr-2" />
+                  Proceed to Checkout
+                </Button>
+              </>
+            )}
           </div>
         </div>
       </div>
