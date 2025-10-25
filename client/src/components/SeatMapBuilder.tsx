@@ -40,6 +40,21 @@ interface SeatMapBuilderProps {
   onSave: (sections: SeatSection[], seats: Seat[]) => Promise<void>;
   initialSections?: SeatSection[];
   initialSeats?: Seat[];
+  templateData?: {
+    id: string;
+    name: string;
+    sections: Array<{ name: string; color: string; basePrice: number }>;
+    seats: Array<{
+      seatLabel: string;
+      row: string;
+      number: number;
+      x: number;
+      y: number;
+      priceOverride: number | null;
+      isAccessible: boolean;
+      sectionName: string;
+    }>;
+  };
 }
 
 const PRESET_COLORS = [
@@ -54,9 +69,47 @@ const PRESET_COLORS = [
 const GRID_SIZE = 40;
 const SEAT_SIZE = 32;
 
-export function SeatMapBuilder({ onSave, initialSections = [], initialSeats = [] }: SeatMapBuilderProps) {
-  const [sections, setSections] = useState<SeatSection[]>(initialSections);
-  const [seats, setSeats] = useState<Seat[]>(initialSeats);
+export function SeatMapBuilder({ onSave, initialSections = [], initialSeats = [], templateData }: SeatMapBuilderProps) {
+  const isTemplateMode = !!templateData;
+  
+  // Initialize from template if provided
+  const [sections, setSections] = useState<SeatSection[]>(() => {
+    if (templateData) {
+      return templateData.sections.map((s, idx) => ({
+        tempId: `template-section-${idx}`,
+        name: s.name,
+        color: s.color,
+        basePrice: s.basePrice,
+      }));
+    }
+    return initialSections;
+  });
+  
+  const [seats, setSeats] = useState<Seat[]>(() => {
+    if (templateData) {
+      // Create section map for lookup
+      const sectionMap = new Map(
+        templateData.sections.map((s, idx) => [s.name, `template-section-${idx}`])
+      );
+      
+      return templateData.seats.map((seat, idx) => {
+        const sectionId = sectionMap.get(seat.sectionName) || `template-section-0`;
+        return {
+          tempId: `template-seat-${idx}`,
+          sectionId,
+          row: seat.row,
+          number: seat.number,
+          seatLabel: seat.seatLabel,
+          x: seat.x,
+          y: seat.y,
+          priceOverride: seat.priceOverride || undefined,
+          isAccessible: seat.isAccessible,
+        };
+      });
+    }
+    return initialSeats;
+  });
+  
   const [selectedSection, setSelectedSection] = useState<string>("");
   const [tool, setTool] = useState<"select" | "add" | "remove">("add");
   const [zoom, setZoom] = useState(1);
@@ -72,6 +125,40 @@ export function SeatMapBuilder({ onSave, initialSections = [], initialSeats = []
     basePrice: 0,
     description: "",
   });
+
+  // Update sections and seats when template data loads
+  useEffect(() => {
+    if (templateData && isTemplateMode) {
+      const templateSections = templateData.sections.map((s: any, idx: number) => ({
+        tempId: `template-section-${idx}`,
+        name: s.name,
+        color: s.color,
+        basePrice: s.basePrice,
+      }));
+      
+      const sectionMap = new Map(
+        templateData.sections.map((s: any, idx: number) => [s.name, `template-section-${idx}`])
+      );
+      
+      const templateSeats = templateData.seats.map((seat: any, idx: number) => {
+        const sectionId = sectionMap.get(seat.sectionName) || `template-section-0`;
+        return {
+          tempId: `template-seat-${idx}`,
+          sectionId,
+          row: seat.row,
+          number: seat.number,
+          seatLabel: seat.seatLabel,
+          x: seat.x,
+          y: seat.y,
+          priceOverride: seat.priceOverride || undefined,
+          isAccessible: seat.isAccessible,
+        };
+      });
+      
+      setSections(templateSections);
+      setSeats(templateSeats);
+    }
+  }, [templateData, isTemplateMode]);
 
   useEffect(() => {
     if (sections.length > 0 && !selectedSection) {
@@ -117,7 +204,7 @@ export function SeatMapBuilder({ onSave, initialSections = [], initialSeats = []
   };
 
   const handleCanvasClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (tool === "select" || !selectedSection) return;
+    if (tool === "select" || !selectedSection || isTemplateMode) return;
 
     const rect = canvasRef.current?.getBoundingClientRect();
     if (!rect) return;
@@ -158,7 +245,7 @@ export function SeatMapBuilder({ onSave, initialSections = [], initialSeats = []
   };
 
   const handleCanvasMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!isDragging || tool !== "add" || !selectedSection) return;
+    if (!isDragging || tool !== "add" || !selectedSection || isTemplateMode) return;
 
     const rect = canvasRef.current?.getBoundingClientRect();
     if (!rect) return;
@@ -283,19 +370,35 @@ export function SeatMapBuilder({ onSave, initialSections = [], initialSeats = []
         </Button>
       </div>
 
+      {isTemplateMode && (
+        <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-4" data-testid="template-mode-notice">
+          <div className="flex items-start gap-3">
+            <div className="text-blue-600 dark:text-blue-400 text-xl">ℹ️</div>
+            <div className="flex-1">
+              <h3 className="font-semibold text-blue-900 dark:text-blue-100 mb-1">Template Mode</h3>
+              <p className="text-sm text-blue-700 dark:text-blue-300">
+                You're using the <strong>{templateData?.name}</strong> template with pre-configured seat positions. 
+                You can edit section names and prices, but seat positions are locked for consistency.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         {/* Section Management Panel */}
         <Card className="lg:col-span-1" data-testid="card-section-panel">
           <CardHeader>
             <CardTitle className="text-lg flex items-center justify-between">
               Sections
-              <Dialog open={showSectionDialog} onOpenChange={setShowSectionDialog}>
-                <DialogTrigger asChild>
-                  <Button size="sm" data-testid="button-add-section">
-                    <Plus className="h-4 w-4" />
-                  </Button>
-                </DialogTrigger>
-                <DialogContent data-testid="dialog-add-section">
+              {!isTemplateMode && (
+                <Dialog open={showSectionDialog} onOpenChange={setShowSectionDialog}>
+                  <DialogTrigger asChild>
+                    <Button size="sm" data-testid="button-add-section">
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent data-testid="dialog-add-section">
                   <DialogHeader>
                     <DialogTitle>Add Section</DialogTitle>
                   </DialogHeader>
@@ -356,13 +459,14 @@ export function SeatMapBuilder({ onSave, initialSections = [], initialSeats = []
                       />
                     </div>
                   </div>
-                  <DialogFooter>
-                    <Button onClick={addSection} data-testid="button-confirm-add-section">
-                      Add Section
-                    </Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
+                    <DialogFooter>
+                      <Button onClick={addSection} data-testid="button-confirm-add-section">
+                        Add Section
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+              )}
             </CardTitle>
           </CardHeader>
           <CardContent>

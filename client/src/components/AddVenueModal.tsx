@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { insertVenueSchema, type InsertVenue } from "@shared/schema";
@@ -32,6 +32,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Loader2, ChevronLeft, ChevronRight } from "lucide-react";
 import { SeatMapBuilder } from "./SeatMapBuilder";
+import { TemplateSelector } from "./TemplateSelector";
 
 const CITIES = ["Nairobi", "Mombasa", "Kisumu", "Nakuru", "Eldoret"];
 
@@ -43,8 +44,19 @@ interface AddVenueModalProps {
 export default function AddVenueModal({ isOpen, onClose }: AddVenueModalProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [step, setStep] = useState<"basic" | "seatmap">("basic");
+  const [step, setStep] = useState<"template" | "basic" | "seatmap">("template");
   const [createdVenueId, setCreatedVenueId] = useState<string | null>(null);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
+  
+  const { data: templateData } = useQuery<any>({
+    queryKey: ['/api/venue-templates', selectedTemplateId],
+    queryFn: async () => {
+      const res = await fetch(`/api/venue-templates/${selectedTemplateId}`);
+      if (!res.ok) throw new Error('Failed to fetch template');
+      return res.json();
+    },
+    enabled: !!selectedTemplateId,
+  });
 
   const form = useForm<InsertVenue>({
     resolver: zodResolver(insertVenueSchema),
@@ -63,7 +75,7 @@ export default function AddVenueModal({ isOpen, onClose }: AddVenueModalProps) {
   });
 
   const createVenueMutation = useMutation({
-    mutationFn: async (data: InsertVenue) => {
+    mutationFn: async (data: InsertVenue & { templateId?: string | null }) => {
       const res = await apiRequest("/api/venues", "POST", data);
       return await res.json();
     },
@@ -110,9 +122,20 @@ export default function AddVenueModal({ isOpen, onClose }: AddVenueModalProps) {
 
   const handleClose = () => {
     form.reset();
-    setStep("basic");
+    setStep("template");
     setCreatedVenueId(null);
+    setSelectedTemplateId(null);
     onClose();
+  };
+  
+  const handleTemplateSelect = (templateId: string) => {
+    setSelectedTemplateId(templateId);
+    setStep("basic");
+  };
+  
+  const handleCustomDesign = () => {
+    setSelectedTemplateId(null);
+    setStep("basic");
   };
 
   const handleSkipSeatMap = () => {
@@ -128,24 +151,39 @@ export default function AddVenueModal({ isOpen, onClose }: AddVenueModalProps) {
   };
 
   const onSubmit = (data: InsertVenue) => {
-    createVenueMutation.mutate(data);
+    createVenueMutation.mutate({ ...data, templateId: selectedTemplateId });
+  };
+
+  const getDialogTitle = () => {
+    switch(step) {
+      case "template": return "Choose Venue Design";
+      case "basic": return "Add New Venue";
+      case "seatmap": return "Configure Seat Map (Optional)";
+    }
+  };
+  
+  const getDialogDescription = () => {
+    switch(step) {
+      case "template": return "Select a professional template or design from scratch";
+      case "basic": return "Submit your venue details for admin approval";
+      case "seatmap": return "Design a visual seat layout for your venue. This step is optional and can be skipped.";
+    }
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
       <DialogContent className={`${step === "seatmap" ? "max-w-7xl max-h-[95vh]" : "max-w-2xl max-h-[90vh]"} overflow-y-auto`}>
         <DialogHeader>
-          <DialogTitle>
-            {step === "basic" ? "Add New Venue" : "Configure Seat Map (Optional)"}
-          </DialogTitle>
-          <DialogDescription>
-            {step === "basic" 
-              ? "Submit your venue details for admin approval"
-              : "Design a visual seat layout for your venue. This step is optional and can be skipped."}
-          </DialogDescription>
+          <DialogTitle>{getDialogTitle()}</DialogTitle>
+          <DialogDescription>{getDialogDescription()}</DialogDescription>
         </DialogHeader>
 
-        {step === "basic" ? (
+        {step === "template" ? (
+          <TemplateSelector 
+            onSelectTemplate={handleTemplateSelect}
+            onCustomDesign={handleCustomDesign}
+          />
+        ) : step === "basic" ? (
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
             <FormField
@@ -335,33 +373,48 @@ export default function AddVenueModal({ isOpen, onClose }: AddVenueModalProps) {
               )}
             />
 
-            <div className="flex justify-end gap-3">
+            <div className="flex justify-between gap-3">
               <Button
                 type="button"
                 variant="outline"
-                onClick={handleClose}
+                onClick={() => setStep("template")}
                 disabled={createVenueMutation.isPending}
-                data-testid="button-cancel"
+                data-testid="button-back-to-template"
               >
-                Cancel
+                <ChevronLeft className="w-4 h-4 mr-2" />
+                Back to Templates
               </Button>
-              <Button
-                type="submit"
-                disabled={createVenueMutation.isPending}
-                className="bg-gradient-to-r from-orange-600 to-pink-600 hover:from-orange-700 hover:to-pink-700"
-                data-testid="button-submit-venue"
-              >
-                {createVenueMutation.isPending && (
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                )}
-                Submit for Approval
-              </Button>
+              <div className="flex gap-3">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleClose}
+                  disabled={createVenueMutation.isPending}
+                  data-testid="button-cancel"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={createVenueMutation.isPending}
+                  className="bg-gradient-to-r from-orange-600 to-pink-600 hover:from-orange-700 hover:to-pink-700"
+                  data-testid="button-submit-venue"
+                >
+                  {createVenueMutation.isPending && (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  )}
+                  Submit for Approval
+                </Button>
+              </div>
             </div>
           </form>
         </Form>
         ) : (
           <div className="space-y-6">
-            <SeatMapBuilder onSave={handleSaveSeatMap} />
+            <SeatMapBuilder 
+              onSave={handleSaveSeatMap} 
+              templateData={selectedTemplateId ? templateData : undefined}
+            />
             <div className="flex justify-end gap-3 pt-4 border-t">
               <Button
                 type="button"
