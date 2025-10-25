@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useForm } from "react-hook-form";
+import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { insertEventSchema, type InsertEvent, type Venue } from "@shared/schema";
+import { insertEventSchema, insertTicketTierSchema, type InsertEvent, type InsertTicketTier, type Venue } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -29,7 +29,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Loader2 } from "lucide-react";
+import { Loader2, Plus, X } from "lucide-react";
+import { z } from "zod";
 
 const EVENT_CATEGORIES = [
   "Concert",
@@ -42,6 +43,19 @@ const EVENT_CATEGORIES = [
   "Workshop",
   "Other"
 ];
+
+const TIER_TYPES = ["VIP", "General", "Early Bird", "Student", "Other"];
+
+// Ticket tier schema for form (without eventId since it doesn't exist yet)
+const formTicketTierSchema = insertTicketTierSchema.omit({ eventId: true });
+
+// Extended schema for event creation with ticket tiers
+const eventWithTiersSchema = z.object({
+  event: insertEventSchema,
+  ticketTiers: z.array(formTicketTierSchema).min(1, "At least one ticket tier is required"),
+});
+
+type EventWithTiers = z.infer<typeof eventWithTiersSchema>;
 
 interface AddEventModalProps {
   isOpen: boolean;
@@ -59,33 +73,54 @@ export default function AddEventModal({ isOpen, onClose }: AddEventModalProps) {
 
   const approvedVenues = venues.filter(v => v.approvalStatus === 'approved' && v.isActive);
 
-  const form = useForm<InsertEvent>({
-    resolver: zodResolver(insertEventSchema),
+  const form = useForm<EventWithTiers>({
+    resolver: zodResolver(eventWithTiersSchema),
     defaultValues: {
-      venueId: "",
-      name: "",
-      description: "",
-      category: "Concert",
-      eventDate: new Date().toISOString().split('T')[0],
-      eventTime: "19:00",
-      duration: 120,
-      posterImageUrl: "",
-      hasSeatMap: false,
-      totalSeats: 100,
-      availableSeats: 100,
+      event: {
+        venueId: "",
+        name: "",
+        description: "",
+        category: "Concert",
+        eventDate: new Date().toISOString().split('T')[0],
+        eventTime: "19:00",
+        duration: 120,
+        posterImageUrl: "",
+        hasSeatMap: false,
+        totalSeats: 100,
+        availableSeats: 100,
+      },
+      ticketTiers: [
+        {
+          name: "General Admission",
+          tierType: "General",
+          price: 1000,
+          description: "",
+          totalQuantity: 100,
+          availableQuantity: 100,
+        },
+      ],
     },
   });
 
+  const { fields, append, remove } = useFieldArray({
+    control: form.control,
+    name: "ticketTiers",
+  });
+
   const createEventMutation = useMutation({
-    mutationFn: async (data: InsertEvent) => {
+    mutationFn: async (data: EventWithTiers) => {
       const eventData = {
-        ...data,
-        eventDate: new Date(data.eventDate as string).toISOString(),
+        ...data.event,
+        eventDate: new Date(data.event.eventDate as string).toISOString(),
+      };
+      const payload = {
+        event: eventData,
+        ticketTiers: data.ticketTiers,
       };
       return await apiRequest<any>("/api/events", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(eventData),
+        body: JSON.stringify(payload),
       });
     },
     onSuccess: () => {
@@ -106,7 +141,7 @@ export default function AddEventModal({ isOpen, onClose }: AddEventModalProps) {
     },
   });
 
-  const onSubmit = (data: InsertEvent) => {
+  const onSubmit = (data: EventWithTiers) => {
     createEventMutation.mutate(data);
   };
 
@@ -145,27 +180,30 @@ export default function AddEventModal({ isOpen, onClose }: AddEventModalProps) {
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-            <FormField
-              control={form.control}
-              name="name"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Event Name *</FormLabel>
-                  <FormControl>
-                    <Input
-                      placeholder="e.g., Summer Music Festival 2025"
-                      {...field}
-                      data-testid="input-event-name"
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold">Event Details</h3>
+              
+              <FormField
+                control={form.control}
+                name="event.name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Event Name *</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="e.g., Summer Music Festival 2025"
+                        {...field}
+                        data-testid="input-event-name"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-            <FormField
-              control={form.control}
-              name="venueId"
+              <FormField
+                control={form.control}
+                name="event.venueId"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Venue *</FormLabel>
@@ -188,66 +226,26 @@ export default function AddEventModal({ isOpen, onClose }: AddEventModalProps) {
               )}
             />
 
-            <FormField
-              control={form.control}
-              name="category"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Event Category *</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
-                    <FormControl>
-                      <SelectTrigger data-testid="select-event-category">
-                        <SelectValue placeholder="Select category" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {EVENT_CATEGORIES.map((category) => (
-                        <SelectItem key={category} value={category}>
-                          {category}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="description"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Description</FormLabel>
-                  <FormControl>
-                    <Textarea
-                      placeholder="Describe your event, lineup, schedule, and what attendees can expect..."
-                      className="min-h-[100px]"
-                      {...field}
-                      value={field.value || ""}
-                      data-testid="textarea-event-description"
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <div className="grid grid-cols-3 gap-4">
               <FormField
                 control={form.control}
-                name="eventDate"
+                name="event.category"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Event Date *</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="date"
-                        {...field}
-                        value={typeof field.value === 'string' ? field.value.split('T')[0] : ''}
-                        data-testid="input-event-date"
-                      />
-                    </FormControl>
+                    <FormLabel>Event Category *</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-event-category">
+                          <SelectValue placeholder="Select category" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {EVENT_CATEGORIES.map((category) => (
+                          <SelectItem key={category} value={category}>
+                            {category}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -255,36 +253,141 @@ export default function AddEventModal({ isOpen, onClose }: AddEventModalProps) {
 
               <FormField
                 control={form.control}
-                name="eventTime"
+                name="event.description"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Start Time *</FormLabel>
+                    <FormLabel>Description</FormLabel>
                     <FormControl>
-                      <Input
-                        type="time"
-                        {...field}
-                        data-testid="input-event-time"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="duration"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Duration (min)</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="number"
-                        placeholder="120"
+                      <Textarea
+                        placeholder="Describe your event, lineup, schedule, and what attendees can expect..."
+                        className="min-h-[100px]"
                         {...field}
                         value={field.value || ""}
-                        onChange={(e) => field.onChange(parseInt(e.target.value) || null)}
-                        data-testid="input-event-duration"
+                        data-testid="textarea-event-description"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <div className="grid grid-cols-3 gap-4">
+                <FormField
+                  control={form.control}
+                  name="event.eventDate"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Event Date *</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="date"
+                          {...field}
+                          value={typeof field.value === 'string' ? field.value.split('T')[0] : ''}
+                          data-testid="input-event-date"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="event.eventTime"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Start Time *</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="time"
+                          {...field}
+                          data-testid="input-event-time"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="event.duration"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Duration (min)</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          placeholder="120"
+                          {...field}
+                          value={field.value || ""}
+                          onChange={(e) => field.onChange(parseInt(e.target.value) || null)}
+                          data-testid="input-event-duration"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="event.totalSeats"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Total Seats *</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          placeholder="e.g., 500"
+                          {...field}
+                          onChange={(e) => {
+                            const value = parseInt(e.target.value);
+                            field.onChange(value);
+                            form.setValue('event.availableSeats', value);
+                          }}
+                          data-testid="input-event-total-seats"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="event.availableSeats"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Available Seats *</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          {...field}
+                          disabled
+                          data-testid="input-event-available-seats"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <FormField
+                control={form.control}
+                name="event.posterImageUrl"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Poster Image URL</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="https://example.com/event-poster.jpg"
+                        {...field}
+                        value={field.value || ""}
+                        data-testid="input-event-poster-url"
                       />
                     </FormControl>
                     <FormMessage />
@@ -293,69 +396,175 @@ export default function AddEventModal({ isOpen, onClose }: AddEventModalProps) {
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="totalSeats"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Total Seats *</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="number"
-                        placeholder="e.g., 500"
-                        {...field}
-                        onChange={(e) => {
-                          const value = parseInt(e.target.value);
-                          field.onChange(value);
-                          form.setValue('availableSeats', value);
-                        }}
-                        data-testid="input-event-total-seats"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+            {/* Ticket Tiers Section */}
+            <div className="space-y-4 border-t pt-4">
+              <div className="flex justify-between items-center">
+                <h3 className="text-lg font-semibold">Ticket Tiers</h3>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => append({
+                    name: "",
+                    tierType: "General",
+                    price: 0,
+                    description: "",
+                    totalQuantity: 0,
+                    availableQuantity: 0,
+                  })}
+                  data-testid="button-add-ticket-tier"
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Tier
+                </Button>
+              </div>
 
-              <FormField
-                control={form.control}
-                name="availableSeats"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Available Seats *</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="number"
-                        {...field}
-                        disabled
-                        data-testid="input-event-available-seats"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
+              {fields.map((field, index) => (
+                <div key={field.id} className="border p-4 rounded-lg space-y-4 relative">
+                  {fields.length > 1 && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="absolute top-2 right-2"
+                      onClick={() => remove(index)}
+                      data-testid={`button-remove-tier-${index}`}
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
+                  )}
 
-            <FormField
-              control={form.control}
-              name="posterImageUrl"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Poster Image URL</FormLabel>
-                  <FormControl>
-                    <Input
-                      placeholder="https://example.com/event-poster.jpg"
-                      {...field}
-                      value={field.value || ""}
-                      data-testid="input-event-poster-url"
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name={`ticketTiers.${index}.name`}
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Tier Name *</FormLabel>
+                          <FormControl>
+                            <Input
+                              placeholder="e.g., VIP Pass"
+                              {...field}
+                              data-testid={`input-tier-name-${index}`}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
                     />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+
+                    <FormField
+                      control={form.control}
+                      name={`ticketTiers.${index}.tierType`}
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Tier Type *</FormLabel>
+                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <FormControl>
+                              <SelectTrigger data-testid={`select-tier-type-${index}`}>
+                                <SelectValue placeholder="Select type" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {TIER_TYPES.map((type) => (
+                                <SelectItem key={type} value={type}>
+                                  {type}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <FormField
+                    control={form.control}
+                    name={`ticketTiers.${index}.description`}
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Description</FormLabel>
+                        <FormControl>
+                          <Textarea
+                            placeholder="What's included in this tier..."
+                            {...field}
+                            value={field.value || ""}
+                            data-testid={`textarea-tier-description-${index}`}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <div className="grid grid-cols-3 gap-4">
+                    <FormField
+                      control={form.control}
+                      name={`ticketTiers.${index}.price`}
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Price (KES) *</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              placeholder="1000"
+                              {...field}
+                              onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                              data-testid={`input-tier-price-${index}`}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name={`ticketTiers.${index}.totalQuantity`}
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Quantity *</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              placeholder="100"
+                              {...field}
+                              onChange={(e) => {
+                                const value = parseInt(e.target.value) || 0;
+                                field.onChange(value);
+                                form.setValue(`ticketTiers.${index}.availableQuantity`, value);
+                              }}
+                              data-testid={`input-tier-quantity-${index}`}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name={`ticketTiers.${index}.availableQuantity`}
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Available</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              {...field}
+                              disabled
+                              data-testid={`input-tier-available-${index}`}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
 
             <div className="flex justify-end gap-3">
               <Button

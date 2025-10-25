@@ -1205,10 +1205,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(verification.error.status).json(verification.error);
       }
       
-      const validatedData = insertEventSchema.parse(req.body);
+      // Handle both old format (direct event data) and new format (with ticketTiers)
+      const { event: eventData, ticketTiers } = req.body.event ? req.body : { event: req.body, ticketTiers: [] };
+      
+      const validatedEvent = insertEventSchema.parse(eventData);
       
       // Verify vendor owns the venue
-      const venue = await storage.getVenueById(validatedData.venueId);
+      const venue = await storage.getVenueById(validatedEvent.venueId);
       if (!venue || venue.vendorId !== userId) {
         return res.status(403).json({ 
           message: "Access denied. You can only create events at your own venues.",
@@ -1216,8 +1219,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      const event = await storage.createEvent(userId, validatedData);
-      res.json(event);
+      // Create the event first
+      const createdEvent = await storage.createEvent(userId, validatedEvent);
+      
+      // Create ticket tiers if provided
+      if (ticketTiers && ticketTiers.length > 0) {
+        // Validate and create each ticket tier
+        const validatedTiers = ticketTiers.map((tier: any) => 
+          insertTicketTierSchema.parse({ ...tier, eventId: createdEvent.id })
+        );
+        
+        await Promise.all(
+          validatedTiers.map((tier: any) => storage.createTicketTier(tier))
+        );
+      }
+      
+      res.json(createdEvent);
     } catch (error) {
       console.error("Error creating event:", error);
       if (error.name === 'ZodError') {
