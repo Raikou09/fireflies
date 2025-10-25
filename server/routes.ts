@@ -1050,6 +1050,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // FIREFLIES EVENT BOOKING SYSTEM ROUTES
   // ============================================
 
+  // Venue template routes
+  app.get("/api/venue-templates", async (req, res) => {
+    try {
+      const { VENUE_TEMPLATES } = await import("@shared/venueTemplates");
+      // Return template info without the full seat data (too large for initial load)
+      const templates = VENUE_TEMPLATES.map(t => ({
+        id: t.id,
+        name: t.name,
+        description: t.description,
+        category: t.category,
+        capacity: t.capacity,
+        sections: t.sections,
+      }));
+      res.json(templates);
+    } catch (error) {
+      console.error("Error fetching venue templates:", error);
+      res.status(500).json({ message: "Failed to fetch venue templates" });
+    }
+  });
+
+  app.get("/api/venue-templates/:id", async (req, res) => {
+    try {
+      const { getTemplateById } = await import("@shared/venueTemplates");
+      const template = getTemplateById(req.params.id);
+      
+      if (!template) {
+        res.status(404).json({ message: "Template not found" });
+        return;
+      }
+      
+      res.json(template);
+    } catch (error) {
+      console.error("Error fetching venue template:", error);
+      res.status(500).json({ message: "Failed to fetch venue template" });
+    }
+  });
+
   // Venue routes
   app.get("/api/venues", async (req, res) => {
     try {

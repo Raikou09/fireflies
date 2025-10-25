@@ -247,6 +247,7 @@ export const venues = pgTable("venues", {
   amenities: text("amenities").array(), // ["parking", "wifi", "food", "accessibility"]
   hasSeatMap: boolean("has_seat_map").default(false),
   seatMapConfig: jsonb("seat_map_config"), // Stores visual layout configuration
+  templateId: varchar("template_id"), // ID of the template used (cricket-stadium, football-stadium, etc.) - null if custom design
   isActive: boolean("is_active").default(true),
   approvalStatus: varchar("approval_status", { enum: ["pending", "approved", "rejected"] }).default("pending"),
   adminNotes: text("admin_notes"),
