@@ -22,6 +22,7 @@ import { notificationService } from "./notificationService";
 import { EnhancedNotificationService } from "./enhancedNotificationService";
 import { EmailService } from "./emailService";
 import { SMSService } from "./smsService";
+import { initiateSTKPush, querySTKPushStatus, parseCallbackData, formatPhoneNumber, type MPesaCallbackData } from "./mpesaService";
 import { z } from "zod";
 
 // Admin middleware to check authentication
@@ -2205,6 +2206,248 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error sending test notification:', error);
       res.status(500).json({ message: 'Failed to send test notification' });
+    }
+  });
+
+  // ==========================================
+  // M-PESA PAYMENT ROUTES
+  // ==========================================
+
+  // Initiate M-Pesa STK Push for SportsBox court booking
+  app.post("/api/mpesa/stkpush/booking", isAuthenticated, async (req, res) => {
+    try {
+      const { bookingId, phone } = req.body;
+      
+      if (!bookingId || !phone) {
+        return res.status(400).json({ message: "Booking ID and phone number are required" });
+      }
+      
+      const booking = await storage.getBooking(bookingId);
+      if (!booking) {
+        return res.status(404).json({ message: "Booking not found" });
+      }
+      
+      if (booking.paymentStatus === "completed") {
+        return res.status(400).json({ message: "Payment already completed for this booking" });
+      }
+      
+      const response = await initiateSTKPush({
+        phone,
+        amount: Number(booking.totalAmount),
+        accountReference: `BK${bookingId.slice(0, 8).toUpperCase()}`,
+        transactionDesc: "Court Booking",
+      });
+      
+      // Store the checkout request ID for later verification
+      await storage.updateBookingPayment(bookingId, {
+        mpesaCheckoutRequestId: response.CheckoutRequestID,
+        mpesaMerchantRequestId: response.MerchantRequestID,
+        mpesaPhoneNumber: formatPhoneNumber(phone),
+      });
+      
+      res.json({
+        success: true,
+        message: "Payment prompt sent to your phone",
+        checkoutRequestId: response.CheckoutRequestID,
+        customerMessage: response.CustomerMessage,
+      });
+    } catch (error: any) {
+      console.error("M-Pesa STK Push error:", error);
+      res.status(500).json({ message: error.message || "Failed to initiate payment" });
+    }
+  });
+
+  // Initiate M-Pesa STK Push for Fireflies event ticket
+  app.post("/api/mpesa/stkpush/event-booking", isAuthenticated, async (req, res) => {
+    try {
+      const { eventBookingId, phone } = req.body;
+      
+      if (!eventBookingId || !phone) {
+        return res.status(400).json({ message: "Event booking ID and phone number are required" });
+      }
+      
+      const eventBooking = await storage.getEventBooking(eventBookingId);
+      if (!eventBooking) {
+        return res.status(404).json({ message: "Event booking not found" });
+      }
+      
+      if (eventBooking.paymentStatus === "completed") {
+        return res.status(400).json({ message: "Payment already completed for this booking" });
+      }
+      
+      const response = await initiateSTKPush({
+        phone,
+        amount: Number(eventBooking.totalAmount),
+        accountReference: `EV${eventBookingId.slice(0, 8).toUpperCase()}`,
+        transactionDesc: "Event Ticket",
+      });
+      
+      // Store the checkout request ID for later verification
+      await storage.updateEventBookingPayment(eventBookingId, {
+        mpesaCheckoutRequestId: response.CheckoutRequestID,
+        mpesaMerchantRequestId: response.MerchantRequestID,
+        mpesaPhoneNumber: formatPhoneNumber(phone),
+      });
+      
+      res.json({
+        success: true,
+        message: "Payment prompt sent to your phone",
+        checkoutRequestId: response.CheckoutRequestID,
+        customerMessage: response.CustomerMessage,
+      });
+    } catch (error: any) {
+      console.error("M-Pesa STK Push error:", error);
+      res.status(500).json({ message: error.message || "Failed to initiate payment" });
+    }
+  });
+
+  // M-Pesa callback endpoint (receives payment notifications from Safaricom)
+  app.post("/api/mpesa/callback", async (req, res) => {
+    try {
+      console.log("===== M-PESA CALLBACK RECEIVED =====");
+      console.log(JSON.stringify(req.body, null, 2));
+      
+      const callbackData = parseCallbackData(req.body as MPesaCallbackData);
+      
+      if (callbackData.success) {
+        console.log("✅ M-Pesa Payment successful!");
+        console.log("Receipt:", callbackData.mpesaReceiptNumber);
+        console.log("Amount:", callbackData.amount);
+        console.log("Phone:", callbackData.phoneNumber);
+        
+        // Try to find and update court booking
+        const booking = await storage.getBookingByCheckoutRequestId(callbackData.checkoutRequestId);
+        if (booking) {
+          await storage.updateBookingPayment(booking.id, {
+            paymentStatus: "completed",
+            mpesaReceiptNumber: callbackData.mpesaReceiptNumber,
+            mpesaTransactionDate: callbackData.transactionDate,
+          });
+          console.log("Court booking payment updated:", booking.id);
+        }
+        
+        // Try to find and update event booking
+        const eventBooking = await storage.getEventBookingByCheckoutRequestId(callbackData.checkoutRequestId);
+        if (eventBooking) {
+          await storage.updateEventBookingPayment(eventBooking.id, {
+            paymentStatus: "completed",
+            mpesaReceiptNumber: callbackData.mpesaReceiptNumber,
+            mpesaTransactionDate: callbackData.transactionDate,
+          });
+          console.log("Event booking payment updated:", eventBooking.id);
+        }
+      } else {
+        console.log("❌ M-Pesa Payment failed:", callbackData.resultDesc);
+        
+        // Update booking status to failed
+        const booking = await storage.getBookingByCheckoutRequestId(callbackData.checkoutRequestId);
+        if (booking) {
+          await storage.updateBookingPayment(booking.id, {
+            paymentStatus: "failed",
+          });
+        }
+        
+        const eventBooking = await storage.getEventBookingByCheckoutRequestId(callbackData.checkoutRequestId);
+        if (eventBooking) {
+          await storage.updateEventBookingPayment(eventBooking.id, {
+            paymentStatus: "failed",
+          });
+        }
+      }
+      
+      // Always respond with success to Safaricom
+      res.json({ ResultCode: 0, ResultDesc: "Success" });
+    } catch (error) {
+      console.error("M-Pesa callback error:", error);
+      res.json({ ResultCode: 0, ResultDesc: "Success" });
+    }
+  });
+
+  // Query M-Pesa payment status for court booking
+  app.get("/api/mpesa/query/booking/:bookingId", isAuthenticated, async (req, res) => {
+    try {
+      const { bookingId } = req.params;
+      
+      const booking = await storage.getBooking(bookingId);
+      if (!booking) {
+        return res.status(404).json({ message: "Booking not found" });
+      }
+      
+      if (!booking.mpesaCheckoutRequestId) {
+        return res.status(400).json({ message: "No M-Pesa payment initiated for this booking" });
+      }
+      
+      // If already completed, return status from database
+      if (booking.paymentStatus === "completed") {
+        return res.json({
+          success: true,
+          status: "completed",
+          mpesaReceiptNumber: booking.mpesaReceiptNumber,
+        });
+      }
+      
+      // Query Safaricom for status
+      const response = await querySTKPushStatus(booking.mpesaCheckoutRequestId);
+      
+      const isSuccess = response.ResultCode === "0";
+      if (isSuccess && booking.paymentStatus !== "completed") {
+        await storage.updateBookingPayment(bookingId, {
+          paymentStatus: "completed",
+        });
+      }
+      
+      res.json({
+        success: isSuccess,
+        status: isSuccess ? "completed" : "pending",
+        resultDesc: response.ResultDesc,
+      });
+    } catch (error: any) {
+      console.error("M-Pesa query error:", error);
+      res.status(500).json({ message: error.message || "Failed to query payment status" });
+    }
+  });
+
+  // Query M-Pesa payment status for event booking
+  app.get("/api/mpesa/query/event-booking/:eventBookingId", isAuthenticated, async (req, res) => {
+    try {
+      const { eventBookingId } = req.params;
+      
+      const eventBooking = await storage.getEventBooking(eventBookingId);
+      if (!eventBooking) {
+        return res.status(404).json({ message: "Event booking not found" });
+      }
+      
+      if (!eventBooking.mpesaCheckoutRequestId) {
+        return res.status(400).json({ message: "No M-Pesa payment initiated for this booking" });
+      }
+      
+      // If already completed, return status from database
+      if (eventBooking.paymentStatus === "completed") {
+        return res.json({
+          success: true,
+          status: "completed",
+          mpesaReceiptNumber: eventBooking.mpesaReceiptNumber,
+        });
+      }
+      
+      // Query Safaricom for status
+      const response = await querySTKPushStatus(eventBooking.mpesaCheckoutRequestId);
+      
+      const isSuccess = response.ResultCode === "0";
+      if (isSuccess && eventBooking.paymentStatus !== "completed") {
+        await storage.updateEventBookingPayment(eventBookingId, {
+          paymentStatus: "completed",
+        });
+      }
+      
+      res.json({
+        success: isSuccess,
+        status: isSuccess ? "completed" : "pending",
+        resultDesc: response.ResultDesc,
+      });
+    } catch (error: any) {
+      console.error("M-Pesa query error:", error);
+      res.status(500).json({ message: error.message || "Failed to query payment status" });
     }
   });
 
