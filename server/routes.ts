@@ -128,6 +128,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Update existing vendor application (for pending vendors)
+  app.put('/api/vendor/update', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub || req.user?.id;
+      const user = await storage.getUser(userId);
+      
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // Only allow updates if vendor is pending (not yet approved)
+      if (user.vendorVerificationStatus === "verified") {
+        return res.status(403).json({ message: "Cannot update an already approved vendor application" });
+      }
+
+      // Validate vendor onboarding data
+      const { vendorOnboardingSchema } = await import("@shared/schema");
+      const validatedData = vendorOnboardingSchema.parse(req.body);
+
+      // Update user with new vendor details, keep status as pending
+      const updatedUser = await storage.upsertUser({
+        ...user,
+        ...validatedData,
+        vendorVerificationStatus: user.vendorVerificationStatus || "pending"
+      });
+
+      res.json(updatedUser);
+    } catch (error: any) {
+      console.error("Error updating vendor application:", error);
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ 
+          message: "Invalid vendor data", 
+          errors: error.errors 
+        });
+      }
+      res.status(500).json({ message: "Failed to update vendor application" });
+    }
+  });
+
   // Check if user can create courts (must be verified vendor)
   app.get('/api/vendor/can-create-courts', isAuthenticated, async (req: any, res) => {
     try {

@@ -28,7 +28,11 @@ import {
   ArrowLeft,
   Package,
   Edit,
-  Clock
+  Clock,
+  UserPlus,
+  FileEdit,
+  CheckCircle,
+  Mail
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
@@ -37,6 +41,7 @@ import EquipmentManager from "@/components/EquipmentManager";
 import VendorCourtUpdateModal from "@/components/VendorCourtUpdateModal";
 import AddCourtModal from "@/components/AddCourtModal";
 import { NotificationTestPanel } from "@/components/NotificationTestPanel";
+import VendorOnboarding from "@/components/VendorOnboarding";
 import type { CourtWithDetails } from "@shared/schema";
 
 interface VendorStats {
@@ -74,6 +79,7 @@ export default function VendorDashboard() {
   const { user, isAuthenticated, isLoading } = useAuth();
   const { toast } = useToast();
   const [isVendor, setIsVendor] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
   
   // Check if user can create courts (verified vendor)
   const { data: vendorStatus } = useQuery({
@@ -198,57 +204,205 @@ export default function VendorDashboard() {
     );
   }
 
-  // Check vendor verification status
-  if ((user as any)?.userType === "vendor" || (user as any)?.user_type === "vendor") {
-    const verificationStatus = (user as any)?.vendorVerificationStatus;
-    
-    if (!verificationStatus || verificationStatus === "pending") {
-      return (
-        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-          <Card className="w-full max-w-md">
-            <CardHeader className="text-center">
-              <Clock className="h-12 w-12 text-orange-500 mx-auto mb-4" />
-              <CardTitle className="text-2xl">Vendor Application Pending</CardTitle>
-              <p className="text-gray-600">Your vendor application is under review. You'll be able to create courts once approved by our admin team.</p>
+  // Get verification status
+  const verificationStatus = (user as any)?.vendorVerificationStatus;
+  const userType = (user as any)?.userType || (user as any)?.user_type;
+  
+  // Check vendor verification status - PENDING
+  if (userType === "vendor" && (!verificationStatus || verificationStatus === "pending")) {
+    return (
+      <>
+        <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50 flex items-center justify-center p-4">
+          <Card className="w-full max-w-lg shadow-xl">
+            <CardHeader className="text-center pb-2">
+              <div className="w-20 h-20 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Clock className="h-10 w-10 text-orange-500" />
+              </div>
+              <CardTitle className="text-2xl text-gray-900">Thank You!</CardTitle>
             </CardHeader>
-            <CardContent>
-              <Button onClick={() => window.location.href = "/"} variant="outline" className="w-full">
-                Back to Home
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-      );
-    }
+            <CardContent className="text-center space-y-6">
+              <p className="text-gray-600 text-lg">
+                Your vendor application has been submitted successfully.
+              </p>
+              
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-left">
+                <div className="flex items-start gap-3">
+                  <Mail className="w-5 h-5 text-blue-600 mt-0.5" />
+                  <div>
+                    <p className="font-medium text-blue-900">What happens next?</p>
+                    <p className="text-sm text-blue-700 mt-1">
+                      Our admin team is reviewing your application. You will be notified of your vendor status on your registered email soon.
+                    </p>
+                  </div>
+                </div>
+              </div>
 
-    if (verificationStatus === "rejected") {
-      return (
-        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-          <Card className="w-full max-w-md">
-            <CardHeader className="text-center">
-              <AlertTriangle className="h-12 w-12 text-red-500 mx-auto mb-4" />
-              <CardTitle className="text-2xl">Vendor Application Rejected</CardTitle>
-              <p className="text-gray-600">Unfortunately, your vendor application was not approved. Please contact support for more information.</p>
-            </CardHeader>
-            <CardContent>
-              <Button onClick={() => window.location.href = "/"} variant="outline" className="w-full">
-                Back to Home
-              </Button>
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 text-left">
+                <div className="flex items-start gap-3">
+                  <FileEdit className="w-5 h-5 text-gray-600 mt-0.5" />
+                  <div>
+                    <p className="font-medium text-gray-900">Need to make changes?</p>
+                    <p className="text-sm text-gray-600 mt-1">
+                      You can still edit your application details before approval.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-3 pt-4">
+                <Button 
+                  onClick={() => setShowOnboarding(true)} 
+                  className="flex-1 bg-blue-600 hover:bg-blue-700"
+                >
+                  <FileEdit className="w-4 h-4 mr-2" />
+                  Edit Application
+                </Button>
+                <Button 
+                  onClick={() => window.location.href = "/"} 
+                  variant="outline" 
+                  className="flex-1"
+                >
+                  <ArrowLeft className="w-4 h-4 mr-2" />
+                  Back to Home
+                </Button>
+              </div>
             </CardContent>
           </Card>
         </div>
-      );
-    }
+        
+        <VendorOnboarding 
+          isOpen={showOnboarding} 
+          onClose={() => setShowOnboarding(false)}
+          existingData={user}
+          isEditing={true}
+        />
+      </>
+    );
   }
 
+  // REJECTED vendor
+  if (userType === "vendor" && verificationStatus === "rejected") {
+    const rejectionReason = (user as any)?.rejectionReason;
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-red-50 to-orange-50 flex items-center justify-center p-4">
+        <Card className="w-full max-w-lg shadow-xl">
+          <CardHeader className="text-center pb-2">
+            <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <AlertTriangle className="h-10 w-10 text-red-500" />
+            </div>
+            <CardTitle className="text-2xl text-gray-900">Application Not Approved</CardTitle>
+          </CardHeader>
+          <CardContent className="text-center space-y-6">
+            <p className="text-gray-600">
+              Unfortunately, your vendor application was not approved at this time.
+            </p>
+            
+            {rejectionReason && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-left">
+                <p className="font-medium text-red-900 mb-1">Reason:</p>
+                <p className="text-sm text-red-700">{rejectionReason}</p>
+              </div>
+            )}
+
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 text-left">
+              <p className="text-sm text-gray-600">
+                If you believe this is an error or would like to reapply, please contact our support team.
+              </p>
+            </div>
+
+            <Button 
+              onClick={() => window.location.href = "/"} 
+              variant="outline" 
+              className="w-full"
+            >
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Back to Home
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // NOT a vendor - show sign up option
   if (!isVendor) {
+    return (
+      <>
+        <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50 flex items-center justify-center p-4">
+          <Card className="w-full max-w-lg shadow-xl">
+            <CardHeader className="text-center pb-2">
+              <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <UserPlus className="h-10 w-10 text-green-600" />
+              </div>
+              <CardTitle className="text-2xl text-gray-900">Become a Vendor</CardTitle>
+            </CardHeader>
+            <CardContent className="text-center space-y-6">
+              <p className="text-gray-600 text-lg">
+                Join SportsBox and start listing your sports courts to reach thousands of customers.
+              </p>
+              
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-left">
+                <div className="bg-white border rounded-lg p-4">
+                  <CheckCircle className="w-6 h-6 text-green-500 mb-2" />
+                  <p className="font-medium text-gray-900">List Your Courts</p>
+                  <p className="text-sm text-gray-600">Add unlimited sports facilities</p>
+                </div>
+                <div className="bg-white border rounded-lg p-4">
+                  <DollarSign className="w-6 h-6 text-green-500 mb-2" />
+                  <p className="font-medium text-gray-900">Earn Money</p>
+                  <p className="text-sm text-gray-600">Receive M-Pesa payments directly</p>
+                </div>
+                <div className="bg-white border rounded-lg p-4">
+                  <Calendar className="w-6 h-6 text-green-500 mb-2" />
+                  <p className="font-medium text-gray-900">Manage Bookings</p>
+                  <p className="text-sm text-gray-600">Track all reservations easily</p>
+                </div>
+                <div className="bg-white border rounded-lg p-4">
+                  <BarChart3 className="w-6 h-6 text-green-500 mb-2" />
+                  <p className="font-medium text-gray-900">Analytics</p>
+                  <p className="text-sm text-gray-600">Detailed business insights</p>
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-3 pt-4">
+                <Button 
+                  onClick={() => setShowOnboarding(true)} 
+                  className="w-full bg-green-600 hover:bg-green-700 text-lg py-6"
+                  size="lg"
+                >
+                  <UserPlus className="w-5 h-5 mr-2" />
+                  Sign Up to Be a Vendor
+                </Button>
+                <Button 
+                  onClick={() => window.location.href = "/"} 
+                  variant="outline" 
+                  className="w-full"
+                >
+                  <ArrowLeft className="w-4 h-4 mr-2" />
+                  Back to Home
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+        
+        <VendorOnboarding 
+          isOpen={showOnboarding} 
+          onClose={() => setShowOnboarding(false)}
+        />
+      </>
+    );
+  }
+  
+  // Only verified vendors reach here - check verification again
+  if (verificationStatus !== "verified") {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <Card className="w-full max-w-md">
           <CardHeader className="text-center">
             <AlertCircle className="h-12 w-12 text-orange-500 mx-auto mb-4" />
-            <CardTitle className="text-2xl">Access Restricted</CardTitle>
-            <p className="text-gray-600">This dashboard is only available to verified vendor accounts.</p>
+            <CardTitle className="text-2xl">Verification Required</CardTitle>
+            <p className="text-gray-600">Your vendor account needs to be verified before you can access the dashboard.</p>
           </CardHeader>
           <CardContent>
             <Button onClick={() => window.location.href = "/"} variant="outline" className="w-full">
