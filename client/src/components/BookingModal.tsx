@@ -395,7 +395,7 @@ export function BookingModal({ court, isOpen, onClose }: BookingModalProps) {
                 <h3 className="text-2xl font-bold text-green-600">Booking Confirmed!</h3>
                 <p className="text-gray-600">
                   Your booking for {court.name} on {selectedDate?.toDateString()} at {selectedTimeSlot} has been confirmed.
-                  You'll receive a confirmation SMS shortly.
+                  You'll receive a confirmation email shortly.
                 </p>
                 <Button onClick={resetModal} data-testid="button-done">
                   Done
