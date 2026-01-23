@@ -455,6 +455,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         duration: duration,
         courtAmount: totalAmount.toString(),
         totalAmount: totalAmount.toString(),
+        paymentMethod: "mpesa",
+        paymentStatus: "pending",
         status: "confirmed",
       });
 
