@@ -2,14 +2,21 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, Calendar, BarChart3, Volleyball, Star, DollarSign, Users } from "lucide-react";
+import { Plus, Calendar, BarChart3, Volleyball, Star, DollarSign, Users, UserPlus, Clock, AlertTriangle, CheckCircle, Mail, FileEdit, ArrowRight } from "lucide-react";
 import AddCourtModal from "./AddCourtModal";
+import VendorOnboarding from "./VendorOnboarding";
 import { useAuth } from "@/hooks/useAuth";
 
 export default function VendorInterface() {
   const { user, isAuthenticated, isLoading } = useAuth();
   const [isAddCourtModalOpen, setIsAddCourtModalOpen] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
   const [activeTab, setActiveTab] = useState<"dashboard" | "bookings" | "analytics">("dashboard");
+
+  // Get user verification status
+  const userType = (user as any)?.userType || (user as any)?.user_type;
+  const verificationStatus = (user as any)?.vendorVerificationStatus;
+  const isVerifiedVendor = userType === "vendor" && verificationStatus === "verified";
 
   const { data: stats } = useQuery<{
     totalCourts: number;
@@ -19,7 +26,7 @@ export default function VendorInterface() {
   }>({
     queryKey: ["/api/vendor/stats"],
     refetchInterval: false,
-    enabled: isAuthenticated,
+    enabled: isAuthenticated && isVerifiedVendor,
   });
 
   const { data: courts = [] } = useQuery<Array<{
@@ -33,7 +40,7 @@ export default function VendorInterface() {
   }>>({
     queryKey: ["/api/vendor/courts"],
     refetchInterval: false,
-    enabled: isAuthenticated,
+    enabled: isAuthenticated && isVerifiedVendor,
   });
 
   // Show login prompt if not authenticated
@@ -67,6 +74,163 @@ export default function VendorInterface() {
           <p className="text-gray-600">Loading vendor dashboard...</p>
         </div>
       </div>
+    );
+  }
+
+  // PENDING vendor - show thank you with edit option
+  if (userType === "vendor" && (!verificationStatus || verificationStatus === "pending")) {
+    return (
+      <>
+        <div className="flex items-center justify-center min-h-[60vh] p-4">
+          <Card className="w-full max-w-lg shadow-xl">
+            <CardHeader className="text-center pb-2">
+              <div className="w-20 h-20 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Clock className="h-10 w-10 text-orange-500" />
+              </div>
+              <CardTitle className="text-2xl text-gray-900">Application Under Review</CardTitle>
+            </CardHeader>
+            <CardContent className="text-center space-y-6">
+              <p className="text-gray-600 text-lg">
+                Your vendor application has been submitted successfully.
+              </p>
+              
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-left">
+                <div className="flex items-start gap-3">
+                  <Mail className="w-5 h-5 text-blue-600 mt-0.5" />
+                  <div>
+                    <p className="font-medium text-blue-900">What happens next?</p>
+                    <p className="text-sm text-blue-700 mt-1">
+                      Our admin team is reviewing your application. You will be notified on your registered email soon.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 text-left">
+                <div className="flex items-start gap-3">
+                  <FileEdit className="w-5 h-5 text-gray-600 mt-0.5" />
+                  <div>
+                    <p className="font-medium text-gray-900">Need to make changes?</p>
+                    <p className="text-sm text-gray-600 mt-1">
+                      You can still edit your application details before approval.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <Button 
+                onClick={() => setShowOnboarding(true)} 
+                className="w-full bg-blue-600 hover:bg-blue-700"
+              >
+                <FileEdit className="w-4 h-4 mr-2" />
+                Edit Application
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+        
+        <VendorOnboarding 
+          isOpen={showOnboarding} 
+          onClose={() => setShowOnboarding(false)}
+          existingData={user}
+          isEditing={true}
+        />
+      </>
+    );
+  }
+
+  // REJECTED vendor
+  if (userType === "vendor" && verificationStatus === "rejected") {
+    const rejectionReason = (user as any)?.rejectionReason;
+    return (
+      <div className="flex items-center justify-center min-h-[60vh] p-4">
+        <Card className="w-full max-w-lg shadow-xl">
+          <CardHeader className="text-center pb-2">
+            <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <AlertTriangle className="h-10 w-10 text-red-500" />
+            </div>
+            <CardTitle className="text-2xl text-gray-900">Application Not Approved</CardTitle>
+          </CardHeader>
+          <CardContent className="text-center space-y-6">
+            <p className="text-gray-600">
+              Unfortunately, your vendor application was not approved at this time.
+            </p>
+            
+            {rejectionReason && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-left">
+                <p className="font-medium text-red-900 mb-1">Reason:</p>
+                <p className="text-sm text-red-700">{rejectionReason}</p>
+              </div>
+            )}
+
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 text-left">
+              <p className="text-sm text-gray-600">
+                If you believe this is an error or would like to reapply, please contact our support team.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // NOT a vendor - show sign up option
+  if (!isVerifiedVendor) {
+    return (
+      <>
+        <div className="flex items-center justify-center min-h-[60vh] p-4">
+          <Card className="w-full max-w-lg shadow-xl">
+            <CardHeader className="text-center pb-2">
+              <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <UserPlus className="h-10 w-10 text-green-600" />
+              </div>
+              <CardTitle className="text-2xl text-gray-900">Become a Vendor</CardTitle>
+            </CardHeader>
+            <CardContent className="text-center space-y-6">
+              <p className="text-gray-600 text-lg">
+                Join SportsBox and start listing your sports courts to reach thousands of customers.
+              </p>
+              
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-left">
+                <div className="bg-white border rounded-lg p-4">
+                  <CheckCircle className="w-6 h-6 text-green-500 mb-2" />
+                  <p className="font-medium text-gray-900">List Your Courts</p>
+                  <p className="text-sm text-gray-600">Add unlimited sports facilities</p>
+                </div>
+                <div className="bg-white border rounded-lg p-4">
+                  <CheckCircle className="w-6 h-6 text-green-500 mb-2" />
+                  <p className="font-medium text-gray-900">Get Bookings</p>
+                  <p className="text-sm text-gray-600">Receive bookings from customers</p>
+                </div>
+                <div className="bg-white border rounded-lg p-4">
+                  <CheckCircle className="w-6 h-6 text-green-500 mb-2" />
+                  <p className="font-medium text-gray-900">M-Pesa Payments</p>
+                  <p className="text-sm text-gray-600">Receive payments directly</p>
+                </div>
+                <div className="bg-white border rounded-lg p-4">
+                  <CheckCircle className="w-6 h-6 text-green-500 mb-2" />
+                  <p className="font-medium text-gray-900">Analytics</p>
+                  <p className="text-sm text-gray-600">Track your business growth</p>
+                </div>
+              </div>
+
+              <Button 
+                onClick={() => setShowOnboarding(true)}
+                className="w-full bg-green-600 hover:bg-green-700 text-lg py-6"
+                size="lg"
+              >
+                <UserPlus className="w-5 h-5 mr-2" />
+                Sign Up to Be a Vendor
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+        
+        <VendorOnboarding 
+          isOpen={showOnboarding} 
+          onClose={() => setShowOnboarding(false)}
+        />
+      </>
     );
   }
 
