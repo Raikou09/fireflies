@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -15,12 +15,33 @@ import { LocationPicker } from "./LocationPicker";
 import type { UploadResult } from "@uppy/core";
 import { CloudUpload, X, Info, Package, Plus, Trash2 } from "lucide-react";
 
+interface CourtData {
+  id: string;
+  name: string;
+  city: string;
+  area: string;
+  address?: string | null;
+  description?: string | null;
+  hourlyRate: string;
+  peakHourRate?: string | null;
+  openingTime: string;
+  closingTime: string;
+  rules?: string | null;
+  availableSports?: string[];
+  facilityType?: 'separate_areas' | 'shared_area';
+  availableDays?: string[];
+  imageUrl?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+}
+
 interface AddCourtModalProps {
   isOpen: boolean;
   onClose: () => void;
+  courtToEdit?: CourtData | null;
 }
 
-export default function AddCourtModal({ isOpen, onClose }: AddCourtModalProps) {
+export default function AddCourtModal({ isOpen, onClose, courtToEdit }: AddCourtModalProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   
@@ -69,6 +90,71 @@ export default function AddCourtModal({ isOpen, onClose }: AddCourtModalProps) {
     quantityAvailable: number;
     description: string;
   }>>([]);
+
+  // Populate form when editing
+  useEffect(() => {
+    if (courtToEdit) {
+      setFormData({
+        name: courtToEdit.name || "",
+        city: courtToEdit.city || "",
+        area: courtToEdit.area || "",
+        address: courtToEdit.address || "",
+        description: courtToEdit.description || "",
+        hourlyRate: courtToEdit.hourlyRate || "",
+        peakHourRate: courtToEdit.peakHourRate || "",
+        openingTime: courtToEdit.openingTime || "",
+        closingTime: courtToEdit.closingTime || "",
+        rules: courtToEdit.rules || "",
+      });
+      setSelectedSports(courtToEdit.availableSports || []);
+      setFacilityType(courtToEdit.facilityType || "shared_area");
+      setAvailableDays(courtToEdit.availableDays || ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]);
+      setImageUrl(courtToEdit.imageUrl || "");
+      setLocationData({
+        latitude: courtToEdit.latitude || null,
+        longitude: courtToEdit.longitude || null,
+        address: courtToEdit.address || undefined,
+      });
+    } else {
+      resetForm();
+    }
+  }, [courtToEdit, isOpen]);
+
+  // Update mutation for editing
+  const updateMutation = useMutation({
+    mutationFn: async (courtData: any) => {
+      const response = await apiRequest(`/api/courts/${courtToEdit?.id}`, "PUT", courtData);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to update court');
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Court Updated Successfully!",
+        description: "Your court details have been updated.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/vendor/courts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/courts"] });
+      onClose();
+    },
+    onError: (error: any) => {
+      if (isUnauthorizedError(error)) {
+        toast({
+          title: "Authentication Required",
+          description: "Please log in to update the court.",
+          variant: "destructive",
+        });
+        return;
+      }
+      toast({
+        title: "Update Failed",
+        description: error.message || "Failed to update court. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
 
   const mutation = useMutation({
     mutationFn: async (courtData: any) => {
@@ -291,7 +377,12 @@ export default function AddCourtModal({ isOpen, onClose }: AddCourtModalProps) {
     };
     
     console.log('Final court payload:', courtPayload);
-    mutation.mutate(courtPayload);
+    
+    if (courtToEdit) {
+      updateMutation.mutate(courtPayload);
+    } else {
+      mutation.mutate(courtPayload);
+    }
   };
 
   const getUploadParameters = async () => {
@@ -321,7 +412,7 @@ export default function AddCourtModal({ isOpen, onClose }: AddCourtModalProps) {
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center justify-between">
-            Add New Court
+            {courtToEdit ? 'Edit Court' : 'Add New Court'}
             <Button variant="ghost" size="sm" onClick={onClose}>
               <X className="h-4 w-4" />
             </Button>

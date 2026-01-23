@@ -7,11 +7,34 @@ import AddCourtModal from "./AddCourtModal";
 import VendorOnboarding from "./VendorOnboarding";
 import { useAuth } from "@/hooks/useAuth";
 
+interface CourtData {
+  id: string;
+  name: string;
+  city: string;
+  area: string;
+  address?: string | null;
+  description?: string | null;
+  hourlyRate: string;
+  peakHourRate?: string | null;
+  openingTime: string;
+  closingTime: string;
+  rules?: string | null;
+  availableSports?: string[];
+  facilityType?: 'separate_areas' | 'shared_area';
+  availableDays?: string[];
+  imageUrl?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  approvalStatus: "pending" | "approved" | "rejected";
+  isActive: boolean;
+}
+
 export default function VendorInterface() {
   const { user, isAuthenticated, isLoading } = useAuth();
   const [isAddCourtModalOpen, setIsAddCourtModalOpen] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [activeTab, setActiveTab] = useState<"dashboard" | "bookings" | "analytics">("dashboard");
+  const [courtToEdit, setCourtToEdit] = useState<CourtData | null>(null);
 
   // Get user verification status
   const userType = (user as any)?.userType || (user as any)?.user_type;
@@ -29,15 +52,7 @@ export default function VendorInterface() {
     enabled: isAuthenticated && isVerifiedVendor,
   });
 
-  const { data: courts = [] } = useQuery<Array<{
-    id: string;
-    name: string;
-    city: string;
-    area: string;
-    approvalStatus: "pending" | "approved" | "rejected";
-    isActive: boolean;
-    availableSports: string[];
-  }>>({
+  const { data: courts = [] } = useQuery<CourtData[]>({
     queryKey: ["/api/vendor/courts"],
     refetchInterval: false,
     enabled: isAuthenticated && isVerifiedVendor,
@@ -435,7 +450,14 @@ export default function VendorInterface() {
                             : 'Unknown'
                           }
                         </span>
-                        <Button variant="ghost" size="sm">
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          onClick={() => {
+                            setCourtToEdit(court);
+                            setIsAddCourtModalOpen(true);
+                          }}
+                        >
                           Edit
                         </Button>
                         <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700">
@@ -491,7 +513,11 @@ export default function VendorInterface() {
 
       <AddCourtModal
         isOpen={isAddCourtModalOpen}
-        onClose={() => setIsAddCourtModalOpen(false)}
+        onClose={() => {
+          setIsAddCourtModalOpen(false);
+          setCourtToEdit(null);
+        }}
+        courtToEdit={courtToEdit}
       />
     </>
   );
