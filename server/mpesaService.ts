@@ -1,7 +1,21 @@
 import axios from 'axios';
+import { randomUUID } from 'crypto';
 
 const SANDBOX_BASE_URL = 'https://sandbox.safaricom.co.ke';
 const PRODUCTION_BASE_URL = 'https://api.safaricom.co.ke';
+
+// Check if simulation mode is enabled
+export const isSimulationMode = (): boolean => {
+  return process.env.MPESA_SIMULATION_MODE === 'true';
+};
+
+// Store simulated payments for status queries
+const simulatedPayments: Map<string, { 
+  status: 'pending' | 'completed' | 'failed';
+  amount: number;
+  phone: string;
+  createdAt: Date;
+}> = new Map();
 
 const getBaseUrl = () => {
   return process.env.NODE_ENV === 'production' ? PRODUCTION_BASE_URL : SANDBOX_BASE_URL;
@@ -25,6 +39,15 @@ const generatePassword = (timestamp: string): string => {
   return Buffer.from(str).toString('base64');
 };
 
+// Generate simulated M-Pesa receipt number
+const generateSimulatedReceipt = (): string => {
+  const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  const prefix = Array.from({ length: 3 }, () => letters[Math.floor(Math.random() * letters.length)]).join('');
+  const numbers = Math.floor(Math.random() * 10000000).toString().padStart(7, '0');
+  const suffix = Array.from({ length: 2 }, () => letters[Math.floor(Math.random() * letters.length)]).join('');
+  return `${prefix}${numbers}${suffix}`;
+};
+
 export const getAccessToken = async (): Promise<string> => {
   try {
     const consumerKey = process.env.MPESA_CONSUMER_KEY;
@@ -36,6 +59,8 @@ export const getAccessToken = async (): Promise<string> => {
     
     const auth = Buffer.from(`${consumerKey}:${consumerSecret}`).toString('base64');
     
+    console.log('Requesting M-Pesa access token from:', `${getBaseUrl()}/oauth/v1/generate`);
+    
     const response = await axios.get(
       `${getBaseUrl()}/oauth/v1/generate?grant_type=client_credentials`,
       {
@@ -45,10 +70,16 @@ export const getAccessToken = async (): Promise<string> => {
       }
     );
     
+    console.log('M-Pesa access token obtained successfully');
     return response.data.access_token;
   } catch (error: any) {
-    console.error('Error getting M-Pesa access token:', error.response?.data || error.message);
-    throw new Error('Failed to get M-Pesa access token');
+    console.error('Error getting M-Pesa access token:', {
+      status: error.response?.status,
+      statusText: error.response?.statusText,
+      data: error.response?.data,
+      message: error.message,
+    });
+    throw new Error(`Failed to get M-Pesa access token: ${error.response?.data?.error_description || error.message}`);
   }
 };
 
@@ -82,16 +113,54 @@ export interface STKPushResponse {
 }
 
 export const initiateSTKPush = async (request: STKPushRequest): Promise<STKPushResponse> => {
+  const formattedPhone = formatPhoneNumber(request.phone);
+  
+  // SIMULATION MODE - for testing without real M-Pesa
+  if (isSimulationMode()) {
+    console.log('[SIMULATION] Initiating simulated M-Pesa STK Push:', { 
+      phone: formattedPhone, 
+      amount: request.amount 
+    });
+    
+    const checkoutRequestId = `SIM_${randomUUID().replace(/-/g, '').substring(0, 20)}`;
+    const merchantRequestId = `SIM_MR_${randomUUID().replace(/-/g, '').substring(0, 15)}`;
+    
+    // Store simulated payment - will auto-complete after 3 seconds
+    simulatedPayments.set(checkoutRequestId, {
+      status: 'pending',
+      amount: request.amount,
+      phone: formattedPhone,
+      createdAt: new Date(),
+    });
+    
+    // Auto-complete payment after 3 seconds (simulates user entering PIN)
+    setTimeout(() => {
+      const payment = simulatedPayments.get(checkoutRequestId);
+      if (payment && payment.status === 'pending') {
+        payment.status = 'completed';
+        console.log('[SIMULATION] Payment auto-completed:', checkoutRequestId);
+      }
+    }, 3000);
+    
+    return {
+      MerchantRequestID: merchantRequestId,
+      CheckoutRequestID: checkoutRequestId,
+      ResponseCode: '0',
+      ResponseDescription: 'Success. Request accepted for processing',
+      CustomerMessage: '[SIMULATION] Payment prompt sent to your phone. Enter PIN to confirm.',
+    };
+  }
+  
+  // REAL M-PESA API
   try {
     const accessToken = await getAccessToken();
     const timestamp = getTimestamp();
     const password = generatePassword(timestamp);
-    const formattedPhone = formatPhoneNumber(request.phone);
     const shortCode = process.env.MPESA_BUSINESS_SHORT_CODE;
     const callbackUrl = process.env.MPESA_CALLBACK_URL;
     
     if (!shortCode || !callbackUrl) {
-      throw new Error('M-Pesa configuration incomplete');
+      throw new Error('M-Pesa configuration incomplete: Missing shortCode or callbackUrl');
     }
     
     const payload = {
@@ -108,7 +177,12 @@ export const initiateSTKPush = async (request: STKPushRequest): Promise<STKPushR
       TransactionDesc: request.transactionDesc.slice(0, 13),
     };
     
-    console.log('Initiating M-Pesa STK Push:', { phone: formattedPhone, amount: request.amount });
+    console.log('Initiating M-Pesa STK Push:', { 
+      phone: formattedPhone, 
+      amount: request.amount,
+      shortCode,
+      callbackUrl: callbackUrl.substring(0, 50) + '...',
+    });
     
     const response = await axios.post(
       `${getBaseUrl()}/mpesa/stkpush/v1/processrequest`,
@@ -124,8 +198,17 @@ export const initiateSTKPush = async (request: STKPushRequest): Promise<STKPushR
     console.log('M-Pesa STK Push response:', response.data);
     return response.data;
   } catch (error: any) {
-    console.error('M-Pesa STK Push Error:', error.response?.data || error.message);
-    throw new Error(error.response?.data?.errorMessage || 'Failed to initiate M-Pesa payment');
+    console.error('M-Pesa STK Push Error:', {
+      status: error.response?.status,
+      statusText: error.response?.statusText,
+      data: error.response?.data,
+      message: error.message,
+    });
+    const errorMessage = error.response?.data?.errorMessage 
+      || error.response?.data?.error_description 
+      || error.message 
+      || 'Failed to initiate M-Pesa payment';
+    throw new Error(errorMessage);
   }
 };
 
@@ -139,11 +222,63 @@ export interface STKQueryResponse {
 }
 
 export const querySTKPushStatus = async (checkoutRequestId: string): Promise<STKQueryResponse> => {
+  // SIMULATION MODE
+  if (isSimulationMode() || checkoutRequestId.startsWith('SIM_')) {
+    console.log('[SIMULATION] Querying simulated payment status:', checkoutRequestId);
+    
+    const payment = simulatedPayments.get(checkoutRequestId);
+    
+    if (!payment) {
+      // If not found, assume completed (for older simulated payments)
+      return {
+        ResponseCode: '0',
+        ResponseDescription: 'The service request has been accepted successfully',
+        MerchantRequestID: `SIM_MR_${Date.now()}`,
+        CheckoutRequestID: checkoutRequestId,
+        ResultCode: '0',
+        ResultDesc: '[SIMULATION] The service request is processed successfully.',
+      };
+    }
+    
+    if (payment.status === 'completed') {
+      return {
+        ResponseCode: '0',
+        ResponseDescription: 'The service request has been accepted successfully',
+        MerchantRequestID: `SIM_MR_${Date.now()}`,
+        CheckoutRequestID: checkoutRequestId,
+        ResultCode: '0',
+        ResultDesc: '[SIMULATION] The service request is processed successfully.',
+      };
+    } else if (payment.status === 'failed') {
+      return {
+        ResponseCode: '0',
+        ResponseDescription: 'The service request has been accepted successfully',
+        MerchantRequestID: `SIM_MR_${Date.now()}`,
+        CheckoutRequestID: checkoutRequestId,
+        ResultCode: '1032',
+        ResultDesc: '[SIMULATION] Request cancelled by user',
+      };
+    } else {
+      // Still pending
+      return {
+        ResponseCode: '0',
+        ResponseDescription: 'The service request has been accepted successfully',
+        MerchantRequestID: `SIM_MR_${Date.now()}`,
+        CheckoutRequestID: checkoutRequestId,
+        ResultCode: '1',
+        ResultDesc: '[SIMULATION] The transaction is being processed',
+      };
+    }
+  }
+  
+  // REAL M-PESA API
   try {
     const accessToken = await getAccessToken();
     const timestamp = getTimestamp();
     const password = generatePassword(timestamp);
     const shortCode = process.env.MPESA_BUSINESS_SHORT_CODE;
+    
+    console.log('Querying M-Pesa STK Push status:', { checkoutRequestId });
     
     const response = await axios.post(
       `${getBaseUrl()}/mpesa/stkpushquery/v1/query`,
@@ -161,11 +296,28 @@ export const querySTKPushStatus = async (checkoutRequestId: string): Promise<STK
       }
     );
     
+    console.log('M-Pesa STK Query response:', response.data);
     return response.data;
   } catch (error: any) {
-    console.error('M-Pesa STK Query Error:', error.response?.data || error.message);
-    throw new Error('Failed to query M-Pesa payment status');
+    console.error('M-Pesa STK Query Error:', {
+      status: error.response?.status,
+      statusText: error.response?.statusText,
+      data: error.response?.data,
+      message: error.message,
+    });
+    throw new Error(`Failed to query M-Pesa payment status: ${error.message}`);
   }
+};
+
+// Get simulated receipt number for completed payments
+export const getSimulatedReceiptNumber = (checkoutRequestId: string): string | null => {
+  if (checkoutRequestId.startsWith('SIM_')) {
+    const payment = simulatedPayments.get(checkoutRequestId);
+    if (payment && payment.status === 'completed') {
+      return generateSimulatedReceipt();
+    }
+  }
+  return null;
 };
 
 export interface MPesaCallbackData {

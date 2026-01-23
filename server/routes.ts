@@ -22,7 +22,7 @@ import { notificationService } from "./notificationService";
 import { EnhancedNotificationService } from "./enhancedNotificationService";
 import { EmailService } from "./emailService";
 import { SMSService } from "./smsService";
-import { initiateSTKPush, querySTKPushStatus, parseCallbackData, formatPhoneNumber, type MPesaCallbackData } from "./mpesaService";
+import { initiateSTKPush, querySTKPushStatus, parseCallbackData, formatPhoneNumber, getSimulatedReceiptNumber, isSimulationMode, type MPesaCallbackData } from "./mpesaService";
 import { z } from "zod";
 
 // Admin middleware to check authentication
@@ -2559,13 +2559,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      // Query Safaricom for status
+      // Query for status (works with both real and simulated)
       const response = await querySTKPushStatus(booking.mpesaCheckoutRequestId);
       
       const isSuccess = response.ResultCode === "0";
       if (isSuccess && booking.paymentStatus !== "completed") {
+        // For simulated payments, generate a receipt number
+        const receiptNumber = getSimulatedReceiptNumber(booking.mpesaCheckoutRequestId) || undefined;
+        
         await storage.updateBookingPayment(bookingId, {
           paymentStatus: "completed",
+          mpesaReceiptNumber: receiptNumber,
+        });
+        
+        return res.json({
+          success: true,
+          status: "completed",
+          mpesaReceiptNumber: receiptNumber,
+          resultDesc: response.ResultDesc,
+          isSimulation: isSimulationMode(),
         });
       }
       
@@ -2573,6 +2585,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         success: isSuccess,
         status: isSuccess ? "completed" : "pending",
         resultDesc: response.ResultDesc,
+        isSimulation: isSimulationMode(),
       });
     } catch (error: any) {
       console.error("M-Pesa query error:", error);
@@ -2603,13 +2616,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      // Query Safaricom for status
+      // Query for status (works with both real and simulated)
       const response = await querySTKPushStatus(eventBooking.mpesaCheckoutRequestId);
       
       const isSuccess = response.ResultCode === "0";
       if (isSuccess && eventBooking.paymentStatus !== "completed") {
+        // For simulated payments, generate a receipt number
+        const receiptNumber = getSimulatedReceiptNumber(eventBooking.mpesaCheckoutRequestId) || undefined;
+        
         await storage.updateEventBookingPayment(eventBookingId, {
           paymentStatus: "completed",
+          mpesaReceiptNumber: receiptNumber,
+        });
+        
+        return res.json({
+          success: true,
+          status: "completed",
+          mpesaReceiptNumber: receiptNumber,
+          resultDesc: response.ResultDesc,
+          isSimulation: isSimulationMode(),
         });
       }
       
@@ -2617,6 +2642,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         success: isSuccess,
         status: isSuccess ? "completed" : "pending",
         resultDesc: response.ResultDesc,
+        isSimulation: isSimulationMode(),
       });
     } catch (error: any) {
       console.error("M-Pesa query error:", error);
