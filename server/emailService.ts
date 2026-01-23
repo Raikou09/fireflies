@@ -1,10 +1,10 @@
 import sgMail from '@sendgrid/mail';
 
-if (!process.env.SENDGRID_API_KEY) {
-  throw new Error("SENDGRID_API_KEY environment variable must be set");
+if (!process.env.SENDGRID_API_KEYNEW) {
+  throw new Error("SENDGRID_API_KEYNEW environment variable must be set");
 }
 
-sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+sgMail.setApiKey(process.env.SENDGRID_API_KEYNEW);
 
 interface EmailTemplate {
   to: string;
