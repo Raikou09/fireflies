@@ -432,17 +432,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Create booking route
-  app.post("/api/bookings", async (req, res) => {
+  app.post("/api/bookings", isAuthenticated, async (req: any, res) => {
     try {
+      const customerId = req.user?.claims?.sub || req.user?.id;
+      if (!customerId) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+
       const { courtId, date, timeSlot, duration, totalAmount } = req.body;
       
       if (!courtId || !date || !timeSlot || !duration || !totalAmount) {
         return res.status(400).json({ message: "Missing required booking fields" });
       }
 
-      // For now, create booking without authentication
-      // In production, you would get userId from authenticated session
       const booking = await storage.createBooking({
+        customerId,
         courtId,
         bookingDate: new Date(date),
         startTime: timeSlot,
