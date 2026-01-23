@@ -59,13 +59,7 @@ export function LocationAwareCourts({ city, sport, searchQuery }: LocationAwareC
 
   // Fetch courts with location parameters
   const { data: courts, isLoading, error } = useQuery({
-    queryKey: ['/api/courts', city, sport, {
-      search: searchQuery,
-      lat: useLocationFilter && userLocation ? userLocation.latitude : undefined,
-      lng: useLocationFilter && userLocation ? userLocation.longitude : undefined,
-      maxDistance: useLocationFilter ? maxDistance[0] : undefined,
-      sortByDistance: useLocationFilter && sortByDistance
-    }],
+    queryKey: ['/api/courts', city, sport, searchQuery || ''],
     queryFn: async () => {
       const params = new URLSearchParams();
       if (searchQuery) params.append('search', searchQuery);
@@ -80,8 +74,12 @@ export function LocationAwareCourts({ city, sport, searchQuery }: LocationAwareC
       if (!response.ok) {
         throw new Error('Failed to fetch courts');
       }
-      return response.json() as Promise<CourtWithDetails[]>;
-    }
+      const data = await response.json();
+      console.log('Courts API response:', data);
+      return data as CourtWithDetails[];
+    },
+    staleTime: 0,
+    refetchOnMount: true
   });
 
   if (isLoading) {
