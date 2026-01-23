@@ -189,42 +189,50 @@ export default function VendorOnboarding({ isOpen, onClose, existingData, isEdit
           "Content-Type": "application/json",
         },
         credentials: "include",
+        body: JSON.stringify({
+          fileName: file.name,
+          fileType: file.type,
+          fileSize: file.size,
+        }),
       });
 
       if (!uploadResponse.ok) {
-        throw new Error("Failed to get upload URL");
+        const errorData = await uploadResponse.json().catch(() => ({}));
+        throw new Error(errorData.error || "Failed to get upload URL");
       }
 
-      const { uploadURL } = await uploadResponse.json();
+      const { uploadURL, documentUrl } = await uploadResponse.json();
 
       const response = await fetch(uploadURL, {
         method: "PUT",
         body: file,
         headers: {
-          'Content-Type': file.type,
+          'Content-Type': file.type || 'application/octet-stream',
         },
       });
 
       if (!response.ok) {
-        throw new Error("Failed to upload document");
+        throw new Error("Failed to upload document to storage");
       }
 
-      const documentUrl = uploadURL.split('?')[0];
+      // Use the documentUrl from the server response
+      const finalDocumentUrl = documentUrl || uploadURL.split('?')[0];
       setUploadedDocs(prev => ({
         ...prev,
-        [documentType]: documentUrl
+        [documentType]: finalDocumentUrl
       }));
       
-      form.setValue(documentType as keyof VendorOnboarding, documentUrl);
+      form.setValue(documentType as keyof VendorOnboarding, finalDocumentUrl);
 
       toast({
         title: "Document Uploaded",
         description: `${documentType.replace(/([A-Z])/g, ' $1').trim()} uploaded successfully!`,
       });
     } catch (error) {
+      console.error('Document upload error:', error);
       toast({
         title: "Upload Failed",
-        description: "Failed to upload document. Please try again.",
+        description: (error as Error).message || "Failed to upload document. Please try again.",
         variant: "destructive",
       });
     } finally {
