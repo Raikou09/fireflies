@@ -809,7 +809,15 @@ export default function VendorOnboarding({ isOpen, onClose }: VendorOnboardingPr
           )}
 
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+            <form 
+              onSubmit={form.handleSubmit(onSubmit)} 
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && currentStep !== 'documents') {
+                  e.preventDefault();
+                }
+              }}
+              className="space-y-6"
+            >
               <AnimatePresence mode="wait">
                 <motion.div
                   key={currentStep}
