@@ -5,11 +5,11 @@ import { Calendar } from '@/components/ui/calendar';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { Clock, MapPin, Users, CreditCard, Calendar as CalendarIcon, Package, Smartphone } from 'lucide-react';
+import { Clock, MapPin, Users, CreditCard, Calendar as CalendarIcon, Package, Smartphone, LogIn } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest } from '@/lib/queryClient';
-import type { CourtWithDetails } from '@shared/schema';
+import type { CourtWithDetails, User } from '@shared/schema';
 import EquipmentRentalModal from './EquipmentRentalModal';
 import { MpesaPayment } from './MpesaPayment';
 
@@ -47,6 +47,13 @@ export function BookingModal({ court, isOpen, onClose }: BookingModalProps) {
   
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  // Check if user is logged in
+  const { data: currentUser, isLoading: isLoadingUser } = useQuery<User>({
+    queryKey: ['/api/auth/user'],
+  });
+
+  const isLoggedIn = !!currentUser && !isLoadingUser;
 
   // Generate time slots based on court operating hours
   const generateTimeSlots = (): TimeSlot[] => {
@@ -191,6 +198,27 @@ export function BookingModal({ court, isOpen, onClose }: BookingModalProps) {
           </div>
         </DialogHeader>
 
+        {/* Login Required Message */}
+        {!isLoggedIn && (
+          <div className="flex flex-col items-center justify-center py-12 space-y-4">
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-6 text-center max-w-md">
+              <LogIn className="h-12 w-12 text-amber-600 mx-auto mb-4" />
+              <h3 className="text-lg font-semibold text-amber-900 mb-2">Login Required</h3>
+              <p className="text-amber-700 mb-4">
+                Please sign in to book this court. It only takes a moment!
+              </p>
+              <Button 
+                onClick={() => window.location.href = '/api/login'}
+                className="bg-amber-600 hover:bg-amber-700 text-white"
+              >
+                <LogIn className="h-4 w-4 mr-2" />
+                Sign In to Continue
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {isLoggedIn && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
           {/* Main Booking Section */}
           <div className="lg:col-span-2 space-y-6">
@@ -473,6 +501,7 @@ export function BookingModal({ court, isOpen, onClose }: BookingModalProps) {
             </Card>
           </div>
         </div>
+        )}
       </DialogContent>
       
       {/* Equipment Rental Modal */}
