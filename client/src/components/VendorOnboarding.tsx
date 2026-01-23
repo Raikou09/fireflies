@@ -137,8 +137,13 @@ export default function VendorOnboarding({ isOpen, onClose, existingData, isEdit
       if (existingData.taxCertificate) docs.taxCertificate = existingData.taxCertificate;
       if (existingData.bankStatement) docs.bankStatement = existingData.bankStatement;
       setUploadedDocs(docs);
+      
+      // When editing, mark all steps as completed so user can navigate freely
+      if (isEditing) {
+        setCompletedSteps(["basic", "company", "legal", "documents"]);
+      }
     }
-  }, [existingData, form]);
+  }, [existingData, form, isEditing]);
 
   const mutation = useMutation({
     mutationFn: async (data: VendorOnboarding) => {
