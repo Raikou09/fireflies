@@ -14,7 +14,7 @@ interface EmailTemplate {
 }
 
 export class EmailService {
-  private static fromEmail = 'noreply@sportsbox.co.ke';
+  private static fromEmail = 'hello@sportsbox.in';
   private static fromName = 'SportsBox Kenya';
 
   static async sendEmail(template: EmailTemplate): Promise<boolean> {
