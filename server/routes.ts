@@ -465,7 +465,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Send booking confirmation email
       try {
         const customer = await storage.getUser(customerId);
-        const court = await storage.getCourt(courtId);
+        const court = await storage.getCourtById(courtId);
         
         if (customer?.email && court) {
           await EmailService.sendBookingConfirmation({
