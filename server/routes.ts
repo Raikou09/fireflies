@@ -445,13 +445,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Missing required booking fields" });
       }
 
+      const endTime = `${parseInt(timeSlot.split(':')[0]) + duration}:00`;
+      
       const booking = await storage.createBooking({
         customerId,
         courtId,
         bookingDate: date,
         timeSlot: timeSlot,
         startTime: timeSlot,
-        endTime: `${parseInt(timeSlot.split(':')[0]) + duration}:00`,
+        endTime: endTime,
         duration: duration,
         courtAmount: totalAmount.toString(),
         totalAmount: totalAmount.toString(),
@@ -459,6 +461,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
         paymentStatus: "pending",
         status: "confirmed",
       });
+
+      // Send booking confirmation email
+      try {
+        const customer = await storage.getUser(customerId);
+        const court = await storage.getCourt(courtId);
+        
+        if (customer?.email && court) {
+          await EmailService.sendBookingConfirmation({
+            customerEmail: customer.email,
+            customerName: `${customer.firstName || ''} ${customer.lastName || ''}`.trim() || 'Valued Customer',
+            courtName: court.name,
+            bookingDate: date,
+            startTime: timeSlot,
+            endTime: endTime,
+            totalAmount: totalAmount.toString(),
+            bookingId: booking.id,
+          });
+          console.log('Booking confirmation email sent to:', customer.email);
+        }
+      } catch (emailError) {
+        console.error('Failed to send booking confirmation email:', emailError);
+        // Don't fail the booking if email fails
+      }
 
       res.status(201).json(booking);
     } catch (error) {
