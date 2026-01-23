@@ -343,9 +343,10 @@ export class DatabaseStorage implements IStorage {
       }));
 
       // Filter by max distance if specified
+      // Include courts without coordinates (they'll be shown at the end)
       if (filters.maxDistance) {
         courtsArray = courtsArray.filter(court => 
-          court.distance !== undefined && court.distance <= filters.maxDistance!
+          court.distance === undefined || court.distance <= filters.maxDistance!
         );
       }
 
