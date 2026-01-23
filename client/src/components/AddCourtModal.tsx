@@ -53,6 +53,7 @@ export default function AddCourtModal({ isOpen, onClose }: AddCourtModalProps) {
   });
 
   const [selectedSports, setSelectedSports] = useState<string[]>([]);
+  const [facilityType, setFacilityType] = useState<"separate_areas" | "shared_area">("shared_area");
 
   const [availableDays, setAvailableDays] = useState<string[]>([
     "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"
@@ -172,6 +173,7 @@ export default function AddCourtModal({ isOpen, onClose }: AddCourtModalProps) {
       rules: "",
     });
     setSelectedSports([]);
+    setFacilityType("shared_area");
     setAvailableDays(["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]);
     setImageUrl("");
     setIncludeEquipment(false);
@@ -270,6 +272,7 @@ export default function AddCourtModal({ isOpen, onClose }: AddCourtModalProps) {
     const courtPayload = {
       name: formData.name,
       availableSports: selectedSports,
+      facilityType,
       city: formData.city,
       area: formData.area,
       address: formData.address || "",
@@ -357,6 +360,59 @@ export default function AddCourtModal({ isOpen, onClose }: AddCourtModalProps) {
                 Select {selectedSports.length > 0 ? selectedSports.length : '0'} sport{selectedSports.length !== 1 ? 's' : ''} selected
               </p>
             </div>
+
+            {/* Facility Type - only show if multiple sports selected */}
+            {selectedSports.length > 1 && (
+              <div className="md:col-span-2">
+                <Label className="mb-3 block">Facility Layout *</Label>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div 
+                    className={`p-4 border-2 rounded-lg cursor-pointer transition-all ${
+                      facilityType === 'separate_areas' 
+                        ? 'border-green-500 bg-green-50' 
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                    onClick={() => setFacilityType('separate_areas')}
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                        facilityType === 'separate_areas' ? 'border-green-500' : 'border-gray-300'
+                      }`}>
+                        {facilityType === 'separate_areas' && (
+                          <div className="w-3 h-3 rounded-full bg-green-500" />
+                        )}
+                      </div>
+                      <div>
+                        <p className="font-medium">Separate Areas</p>
+                        <p className="text-sm text-gray-600">Each sport has its own dedicated space (e.g., separate football pitch and tennis court). Multiple sports can be booked at the same time.</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div 
+                    className={`p-4 border-2 rounded-lg cursor-pointer transition-all ${
+                      facilityType === 'shared_area' 
+                        ? 'border-green-500 bg-green-50' 
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                    onClick={() => setFacilityType('shared_area')}
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                        facilityType === 'shared_area' ? 'border-green-500' : 'border-gray-300'
+                      }`}>
+                        {facilityType === 'shared_area' && (
+                          <div className="w-3 h-3 rounded-full bg-green-500" />
+                        )}
+                      </div>
+                      <div>
+                        <p className="font-medium">Shared Multi-Use Area</p>
+                        <p className="text-sm text-gray-600">One court/space used for different sports (e.g., multipurpose hall). Only one sport can be booked per time slot.</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Location */}

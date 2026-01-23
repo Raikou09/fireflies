@@ -413,7 +413,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Booking availability route
+  // Booking availability route - returns bookings and court info for availability calculation
   app.get("/api/bookings/availability/:courtId", async (req, res) => {
     try {
       const { courtId } = req.params;
@@ -424,7 +424,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const bookings = await storage.getBookingsByCourtAndDate(courtId, date as string);
-      res.json(bookings);
+      const court = await storage.getCourtById(courtId);
+      
+      // Return bookings with court facility type for smart availability calculation
+      res.json({
+        bookings,
+        facilityType: court?.facilityType || 'shared_area',
+        availableSports: court?.availableSports || []
+      });
     } catch (error) {
       console.error("Error fetching availability:", error);
       res.status(500).json({ message: "Failed to fetch availability" });
@@ -439,7 +446,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "Authentication required" });
       }
 
-      const { courtId, date, timeSlot, duration, totalAmount } = req.body;
+      const { courtId, date, timeSlot, duration, totalAmount, selectedSport } = req.body;
       
       if (!courtId || !date || !timeSlot || !duration || !totalAmount) {
         return res.status(400).json({ message: "Missing required booking fields" });
@@ -450,6 +457,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const booking = await storage.createBooking({
         customerId,
         courtId,
+        selectedSport: selectedSport || "General",
         bookingDate: date,
         timeSlot: timeSlot,
         startTime: timeSlot,

@@ -74,6 +74,7 @@ export const courts = pgTable("courts", {
   vendorId: varchar("vendor_id").notNull().references(() => users.id),
   name: text("name").notNull(),
   availableSports: text("available_sports").array().notNull(), // Array of sports available at this location
+  facilityType: varchar("facility_type", { enum: ["separate_areas", "shared_area"] }).default("shared_area"), // Whether different sports have separate areas or share one space
   city: varchar("city").notNull(),
   area: varchar("area").notNull(),
   address: text("address"),
