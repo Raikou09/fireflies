@@ -448,7 +448,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const booking = await storage.createBooking({
         customerId,
         courtId,
-        bookingDate: new Date(date),
+        bookingDate: date,
         timeSlot: timeSlot,
         startTime: timeSlot,
         endTime: `${parseInt(timeSlot.split(':')[0]) + duration}:00`,

@@ -117,9 +117,10 @@ export const bookings = pgTable("bookings", {
   customerId: varchar("customer_id").notNull().references(() => users.id),
   courtId: varchar("court_id").notNull().references(() => courts.id),
   selectedSport: varchar("selected_sport").default("General"), // The specific sport chosen for this booking
-  bookingDate: timestamp("booking_date").notNull(),
-  startTime: varchar("start_time").notNull(), // e.g., "14:00"
-  endTime: varchar("end_time").notNull(), // e.g., "16:00"
+  bookingDate: varchar("booking_date").notNull(),
+  timeSlot: varchar("time_slot").notNull(), // e.g., "14:00" - required by database
+  startTime: varchar("start_time"), // e.g., "14:00"
+  endTime: varchar("end_time"), // e.g., "16:00"
   duration: integer("duration").default(1), // hours
   courtAmount: decimal("court_amount", { precision: 10, scale: 2 }).notNull(),
   equipmentAmount: decimal("equipment_amount", { precision: 10, scale: 2 }).default("0.00"),
