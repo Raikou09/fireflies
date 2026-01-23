@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRoute, Link } from 'wouter';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
@@ -8,6 +8,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import { SeatSelector } from '@/components/SeatSelector';
+import { MpesaPayment } from '@/components/MpesaPayment';
+import { apiRequest } from '@/lib/queryClient';
 import { 
   MapPin, 
   Calendar,
@@ -17,7 +19,9 @@ import {
   Tag,
   Ticket,
   MinusCircle,
-  PlusCircle
+  PlusCircle,
+  Smartphone,
+  Loader2
 } from 'lucide-react';
 import type { Event, Venue, TicketTier } from '@shared/schema';
 
@@ -40,6 +44,10 @@ export default function EventDetails() {
   const [ticketSelections, setTicketSelections] = useState<Record<string, number>>({});
   const [selectedSeats, setSelectedSeats] = useState<{ seatId: string; price: number }[]>([]);
   const [seatsTotalPrice, setSeatsTotalPrice] = useState(0);
+  const [showMpesaPayment, setShowMpesaPayment] = useState(false);
+  const [createdBookingId, setCreatedBookingId] = useState<string | null>(null);
+  const [bookingConfirmed, setBookingConfirmed] = useState(false);
+  const queryClient = useQueryClient();
 
   const eventId = params?.id;
 
@@ -120,6 +128,35 @@ export default function EventDetails() {
     setSeatsTotalPrice(totalPrice);
   };
 
+  // Create event booking mutation
+  const createEventBookingMutation = useMutation({
+    mutationFn: async (bookingData: any) => {
+      const response = await apiRequest('/api/event-bookings', 'POST', bookingData);
+      return response.json();
+    },
+    onSuccess: (data) => {
+      setCreatedBookingId(data.id);
+      setShowMpesaPayment(true);
+      queryClient.invalidateQueries({ queryKey: ['/api/events', eventId] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Booking Failed",
+        description: error.message || "There was an error processing your booking. Please try again.",
+        variant: "destructive",
+      });
+    }
+  });
+
+  const handleMpesaPaymentComplete = () => {
+    setShowMpesaPayment(false);
+    setBookingConfirmed(true);
+    toast({
+      title: "Booking Confirmed!",
+      description: "Your event tickets have been booked and payment received.",
+    });
+  };
+
   const handleProceedToCheckout = () => {
     if (!isAuthenticated) {
       toast({
@@ -152,10 +189,19 @@ export default function EventDetails() {
       }
     }
 
-    // TODO: Implement checkout flow
-    toast({
-      title: "Checkout coming soon",
-      description: "Event booking checkout is under development.",
+    // Get the first selected ticket tier for the booking
+    const selectedTierId = Object.keys(ticketSelections)[0];
+    const selectedQuantity = ticketSelections[selectedTierId] || selectedSeats.length;
+    const totalAmount = usesSeatMap ? seatsTotalPrice : getTotalPrice();
+
+    // Create event booking
+    createEventBookingMutation.mutate({
+      eventId,
+      ticketTierId: selectedTierId || event?.ticketTiers?.[0]?.id,
+      quantity: selectedQuantity,
+      seatNumbers: usesSeatMap ? selectedSeats.map(s => s.seatId) : [],
+      totalAmount,
+      paymentMethod: 'mpesa',
     });
   };
 
@@ -401,11 +447,15 @@ export default function EventDetails() {
                   size="lg"
                   className="bg-gradient-to-r from-orange-600 to-pink-600 hover:from-orange-700 hover:to-pink-700 px-8"
                   onClick={handleProceedToCheckout}
-                  disabled={selectedSeats.length === 0}
+                  disabled={selectedSeats.length === 0 || createEventBookingMutation.isPending}
                   data-testid="button-checkout"
                 >
-                  <Ticket className="w-5 h-5 mr-2" />
-                  Proceed to Checkout
+                  {createEventBookingMutation.isPending ? (
+                    <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                  ) : (
+                    <Smartphone className="w-5 h-5 mr-2" />
+                  )}
+                  {createEventBookingMutation.isPending ? 'Processing...' : 'Pay with M-Pesa'}
                 </Button>
               </>
             ) : (
@@ -429,17 +479,33 @@ export default function EventDetails() {
                   size="lg"
                   className="bg-gradient-to-r from-orange-600 to-pink-600 hover:from-orange-700 hover:to-pink-700 px-8"
                   onClick={handleProceedToCheckout}
-                  disabled={getTotalTickets() === 0}
+                  disabled={getTotalTickets() === 0 || createEventBookingMutation.isPending}
                   data-testid="button-checkout"
                 >
-                  <Ticket className="w-5 h-5 mr-2" />
-                  Proceed to Checkout
+                  {createEventBookingMutation.isPending ? (
+                    <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                  ) : (
+                    <Smartphone className="w-5 h-5 mr-2" />
+                  )}
+                  {createEventBookingMutation.isPending ? 'Processing...' : 'Pay with M-Pesa'}
                 </Button>
               </>
             )}
           </div>
         </div>
       </div>
+
+      {/* M-Pesa Payment Modal */}
+      {createdBookingId && (
+        <MpesaPayment
+          isOpen={showMpesaPayment}
+          onClose={() => setShowMpesaPayment(false)}
+          bookingId={createdBookingId}
+          bookingType="event"
+          amount={event?.venue?.hasSeatMap ? seatsTotalPrice : getTotalPrice()}
+          onPaymentComplete={handleMpesaPaymentComplete}
+        />
+      )}
     </div>
   );
 }

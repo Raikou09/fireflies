@@ -89,7 +89,17 @@ export interface IStorage {
   getBookingsByVendor(vendorId: string): Promise<BookingWithDetails[]>;
   getBookingsByCourtAndDate(courtId: string, date: string): Promise<Booking[]>;
   getBookingById(id: string): Promise<BookingWithDetails | undefined>;
+  getBooking(id: string): Promise<Booking | undefined>;
   updateBookingStatus(id: string, status: string): Promise<Booking | undefined>;
+  updateBookingPayment(id: string, data: {
+    paymentStatus?: "pending" | "completed" | "failed";
+    mpesaReceiptNumber?: string;
+    mpesaPhoneNumber?: string;
+    mpesaCheckoutRequestId?: string;
+    mpesaMerchantRequestId?: string;
+    mpesaTransactionDate?: string;
+  }): Promise<Booking | undefined>;
+  getBookingByCheckoutRequestId(checkoutRequestId: string): Promise<Booking | undefined>;
 
   // Review operations
   createReview(review: InsertReview): Promise<Review>;
@@ -183,7 +193,17 @@ export interface IStorage {
   getEventBookingsByCustomer(customerId: string): Promise<EventBookingWithDetails[]>;
   getEventBookingsByVendor(vendorId: string): Promise<EventBookingWithDetails[]>;
   getEventBookingById(id: string): Promise<EventBookingWithDetails | undefined>;
+  getEventBooking(id: string): Promise<EventBooking | undefined>;
   updateEventBookingStatus(id: string, status: string): Promise<EventBooking | undefined>;
+  updateEventBookingPayment(id: string, data: {
+    paymentStatus?: "pending" | "completed" | "failed";
+    mpesaReceiptNumber?: string;
+    mpesaPhoneNumber?: string;
+    mpesaCheckoutRequestId?: string;
+    mpesaMerchantRequestId?: string;
+    mpesaTransactionDate?: string;
+  }): Promise<EventBooking | undefined>;
+  getEventBookingByCheckoutRequestId(checkoutRequestId: string): Promise<EventBooking | undefined>;
 
   // Event admin operations
   getPendingVenues(): Promise<VenueWithDetails[]>;
@@ -604,6 +624,38 @@ export class DatabaseStorage implements IStorage {
       .where(eq(bookings.id, id))
       .returning();
     return updatedBooking;
+  }
+
+  async getBooking(id: string): Promise<Booking | undefined> {
+    const [booking] = await db
+      .select()
+      .from(bookings)
+      .where(eq(bookings.id, id));
+    return booking;
+  }
+
+  async updateBookingPayment(id: string, data: {
+    paymentStatus?: "pending" | "completed" | "failed";
+    mpesaReceiptNumber?: string;
+    mpesaPhoneNumber?: string;
+    mpesaCheckoutRequestId?: string;
+    mpesaMerchantRequestId?: string;
+    mpesaTransactionDate?: string;
+  }): Promise<Booking | undefined> {
+    const [updatedBooking] = await db
+      .update(bookings)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(bookings.id, id))
+      .returning();
+    return updatedBooking;
+  }
+
+  async getBookingByCheckoutRequestId(checkoutRequestId: string): Promise<Booking | undefined> {
+    const [booking] = await db
+      .select()
+      .from(bookings)
+      .where(eq(bookings.mpesaCheckoutRequestId, checkoutRequestId));
+    return booking;
   }
 
   // Review operations
@@ -1777,6 +1829,38 @@ export class DatabaseStorage implements IStorage {
       .set({ status: status as any, updatedAt: new Date() })
       .where(eq(eventBookings.id, id))
       .returning();
+    return booking;
+  }
+
+  async getEventBooking(id: string): Promise<EventBooking | undefined> {
+    const [booking] = await db
+      .select()
+      .from(eventBookings)
+      .where(eq(eventBookings.id, id));
+    return booking;
+  }
+
+  async updateEventBookingPayment(id: string, data: {
+    paymentStatus?: "pending" | "completed" | "failed";
+    mpesaReceiptNumber?: string;
+    mpesaPhoneNumber?: string;
+    mpesaCheckoutRequestId?: string;
+    mpesaMerchantRequestId?: string;
+    mpesaTransactionDate?: string;
+  }): Promise<EventBooking | undefined> {
+    const [updatedBooking] = await db
+      .update(eventBookings)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(eventBookings.id, id))
+      .returning();
+    return updatedBooking;
+  }
+
+  async getEventBookingByCheckoutRequestId(checkoutRequestId: string): Promise<EventBooking | undefined> {
+    const [booking] = await db
+      .select()
+      .from(eventBookings)
+      .where(eq(eventBookings.mpesaCheckoutRequestId, checkoutRequestId));
     return booking;
   }
 

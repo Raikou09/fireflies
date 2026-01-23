@@ -5,12 +5,13 @@ import { Calendar } from '@/components/ui/calendar';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { Clock, MapPin, Users, CreditCard, Calendar as CalendarIcon, Package } from 'lucide-react';
+import { Clock, MapPin, Users, CreditCard, Calendar as CalendarIcon, Package, Smartphone } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest } from '@/lib/queryClient';
 import type { CourtWithDetails } from '@shared/schema';
 import EquipmentRentalModal from './EquipmentRentalModal';
+import { MpesaPayment } from './MpesaPayment';
 
 interface BookingModalProps {
   court: CourtWithDetails;
@@ -40,6 +41,9 @@ export function BookingModal({ court, isOpen, onClose }: BookingModalProps) {
   const [step, setStep] = useState<'datetime' | 'payment' | 'confirmation'>('datetime');
   const [selectedEquipment, setSelectedEquipment] = useState<Array<{equipmentId: string, quantity: number, pricePerHour: number, name: string}>>([]);
   const [showEquipmentModal, setShowEquipmentModal] = useState(false);
+  const [showMpesaPayment, setShowMpesaPayment] = useState(false);
+  const [createdBookingId, setCreatedBookingId] = useState<string | null>(null);
+  const [customerPhone, setCustomerPhone] = useState('');
   
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -64,7 +68,7 @@ export function BookingModal({ court, isOpen, onClose }: BookingModalProps) {
         time,
         isAvailable,
         isSelected: selectedTimeSlot === time,
-        price: hour >= 17 && hour <= 20 ? court.peakHourRate || court.hourlyRate : court.hourlyRate
+        price: hour >= 17 && hour <= 20 ? Number(court.peakHourRate || court.hourlyRate) : Number(court.hourlyRate)
       });
     }
     
@@ -94,15 +98,13 @@ export function BookingModal({ court, isOpen, onClose }: BookingModalProps) {
   // Create booking mutation
   const createBookingMutation = useMutation({
     mutationFn: async (bookingData: BookingData) => {
-      return apiRequest('POST', '/api/bookings', bookingData);
+      const response = await apiRequest('/api/bookings', 'POST', bookingData);
+      return response.json();
     },
-    onSuccess: () => {
-      setStep('confirmation');
+    onSuccess: (data) => {
+      setCreatedBookingId(data.id);
+      setShowMpesaPayment(true);
       queryClient.invalidateQueries({ queryKey: ['/api/bookings'] });
-      toast({
-        title: "Booking Confirmed!",
-        description: "Your court has been successfully booked.",
-      });
     },
     onError: (error) => {
       toast({
@@ -143,12 +145,24 @@ export function BookingModal({ court, isOpen, onClose }: BookingModalProps) {
     createBookingMutation.mutate(bookingData);
   };
 
+  const handleMpesaPaymentComplete = () => {
+    setShowMpesaPayment(false);
+    setStep('confirmation');
+    toast({
+      title: "Booking Confirmed!",
+      description: "Your court has been successfully booked and payment received.",
+    });
+  };
+
   const resetModal = () => {
     setSelectedDate(new Date());
     setSelectedTimeSlot('');
     setSelectedDuration(1);
     setSelectedEquipment([]);
     setStep('datetime');
+    setShowMpesaPayment(false);
+    setCreatedBookingId(null);
+    setCustomerPhone('');
     onClose();
   };
 
@@ -471,6 +485,19 @@ export function BookingModal({ court, isOpen, onClose }: BookingModalProps) {
           setShowEquipmentModal(false);
         }}
       />
+
+      {/* M-Pesa Payment Modal */}
+      {createdBookingId && (
+        <MpesaPayment
+          isOpen={showMpesaPayment}
+          onClose={() => setShowMpesaPayment(false)}
+          bookingId={createdBookingId}
+          bookingType="court"
+          amount={totalAmount}
+          onPaymentComplete={handleMpesaPaymentComplete}
+          defaultPhone={customerPhone}
+        />
+      )}
     </Dialog>
   );
 }
