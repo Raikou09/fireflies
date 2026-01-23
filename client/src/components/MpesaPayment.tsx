@@ -37,7 +37,10 @@ export function MpesaPayment({
   const [status, setStatus] = useState<PaymentStatus>("idle");
   const [checkoutRequestId, setCheckoutRequestId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string>("");
+  const [pollCount, setPollCount] = useState(0);
   const { toast } = useToast();
+
+  const MAX_POLL_ATTEMPTS = 24; // 2 minutes timeout (5 sec * 24 = 120 sec)
 
   useEffect(() => {
     if (defaultPhone) {
@@ -51,6 +54,16 @@ export function MpesaPayment({
     if (status === "waiting" && checkoutRequestId) {
       pollInterval = setInterval(async () => {
         try {
+          setPollCount((prev) => prev + 1);
+
+          // Timeout after MAX_POLL_ATTEMPTS
+          if (pollCount >= MAX_POLL_ATTEMPTS) {
+            setStatus("failed");
+            setErrorMessage("Payment timed out. Please check your M-Pesa messages and try again if the payment was not completed.");
+            if (pollInterval) clearInterval(pollInterval);
+            return;
+          }
+
           const endpoint =
             bookingType === "court"
               ? `/api/mpesa/query/booking/${bookingId}`
@@ -70,6 +83,10 @@ export function MpesaPayment({
               onPaymentComplete();
               onClose();
             }, 2000);
+          } else if (data.status === "failed" || data.status === "cancelled") {
+            setStatus("failed");
+            setErrorMessage(data.message || "Payment was cancelled or failed. Please try again.");
+            if (pollInterval) clearInterval(pollInterval);
           }
         } catch (error) {
           console.error("Error polling payment status:", error);
@@ -80,7 +97,7 @@ export function MpesaPayment({
     return () => {
       if (pollInterval) clearInterval(pollInterval);
     };
-  }, [status, checkoutRequestId, bookingId, bookingType, onPaymentComplete, onClose, toast]);
+  }, [status, checkoutRequestId, bookingId, bookingType, pollCount, onPaymentComplete, onClose, toast]);
 
   const initiatePayment = async () => {
     if (!phone || phone.length < 9) {
@@ -140,6 +157,7 @@ export function MpesaPayment({
     setStatus("idle");
     setCheckoutRequestId(null);
     setErrorMessage("");
+    setPollCount(0);
   };
 
   const formatPhone = (value: string) => {
