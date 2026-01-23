@@ -33,6 +33,7 @@ interface BookingData {
   duration: number;
   totalAmount: number;
   selectedSport: string;
+  sportSegments?: Array<{hour: number, sport: string}>;
 }
 
 export function BookingModal({ court, isOpen, onClose }: BookingModalProps) {
@@ -40,6 +41,7 @@ export function BookingModal({ court, isOpen, onClose }: BookingModalProps) {
   const [selectedTimeSlot, setSelectedTimeSlot] = useState<string>('');
   const [selectedDuration, setSelectedDuration] = useState<number>(1);
   const [selectedSport, setSelectedSport] = useState<string>('');
+  const [sportSegments, setSportSegments] = useState<Array<{hour: number, sport: string}>>([]);
   const [step, setStep] = useState<'datetime' | 'payment' | 'confirmation'>('datetime');
   const [selectedEquipment, setSelectedEquipment] = useState<Array<{equipmentId: string, quantity: number, pricePerHour: number, name: string}>>([]);
   const [showEquipmentModal, setShowEquipmentModal] = useState(false);
@@ -64,6 +66,14 @@ export function BookingModal({ court, isOpen, onClose }: BookingModalProps) {
     }
   }, [court.availableSports, selectedSport]);
 
+  // Rebuild sport segments when selectedSport or selectedTimeSlot changes
+  useEffect(() => {
+    if (selectedSport && selectedTimeSlot && selectedDuration > 0) {
+      const segments = buildSportSegments(selectedDuration);
+      setSportSegments(segments);
+    }
+  }, [selectedSport, selectedTimeSlot]);
+
   // Fetch existing bookings for the selected date
   const { data: availabilityData } = useQuery<{
     bookings: Array<{
@@ -73,6 +83,7 @@ export function BookingModal({ court, isOpen, onClose }: BookingModalProps) {
       endTime: string;
       duration: number;
       selectedSport: string;
+      sportSegments?: Array<{hour: number, sport: string}>;
     }>;
     facilityType: 'separate_areas' | 'shared_area';
     availableSports: string[];
@@ -89,7 +100,7 @@ export function BookingModal({ court, isOpen, onClose }: BookingModalProps) {
   const existingBookings = availabilityData?.bookings || [];
   const facilityType = availabilityData?.facilityType || 'shared_area';
 
-  // Check if a time slot is available based on existing bookings
+  // Check if a time slot is available based on existing bookings (considers multi-sport via sportSegments)
   const isSlotAvailable = (time: string): boolean => {
     // If no sport selected yet, assume available (will be checked again after selection)
     if (!selectedSport) return true;
@@ -106,8 +117,18 @@ export function BookingModal({ court, isOpen, onClose }: BookingModalProps) {
         if (facilityType === 'shared_area') {
           return false;
         }
-        // For separate areas, only same sport bookings block the slot
-        if (booking.selectedSport === selectedSport) {
+        
+        // For separate areas, check sportSegments for per-hour blocking
+        let sportForThisHour = booking.selectedSport;
+        if (booking.sportSegments && Array.isArray(booking.sportSegments)) {
+          const segmentForHour = booking.sportSegments.find((seg: {hour: number, sport: string}) => seg.hour === hour);
+          if (segmentForHour) {
+            sportForThisHour = segmentForHour.sport;
+          }
+        }
+        
+        // Block if same sport is booked for this hour
+        if (sportForThisHour === selectedSport) {
           return false;
         }
       }
@@ -149,6 +170,83 @@ export function BookingModal({ court, isOpen, onClose }: BookingModalProps) {
     }
     
     return (court.availableSports || []).filter(sport => !bookedSports.has(sport) && sport !== selectedSport);
+  };
+
+  // Get all available sports for a specific hour (considers multi-sport bookings via sportSegments)
+  const getAvailableSportsForHour = (hour: number): string[] => {
+    const bookedSports = new Set<string>();
+    
+    for (const booking of existingBookings) {
+      const bookingStart = parseInt(booking.startTime?.split(':')[0] || booking.timeSlot.split(':')[0]);
+      const bookingEnd = bookingStart + (booking.duration || 1);
+      
+      if (hour >= bookingStart && hour < bookingEnd) {
+        if (facilityType === 'shared_area') {
+          return []; // Shared area - if any booking exists, no sports available
+        }
+        
+        // Check sportSegments for per-hour sport assignments
+        if (booking.sportSegments && Array.isArray(booking.sportSegments)) {
+          const segmentForHour = booking.sportSegments.find((seg: {hour: number, sport: string}) => seg.hour === hour);
+          if (segmentForHour) {
+            bookedSports.add(segmentForHour.sport);
+          } else {
+            // Fallback to selectedSport if no segment for this hour
+            bookedSports.add(booking.selectedSport);
+          }
+        } else {
+          // No segments, use selectedSport for all hours
+          bookedSports.add(booking.selectedSport);
+        }
+      }
+    }
+    
+    return (court.availableSports || []).filter(sport => !bookedSports.has(sport));
+  };
+
+  // Check if a duration is possible with multi-sport booking
+  const canBookDurationWithMultiSport = (duration: number): boolean => {
+    if (!selectedTimeSlot) return false;
+    const startHour = parseInt(selectedTimeSlot.split(':')[0]);
+    const endHour = parseInt(court.closingTime.split(':')[0]);
+    
+    // Check if duration fits within operating hours
+    if (startHour + duration > endHour) return false;
+    
+    // Check each hour to see if any sport is available
+    for (let i = 0; i < duration; i++) {
+      const hour = startHour + i;
+      const availableSports = getAvailableSportsForHour(hour);
+      if (availableSports.length === 0) return false;
+    }
+    return true;
+  };
+
+  // Build sport segments for a given duration
+  const buildSportSegments = (duration: number): Array<{hour: number, sport: string}> => {
+    if (!selectedTimeSlot || !selectedSport) return [];
+    const startHour = parseInt(selectedTimeSlot.split(':')[0]);
+    const segments: Array<{hour: number, sport: string}> = [];
+    
+    for (let i = 0; i < duration; i++) {
+      const hour = startHour + i;
+      const availableSports = getAvailableSportsForHour(hour);
+      
+      // Use selected sport if available, otherwise use first available alternative
+      if (availableSports.includes(selectedSport)) {
+        segments.push({ hour, sport: selectedSport });
+      } else if (availableSports.length > 0) {
+        segments.push({ hour, sport: availableSports[0] });
+      }
+    }
+    return segments;
+  };
+
+  // Update sport for a specific hour in segments
+  const updateSportForHour = (hour: number, sport: string) => {
+    setSportSegments(prev => prev.map(seg => 
+      seg.hour === hour ? { ...seg, sport } : seg
+    ));
   };
 
   // Generate time slots based on court operating hours
@@ -230,7 +328,8 @@ export function BookingModal({ court, isOpen, onClose }: BookingModalProps) {
       timeSlot: selectedTimeSlot,
       duration: selectedDuration,
       totalAmount,
-      selectedSport
+      selectedSport,
+      sportSegments: sportSegments.length > 0 ? sportSegments : undefined
     };
     
     createBookingMutation.mutate(bookingData);
@@ -250,6 +349,7 @@ export function BookingModal({ court, isOpen, onClose }: BookingModalProps) {
     setSelectedTimeSlot('');
     setSelectedDuration(1);
     setSelectedSport('');
+    setSportSegments([]);
     setSelectedEquipment([]);
     setStep('datetime');
     setShowMpesaPayment(false);
@@ -378,46 +478,40 @@ export function BookingModal({ court, isOpen, onClose }: BookingModalProps) {
                   </div>
                 )}
 
-                {/* Duration Selection with Smart Availability */}
+                {/* Duration Selection with Multi-Sport Support */}
                 {selectedTimeSlot && (
                   <div>
                     <h3 className="text-lg font-semibold mb-4">Duration</h3>
                     <div className="flex flex-wrap gap-2">
                       {[1, 2, 3, 4].map((duration) => {
-                        const isAvailable = duration <= maxConsecutiveHours;
-                        const blockedHour = !isAvailable ? parseInt(selectedTimeSlot.split(':')[0]) + maxConsecutiveHours : null;
-                        const blockedTime = blockedHour ? `${blockedHour.toString().padStart(2, '0')}:00` : '';
-                        const alternativeSports = blockedTime ? getAlternativeSports(blockedTime) : [];
+                        const singleSportAvailable = duration <= maxConsecutiveHours;
+                        const multiSportAvailable = !singleSportAvailable && facilityType === 'separate_areas' && canBookDurationWithMultiSport(duration);
+                        const isAvailable = singleSportAvailable || multiSportAvailable;
                         
                         return (
                           <div key={duration} className="relative group">
                             <Button
                               variant={selectedDuration === duration ? "default" : isAvailable ? "outline" : "ghost"}
-                              onClick={() => isAvailable && setSelectedDuration(duration)}
-                              className={`${!isAvailable ? 'opacity-50 cursor-not-allowed line-through' : ''}`}
+                              onClick={() => {
+                                if (isAvailable) {
+                                  setSelectedDuration(duration);
+                                  // Build sport segments when duration changes
+                                  const segments = buildSportSegments(duration);
+                                  setSportSegments(segments);
+                                }
+                              }}
+                              className={`${!isAvailable ? 'opacity-50 cursor-not-allowed line-through' : ''} ${multiSportAvailable && !singleSportAvailable ? 'border-amber-400 border-2' : ''}`}
                               data-testid={`button-duration-${duration}`}
                             >
                               {duration} hour{duration > 1 ? 's' : ''}
+                              {multiSportAvailable && !singleSportAvailable && (
+                                <span className="ml-1 text-amber-500">*</span>
+                              )}
                             </Button>
-                            {/* Tooltip for blocked durations - show alternative sports */}
-                            {!isAvailable && alternativeSports.length > 0 && (
-                              <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 hidden group-hover:block z-50">
-                                <div className="bg-gray-900 text-white text-xs rounded-lg p-3 whitespace-nowrap shadow-lg">
-                                  <p className="font-semibold mb-1">{blockedTime} is booked</p>
-                                  <p className="text-gray-300">Available sports at this time:</p>
-                                  <ul className="mt-1">
-                                    {alternativeSports.slice(0, 3).map(sport => (
-                                      <li key={sport} className="text-green-400">• {sport}</li>
-                                    ))}
-                                  </ul>
-                                  <div className="absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-gray-900"></div>
-                                </div>
-                              </div>
-                            )}
-                            {!isAvailable && alternativeSports.length === 0 && (
+                            {!isAvailable && (
                               <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 hidden group-hover:block z-50">
                                 <div className="bg-gray-900 text-white text-xs rounded-lg p-2 whitespace-nowrap shadow-lg">
-                                  <p>{blockedTime} is fully booked</p>
+                                  <p>Time slot fully booked</p>
                                   <div className="absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-gray-900"></div>
                                 </div>
                               </div>
@@ -426,11 +520,45 @@ export function BookingModal({ court, isOpen, onClose }: BookingModalProps) {
                         );
                       })}
                     </div>
-                    {maxConsecutiveHours < 4 && (
+                    {facilityType === 'separate_areas' && maxConsecutiveHours < 4 && (
                       <p className="text-sm text-amber-600 mt-2">
-                        Max {maxConsecutiveHours} hour{maxConsecutiveHours !== 1 ? 's' : ''} available from {selectedTimeSlot} for {selectedSport}
+                        * Requires switching sports for some hours
                       </p>
                     )}
+                  </div>
+                )}
+
+                {/* Hour-by-Hour Sport Selection */}
+                {selectedTimeSlot && sportSegments.length > 1 && sportSegments.some(seg => seg.sport !== selectedSport) && (
+                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                    <h3 className="text-md font-semibold mb-3 text-amber-800">Hour-by-Hour Sports</h3>
+                    <p className="text-sm text-amber-700 mb-3">Some hours require a different sport. Customize below:</p>
+                    <div className="space-y-2">
+                      {sportSegments.map((segment) => {
+                        const availableSports = getAvailableSportsForHour(segment.hour);
+                        const timeStr = `${segment.hour.toString().padStart(2, '0')}:00`;
+                        
+                        return (
+                          <div key={segment.hour} className="flex items-center gap-3 bg-white rounded-md p-2">
+                            <span className="text-sm font-medium w-16">{timeStr}</span>
+                            <select
+                              value={segment.sport}
+                              onChange={(e) => updateSportForHour(segment.hour, e.target.value)}
+                              className="flex-1 text-sm border rounded-md px-2 py-1"
+                            >
+                              {availableSports.map(sport => (
+                                <option key={sport} value={sport}>{sport}</option>
+                              ))}
+                            </select>
+                            {segment.sport !== selectedSport && (
+                              <Badge variant="outline" className="text-xs bg-amber-100 text-amber-700">
+                                Different
+                              </Badge>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
                 )}
 
@@ -571,7 +699,19 @@ export function BookingModal({ court, isOpen, onClose }: BookingModalProps) {
                     </div>
                   </div>
 
-                  {selectedSport ? (
+                  {sportSegments.length > 1 && sportSegments.some(seg => seg.sport !== selectedSport) ? (
+                    <div className="space-y-1">
+                      <p className="text-xs text-gray-500 font-medium">Sports by hour:</p>
+                      {sportSegments.map((seg) => (
+                        <div key={seg.hour} className="flex items-center gap-2">
+                          <span className="text-xs text-gray-500 w-12">{seg.hour.toString().padStart(2, '0')}:00</span>
+                          <Badge variant={seg.sport === selectedSport ? "default" : "secondary"} className={`text-xs ${seg.sport === selectedSport ? 'bg-green-600' : 'bg-amber-100 text-amber-700'}`}>
+                            {seg.sport}
+                          </Badge>
+                        </div>
+                      ))}
+                    </div>
+                  ) : selectedSport ? (
                     <div className="flex items-center gap-2">
                       <Badge variant="default" className="text-xs bg-green-600">
                         {selectedSport}

@@ -117,7 +117,8 @@ export const bookings = pgTable("bookings", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   customerId: varchar("customer_id").notNull().references(() => users.id),
   courtId: varchar("court_id").notNull().references(() => courts.id),
-  selectedSport: varchar("selected_sport").default("General"), // The specific sport chosen for this booking
+  selectedSport: varchar("selected_sport").default("General"), // The primary sport for display/backwards compatibility
+  sportSegments: jsonb("sport_segments"), // Array of {sport, hour} for multi-sport bookings - e.g., [{sport: "Cricket", hour: 14}, {sport: "Basketball", hour: 15}]
   bookingDate: varchar("booking_date").notNull(),
   timeSlot: varchar("time_slot").notNull(), // e.g., "14:00" - required by database
   startTime: varchar("start_time"), // e.g., "14:00"

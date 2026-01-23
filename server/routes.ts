@@ -446,7 +446,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "Authentication required" });
       }
 
-      const { courtId, date, timeSlot, duration, totalAmount, selectedSport } = req.body;
+      const { courtId, date, timeSlot, duration, totalAmount, selectedSport, sportSegments } = req.body;
       
       if (!courtId || !date || !timeSlot || !duration || !totalAmount) {
         return res.status(400).json({ message: "Missing required booking fields" });
@@ -458,6 +458,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         customerId,
         courtId,
         selectedSport: selectedSport || "General",
+        sportSegments: sportSegments || null, // Array of {hour, sport} for multi-sport bookings
         bookingDate: date,
         timeSlot: timeSlot,
         startTime: timeSlot,
@@ -967,75 +968,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       console.error("Error creating equipment:", error);
       res.status(500).json({ message: "Failed to create equipment" });
-    }
-  });
-
-  // Booking routes
-  app.post("/api/bookings", isAuthenticated, async (req: any, res) => {
-    try {
-      const customerId = req.user?.claims?.sub || req.user?.id;
-      const bookingData = insertBookingSchema.parse(req.body);
-      const booking = await storage.createBooking({ 
-        ...bookingData, 
-        customerId,
-        createdAt: new Date(),
-        updatedAt: new Date()
-      });
-      
-      // Get customer and court details for notifications
-      const customer = await storage.getUser(customerId);
-      const court = await storage.getCourtById(bookingData.courtId);
-      
-      if (customer && court) {
-        // Send comprehensive booking confirmation notifications
-        try {
-          await EnhancedNotificationService.sendBookingConfirmation({
-            bookingId: booking.id,
-            customerId: customer.id,
-            customerEmail: customer.email,
-            customerPhone: customer.phoneNumber || undefined,
-            customerName: `${customer.firstName} ${customer.lastName}`,
-            courtName: court.name,
-            bookingDate: new Date(bookingData.bookingDate).toLocaleDateString('en-KE'),
-            startTime: bookingData.startTime,
-            endTime: bookingData.endTime,
-            totalAmount: bookingData.totalAmount,
-            equipmentRented: bookingData.equipmentIds || []
-          });
-
-          // Send vendor earnings notification
-          const vendor = await storage.getUser(court.vendorId);
-          if (vendor) {
-            const commissionRate = 0.15; // 15% commission
-            const totalAmount = parseFloat(bookingData.totalAmount);
-            const commission = totalAmount * commissionRate;
-            const earnings = totalAmount - commission;
-
-            await EnhancedNotificationService.sendVendorEarningsNotification({
-              vendorId: vendor.id,
-              vendorEmail: vendor.email,
-              vendorName: `${vendor.firstName} ${vendor.lastName}`,
-              courtName: court.name,
-              bookingDate: new Date(bookingData.bookingDate).toLocaleDateString('en-KE'),
-              customerName: `${customer.firstName} ${customer.lastName}`,
-              earnings: earnings.toFixed(2),
-              commission: commission.toFixed(2),
-              bookingId: booking.id
-            });
-          }
-        } catch (notificationError) {
-          console.error('Error sending booking notifications:', notificationError);
-          // Don't fail the booking if notifications fail
-        }
-      }
-      
-      res.status(201).json(booking);
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid booking data", errors: error.errors });
-      }
-      console.error("Error creating booking:", error);
-      res.status(500).json({ message: "Failed to create booking" });
     }
   });
 
