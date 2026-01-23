@@ -1,10 +1,43 @@
-import sgMail from '@sendgrid/mail';
+import { Resend } from 'resend';
 
-if (!process.env.SENDGRID_API_KEYNEW) {
-  throw new Error("SENDGRID_API_KEYNEW environment variable must be set");
+// Resend integration via Replit connector
+let connectionSettings: any;
+
+async function getCredentials() {
+  const hostname = process.env.REPLIT_CONNECTORS_HOSTNAME;
+  const xReplitToken = process.env.REPL_IDENTITY 
+    ? 'repl ' + process.env.REPL_IDENTITY 
+    : process.env.WEB_REPL_RENEWAL 
+    ? 'depl ' + process.env.WEB_REPL_RENEWAL 
+    : null;
+
+  if (!xReplitToken) {
+    throw new Error('X_REPLIT_TOKEN not found for repl/depl');
+  }
+
+  connectionSettings = await fetch(
+    'https://' + hostname + '/api/v2/connection?include_secrets=true&connector_names=resend',
+    {
+      headers: {
+        'Accept': 'application/json',
+        'X_REPLIT_TOKEN': xReplitToken
+      }
+    }
+  ).then(res => res.json()).then(data => data.items?.[0]);
+
+  if (!connectionSettings || (!connectionSettings.settings.api_key)) {
+    throw new Error('Resend not connected');
+  }
+  return {apiKey: connectionSettings.settings.api_key, fromEmail: connectionSettings.settings.from_email};
 }
 
-sgMail.setApiKey(process.env.SENDGRID_API_KEYNEW);
+async function getResendClient() {
+  const { apiKey, fromEmail } = await getCredentials();
+  return {
+    client: new Resend(apiKey),
+    fromEmail: fromEmail || 'hello@sportsbox.in'
+  };
+}
 
 interface EmailTemplate {
   to: string;
@@ -14,24 +47,26 @@ interface EmailTemplate {
 }
 
 export class EmailService {
-  private static fromEmail = 'hello@sportsbox.in';
   private static fromName = 'SportsBox Kenya';
 
   static async sendEmail(template: EmailTemplate): Promise<boolean> {
     try {
-      const msg = {
+      const { client, fromEmail } = await getResendClient();
+      
+      const { data, error } = await client.emails.send({
+        from: `${this.fromName} <${fromEmail}>`,
         to: template.to,
-        from: {
-          email: this.fromEmail,
-          name: this.fromName
-        },
         subject: template.subject,
         html: template.html,
         text: template.text || this.stripHtml(template.html)
-      };
+      });
 
-      await sgMail.send(msg);
-      console.log('Email sent successfully to:', template.to);
+      if (error) {
+        console.error('Email sending failed:', error);
+        return false;
+      }
+
+      console.log('Email sent successfully to:', template.to, 'ID:', data?.id);
       return true;
     } catch (error) {
       console.error('Email sending failed:', error);
