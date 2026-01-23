@@ -1829,6 +1829,140 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Admin seed sample courts for production
+  app.post("/api/admin/seed-courts", requireAdminAuth, async (req: any, res) => {
+    try {
+      const sampleCourts = [
+        {
+          name: "Kenya Nairobi Basketball Court",
+          availableSports: ["Basketball"],
+          city: "Nairobi",
+          area: "Westlands",
+          hourlyRate: "1500.00",
+          peakHourRate: "2000.00",
+          openingTime: "06:30",
+          closingTime: "22:30",
+          availableDays: ["Monday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
+          description: "Premium indoor basketball court with professional flooring",
+          rules: "Please wear proper sports shoes",
+          isActive: true,
+          approvalStatus: "approved" as const,
+          commissionRate: "12.00"
+        },
+        {
+          name: "Mombasa Beach Football Pitch",
+          availableSports: ["Football"],
+          city: "Mombasa",
+          area: "Nyali",
+          hourlyRate: "1200.00",
+          peakHourRate: "1800.00",
+          openingTime: "06:00",
+          closingTime: "21:00",
+          availableDays: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
+          description: "Beautiful beachside football pitch with ocean views",
+          rules: "No metal studs allowed",
+          isActive: true,
+          approvalStatus: "approved" as const,
+          commissionRate: "15.00"
+        },
+        {
+          name: "Kisumu Tennis Club",
+          availableSports: ["Tennis", "Badminton"],
+          city: "Kisumu",
+          area: "Milimani",
+          hourlyRate: "2000.00",
+          peakHourRate: "2500.00",
+          openingTime: "07:00",
+          closingTime: "20:00",
+          availableDays: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
+          description: "Professional tennis courts with excellent lighting",
+          rules: "Proper tennis attire required",
+          isActive: true,
+          approvalStatus: "approved" as const,
+          commissionRate: "14.00"
+        },
+        {
+          name: "Nakuru Multi-Sports Arena",
+          availableSports: ["Football", "Basketball", "Volleyball", "Netball"],
+          city: "Nakuru",
+          area: "Town Centre",
+          hourlyRate: "1800.00",
+          peakHourRate: "2200.00",
+          openingTime: "06:00",
+          closingTime: "22:00",
+          availableDays: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
+          description: "Versatile indoor arena suitable for multiple sports",
+          rules: "Book in advance for peak hours",
+          isActive: true,
+          approvalStatus: "approved" as const,
+          commissionRate: "13.00"
+        },
+        {
+          name: "Eldoret Athletics Track",
+          availableSports: ["Athletics", "Football"],
+          city: "Eldoret",
+          area: "Kipchoge Arena",
+          hourlyRate: "1000.00",
+          peakHourRate: "1500.00",
+          openingTime: "05:00",
+          closingTime: "19:00",
+          availableDays: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
+          description: "World-class athletics track in the home of champions",
+          rules: "Spikes allowed on track only",
+          isActive: true,
+          approvalStatus: "approved" as const,
+          commissionRate: "10.00"
+        },
+        {
+          name: "Nairobi Swimming Complex",
+          availableSports: ["Swimming"],
+          city: "Nairobi",
+          area: "Kasarani",
+          hourlyRate: "800.00",
+          peakHourRate: "1200.00",
+          openingTime: "06:00",
+          closingTime: "21:00",
+          availableDays: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
+          description: "Olympic-sized swimming pool with trained lifeguards",
+          rules: "Swimming cap required",
+          isActive: true,
+          approvalStatus: "approved" as const,
+          commissionRate: "15.00"
+        }
+      ];
+
+      // First, create or get a system vendor user
+      let systemVendor = await storage.getUser("system-vendor");
+      if (!systemVendor) {
+        systemVendor = await storage.upsertUser({
+          id: "system-vendor",
+          email: "vendor@sportsbox.co.ke",
+          firstName: "SportsBox",
+          lastName: "Vendor",
+          userType: "vendor",
+          vendorVerificationStatus: "verified"
+        });
+      }
+
+      const createdCourts = [];
+      for (const courtData of sampleCourts) {
+        const court = await storage.createCourt({
+          ...courtData,
+          vendorId: systemVendor.id
+        });
+        createdCourts.push(court);
+      }
+
+      res.json({ 
+        message: `Successfully seeded ${createdCourts.length} courts`,
+        courts: createdCourts 
+      });
+    } catch (error) {
+      console.error("Error seeding courts:", error);
+      res.status(500).json({ message: "Failed to seed courts" });
+    }
+  });
+
   // Admin delete court
   app.delete("/api/admin/courts/:id", isAuthenticated, async (req: any, res) => {
     try {

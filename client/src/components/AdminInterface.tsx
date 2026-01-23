@@ -872,6 +872,46 @@ export default function AdminInterface() {
         </TabsContent>
 
         <TabsContent value="management" className="mt-6">
+          <div className="mb-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Database className="h-5 w-5" />
+                  Seed Sample Courts
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-gray-600 mb-4">
+                  If no courts are showing on your site, click this button to add sample courts for all major cities in Kenya. 
+                  This creates 6 pre-approved courts that will be immediately visible to users.
+                </p>
+                <Button
+                  onClick={async () => {
+                    try {
+                      const res = await apiRequest("POST", "/api/admin/seed-courts");
+                      const data = await res.json();
+                      toast({
+                        title: "Courts Seeded Successfully",
+                        description: data.message,
+                      });
+                      queryClient.invalidateQueries({ queryKey: ["/api/courts"] });
+                      queryClient.invalidateQueries({ queryKey: ["/api/admin/courts/all"] });
+                    } catch (error) {
+                      toast({
+                        title: "Error",
+                        description: "Failed to seed courts. Please try again.",
+                        variant: "destructive",
+                      });
+                    }
+                  }}
+                  className="w-full sm:w-auto"
+                >
+                  <Database className="h-4 w-4 mr-2" />
+                  Seed Sample Courts
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
           <AdminCourtsManager />
         </TabsContent>
 
