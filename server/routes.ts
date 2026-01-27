@@ -2428,7 +2428,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ==========================================
 
   // Initiate M-Pesa STK Push for SportsBox court booking
-  app.post("/api/mpesa/stkpush/booking", isAuthenticated, async (req, res) => {
+  // Allow unauthenticated requests for guest bookings
+  app.post("/api/mpesa/stkpush/booking", async (req: any, res) => {
     try {
       const { bookingId, phone } = req.body;
       
@@ -2439,6 +2440,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const booking = await storage.getBooking(bookingId);
       if (!booking) {
         return res.status(404).json({ message: "Booking not found" });
+      }
+      
+      // Validate booking ownership: either user's booking or guest booking
+      const customerId = req.user?.claims?.sub || req.user?.id || null;
+      if (!booking.isGuestBooking && booking.customerId !== customerId) {
+        return res.status(403).json({ message: "Unauthorized to pay for this booking" });
       }
       
       if (booking.paymentStatus === "completed") {
@@ -2578,13 +2585,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Query M-Pesa payment status for court booking
-  app.get("/api/mpesa/query/booking/:bookingId", isAuthenticated, async (req, res) => {
+  // Allow unauthenticated requests for guest bookings
+  app.get("/api/mpesa/query/booking/:bookingId", async (req: any, res) => {
     try {
       const { bookingId } = req.params;
       
       const booking = await storage.getBooking(bookingId);
       if (!booking) {
         return res.status(404).json({ message: "Booking not found" });
+      }
+      
+      // Validate booking ownership: either user's booking or guest booking
+      const customerId = req.user?.claims?.sub || req.user?.id || null;
+      if (!booking.isGuestBooking && booking.customerId !== customerId) {
+        return res.status(403).json({ message: "Unauthorized to query this payment" });
       }
       
       if (!booking.mpesaCheckoutRequestId) {
