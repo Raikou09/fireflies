@@ -77,6 +77,15 @@ Preferred communication style: Simple, everyday language.
   - Text search for court names, areas, and descriptions
   - City-based browsing (Nairobi, Mombasa, Kisumu, Nakuru, Eldoret)
 - **Booking System**: Time slot management with real-time availability
+- **Guest Booking Support**: Book courts without creating an account
+  - Name, email, and phone number required for guest checkout
+  - Confirmation emails sent to guest email address
+  - M-Pesa payment via provided phone number
+- **First Booking Discount**: 10% off first booking for signed-up users
+  - Discount calculated and validated server-side
+  - Discount comes from platform commission (vendor receives full share)
+  - One-time use tracked via hasUsedFirstDiscount user field
+  - Signup incentive banner shown to guest users
 - **Payment Integration**: M-Pesa payment method integration
 - **Location Pin Functionality**: Interactive location marking system for vendors
   - GPS-based location detection for automatic positioning

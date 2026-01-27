@@ -439,47 +439,115 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Create booking route
-  app.post("/api/bookings", isAuthenticated, async (req: any, res) => {
+  // Allow both authenticated and guest bookings
+  app.post("/api/bookings", async (req: any, res) => {
     try {
-      const customerId = req.user?.claims?.sub || req.user?.id;
-      if (!customerId) {
-        return res.status(401).json({ message: "Authentication required" });
-      }
-
-      const { courtId, date, timeSlot, duration, totalAmount, selectedSport, sportSegments } = req.body;
+      const { 
+        courtId, date, timeSlot, duration, totalAmount, selectedSport, sportSegments,
+        // Guest booking fields
+        isGuestBooking, guestName, guestEmail, guestPhone
+        // Note: discount fields are NOT accepted from client - calculated server-side
+      } = req.body;
       
+      // Check if user is authenticated
+      const customerId = req.user?.claims?.sub || req.user?.id || null;
+      
+      // Validate required fields
       if (!courtId || !date || !timeSlot || !duration || !totalAmount) {
         return res.status(400).json({ message: "Missing required booking fields" });
+      }
+      
+      // For guest bookings, require guest info
+      if (!customerId && isGuestBooking) {
+        if (!guestName || !guestEmail || !guestPhone) {
+          return res.status(400).json({ message: "Guest name, email, and phone are required for guest bookings" });
+        }
       }
 
       const endTime = `${parseInt(timeSlot.split(':')[0]) + duration}:00`;
       
-      const booking = await storage.createBooking({
-        customerId,
+      // Server-side discount calculation for authenticated users only
+      let serverDiscountAmount = 0;
+      let serverDiscountType: string | null = null;
+      let isEligibleForDiscount = false;
+      
+      if (customerId) {
+        const user = await storage.getUser(customerId);
+        if (user && !user.hasUsedFirstDiscount) {
+          isEligibleForDiscount = true;
+          // Calculate 10% discount server-side
+          serverDiscountAmount = Math.round(Number(totalAmount) * 0.10);
+          serverDiscountType = 'first_booking';
+        }
+      }
+      
+      // Calculate final amount (discount only for eligible authenticated users)
+      const originalAmount = Number(totalAmount);
+      const finalAmount = isEligibleForDiscount ? originalAmount - serverDiscountAmount : originalAmount;
+      
+      // Build booking data
+      const bookingData: any = {
         courtId,
         selectedSport: selectedSport || "General",
-        sportSegments: sportSegments || null, // Array of {hour, sport} for multi-sport bookings
+        sportSegments: sportSegments || null,
         bookingDate: date,
         timeSlot: timeSlot,
         startTime: timeSlot,
         endTime: endTime,
         duration: duration,
-        courtAmount: totalAmount.toString(),
-        totalAmount: totalAmount.toString(),
+        courtAmount: originalAmount.toString(),
+        totalAmount: finalAmount.toString(),
         paymentMethod: "mpesa",
         paymentStatus: "pending",
         status: "confirmed",
-      });
+      };
+      
+      // Handle guest vs authenticated booking
+      if (customerId) {
+        bookingData.customerId = customerId;
+        bookingData.isGuestBooking = false;
+        
+        // Apply first booking discount if eligible (calculated server-side)
+        if (isEligibleForDiscount && serverDiscountAmount > 0) {
+          bookingData.discountAmount = serverDiscountAmount.toString();
+          bookingData.discountType = serverDiscountType;
+          bookingData.originalAmount = originalAmount.toString();
+          
+          // Mark user as having used their first booking discount AFTER validation
+          await storage.updateUser(customerId, { hasUsedFirstDiscount: true });
+        }
+      } else {
+        // Guest booking - no discount available (must sign up to get discount)
+        bookingData.customerId = null;
+        bookingData.isGuestBooking = true;
+        bookingData.guestName = guestName;
+        bookingData.guestEmail = guestEmail;
+        bookingData.guestPhone = guestPhone;
+      }
+      
+      const booking = await storage.createBooking(bookingData);
 
       // Send booking confirmation email
       try {
-        const customer = await storage.getUser(customerId);
         const court = await storage.getCourtById(courtId);
         
-        if (customer?.email && court) {
+        // Determine email recipient and name
+        let recipientEmail: string | undefined;
+        let recipientName: string;
+        
+        if (customerId) {
+          const customer = await storage.getUser(customerId);
+          recipientEmail = customer?.email ?? undefined;
+          recipientName = `${customer?.firstName || ''} ${customer?.lastName || ''}`.trim() || 'Valued Customer';
+        } else {
+          recipientEmail = guestEmail;
+          recipientName = guestName || 'Valued Guest';
+        }
+        
+        if (recipientEmail && court) {
           await EmailService.sendBookingConfirmation({
-            customerEmail: customer.email,
-            customerName: `${customer.firstName || ''} ${customer.lastName || ''}`.trim() || 'Valued Customer',
+            customerEmail: recipientEmail,
+            customerName: recipientName,
             courtName: court.name,
             bookingDate: date,
             startTime: timeSlot,
@@ -487,7 +555,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             totalAmount: totalAmount.toString(),
             bookingId: booking.id,
           });
-          console.log('Booking confirmation email sent to:', customer.email);
+          console.log('Booking confirmation email sent to:', recipientEmail);
         }
       } catch (emailError) {
         console.error('Failed to send booking confirmation email:', emailError);

@@ -5,13 +5,15 @@ import { Calendar } from '@/components/ui/calendar';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { Clock, MapPin, Users, CreditCard, Calendar as CalendarIcon, Package, Smartphone, LogIn } from 'lucide-react';
+import { Clock, MapPin, Users, CreditCard, Calendar as CalendarIcon, Package, Smartphone, LogIn, Gift, User as UserIcon, Mail, Phone } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest } from '@/lib/queryClient';
 import type { CourtWithDetails, User } from '@shared/schema';
 import EquipmentRentalModal from './EquipmentRentalModal';
 import { MpesaPayment } from './MpesaPayment';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 
 interface BookingModalProps {
   court: CourtWithDetails;
@@ -34,6 +36,15 @@ interface BookingData {
   totalAmount: number;
   selectedSport: string;
   sportSegments?: Array<{hour: number, sport: string}>;
+  // Guest booking fields
+  isGuestBooking?: boolean;
+  guestName?: string;
+  guestEmail?: string;
+  guestPhone?: string;
+  // Discount fields
+  discountAmount?: number;
+  discountType?: string;
+  originalAmount?: number;
 }
 
 export function BookingModal({ court, isOpen, onClose }: BookingModalProps) {
@@ -49,6 +60,11 @@ export function BookingModal({ court, isOpen, onClose }: BookingModalProps) {
   const [createdBookingId, setCreatedBookingId] = useState<string | null>(null);
   const [customerPhone, setCustomerPhone] = useState('');
   
+  // Guest booking state
+  const [guestName, setGuestName] = useState('');
+  const [guestEmail, setGuestEmail] = useState('');
+  const [guestPhone, setGuestPhone] = useState('');
+  
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -58,6 +74,10 @@ export function BookingModal({ court, isOpen, onClose }: BookingModalProps) {
   });
 
   const isLoggedIn = !!currentUser && !isLoadingUser;
+  
+  // Check if user is eligible for first booking discount (10% off)
+  const isEligibleForDiscount = isLoggedIn && currentUser && !currentUser.hasUsedFirstDiscount;
+  const discountPercentage = 10; // 10% discount for first booking
 
   // Auto-select sport if only one available
   useEffect(() => {
@@ -277,11 +297,13 @@ export function BookingModal({ court, isOpen, onClose }: BookingModalProps) {
   const selectedSlot = timeSlots.find(slot => slot.time === selectedTimeSlot);
   const maxConsecutiveHours = selectedTimeSlot ? getMaxConsecutiveHours(selectedTimeSlot) : 4;
   
-  // Calculate total amount including equipment
+  // Calculate total amount including equipment and discount
   const courtCost = selectedSlot ? selectedSlot.price * selectedDuration : 0;
   const equipmentCost = selectedEquipment.reduce((total, item) => 
     total + (item.pricePerHour * item.quantity * selectedDuration), 0);
-  const totalAmount = courtCost + equipmentCost;
+  const subtotal = courtCost + equipmentCost;
+  const discountAmount = isEligibleForDiscount ? Math.round(subtotal * discountPercentage / 100) : 0;
+  const totalAmount = subtotal - discountAmount;
 
   // Create booking mutation
   const createBookingMutation = useMutation({
@@ -322,6 +344,34 @@ export function BookingModal({ court, isOpen, onClose }: BookingModalProps) {
   const handleConfirmBooking = () => {
     if (!selectedDate || !selectedTimeSlot || !selectedSport) return;
     
+    // Validate guest info if not logged in
+    if (!isLoggedIn) {
+      if (!guestName.trim()) {
+        toast({
+          title: "Name Required",
+          description: "Please enter your name to continue.",
+          variant: "destructive",
+        });
+        return;
+      }
+      if (!guestEmail.trim() || !guestEmail.includes('@')) {
+        toast({
+          title: "Valid Email Required",
+          description: "Please enter a valid email address.",
+          variant: "destructive",
+        });
+        return;
+      }
+      if (!guestPhone.trim()) {
+        toast({
+          title: "Phone Required",
+          description: "Please enter your phone number for M-Pesa payment.",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+    
     const bookingData: BookingData = {
       courtId: court.id,
       date: selectedDate.toISOString().split('T')[0],
@@ -329,7 +379,16 @@ export function BookingModal({ court, isOpen, onClose }: BookingModalProps) {
       duration: selectedDuration,
       totalAmount,
       selectedSport,
-      sportSegments: sportSegments.length > 0 ? sportSegments : undefined
+      sportSegments: sportSegments.length > 0 ? sportSegments : undefined,
+      // Guest booking fields
+      isGuestBooking: !isLoggedIn,
+      guestName: !isLoggedIn ? guestName : undefined,
+      guestEmail: !isLoggedIn ? guestEmail : undefined,
+      guestPhone: !isLoggedIn ? guestPhone : undefined,
+      // Discount fields
+      discountAmount: discountAmount > 0 ? discountAmount : undefined,
+      discountType: discountAmount > 0 ? 'first_booking' : undefined,
+      originalAmount: discountAmount > 0 ? subtotal : undefined,
     };
     
     createBookingMutation.mutate(bookingData);
@@ -355,6 +414,9 @@ export function BookingModal({ court, isOpen, onClose }: BookingModalProps) {
     setShowMpesaPayment(false);
     setCreatedBookingId(null);
     setCustomerPhone('');
+    setGuestName('');
+    setGuestEmail('');
+    setGuestPhone('');
     onClose();
   };
 
@@ -383,27 +445,53 @@ export function BookingModal({ court, isOpen, onClose }: BookingModalProps) {
           </div>
         </DialogHeader>
 
-        {/* Login Required Message */}
+        {/* Signup Incentive Banner for Guests */}
         {!isLoggedIn && (
-          <div className="flex flex-col items-center justify-center py-12 space-y-4">
-            <div className="bg-amber-50 border border-amber-200 rounded-lg p-6 text-center max-w-md">
-              <LogIn className="h-12 w-12 text-amber-600 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-amber-900 mb-2">Login Required</h3>
-              <p className="text-amber-700 mb-4">
-                Please sign in to book this court. It only takes a moment!
-              </p>
+          <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-lg p-4 mb-4">
+            <div className="flex items-center gap-3">
+              <div className="bg-green-100 rounded-full p-2">
+                <Gift className="h-5 w-5 text-green-600" />
+              </div>
+              <div className="flex-1">
+                <p className="text-sm font-medium text-green-800">
+                  Sign up and get 10% off your first booking!
+                </p>
+                <p className="text-xs text-green-600">
+                  Create an account to unlock exclusive discounts
+                </p>
+              </div>
               <Button 
+                variant="outline"
+                size="sm"
                 onClick={() => window.location.href = '/api/login'}
-                className="bg-amber-600 hover:bg-amber-700 text-white"
+                className="border-green-500 text-green-700 hover:bg-green-100"
               >
-                <LogIn className="h-4 w-4 mr-2" />
-                Sign In to Continue
+                <LogIn className="h-3 w-3 mr-1" />
+                Sign Up
               </Button>
             </div>
           </div>
         )}
 
-        {isLoggedIn && (
+        {/* First Booking Discount Badge for Logged-in Users */}
+        {isEligibleForDiscount && (
+          <div className="bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-200 rounded-lg p-4 mb-4">
+            <div className="flex items-center gap-3">
+              <div className="bg-purple-100 rounded-full p-2">
+                <Gift className="h-5 w-5 text-purple-600" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-purple-800">
+                  10% First Booking Discount Applied!
+                </p>
+                <p className="text-xs text-purple-600">
+                  Welcome bonus - your discount will be shown in the total
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
           {/* Main Booking Section */}
           <div className="lg:col-span-2 space-y-6">
@@ -615,6 +703,62 @@ export function BookingModal({ court, isOpen, onClose }: BookingModalProps) {
 
             {step === 'payment' && (
               <div className="space-y-6">
+                {/* Guest Info Form (only show if not logged in) */}
+                {!isLoggedIn && (
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-semibold flex items-center gap-2">
+                      <UserIcon className="h-5 w-5" />
+                      Your Details
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="guestName">Full Name *</Label>
+                        <div className="relative">
+                          <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                          <Input
+                            id="guestName"
+                            placeholder="John Doe"
+                            value={guestName}
+                            onChange={(e) => setGuestName(e.target.value)}
+                            className="pl-10"
+                            data-testid="input-guest-name"
+                          />
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="guestEmail">Email *</Label>
+                        <div className="relative">
+                          <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                          <Input
+                            id="guestEmail"
+                            type="email"
+                            placeholder="john@example.com"
+                            value={guestEmail}
+                            onChange={(e) => setGuestEmail(e.target.value)}
+                            className="pl-10"
+                            data-testid="input-guest-email"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="guestPhone">Phone Number (for M-Pesa) *</Label>
+                      <div className="relative">
+                        <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                        <Input
+                          id="guestPhone"
+                          placeholder="254712345678"
+                          value={guestPhone}
+                          onChange={(e) => setGuestPhone(e.target.value)}
+                          className="pl-10"
+                          data-testid="input-guest-phone"
+                        />
+                      </div>
+                      <p className="text-xs text-gray-500">Enter your M-Pesa registered number (e.g., 254712345678)</p>
+                    </div>
+                  </div>
+                )}
+
                 <h3 className="text-lg font-semibold">Payment Method</h3>
                 
                 {/* Payment Options */}
@@ -757,7 +901,7 @@ export function BookingModal({ court, isOpen, onClose }: BookingModalProps) {
                     </div>
                   )}
 
-                  {totalAmount > 0 && (
+                  {subtotal > 0 && (
                     <>
                       <Separator />
                       <div className="space-y-2">
@@ -779,11 +923,29 @@ export function BookingModal({ court, isOpen, onClose }: BookingModalProps) {
                             <span>KSh {equipmentCost}</span>
                           </div>
                         )}
+                        {discountAmount > 0 && (
+                          <>
+                            <div className="flex justify-between text-sm">
+                              <span>Subtotal</span>
+                              <span>KSh {subtotal}</span>
+                            </div>
+                            <div className="flex justify-between text-sm text-green-600 font-medium">
+                              <span className="flex items-center gap-1">
+                                <Gift className="h-3 w-3" />
+                                First Booking Discount (10%)
+                              </span>
+                              <span>-KSh {discountAmount}</span>
+                            </div>
+                          </>
+                        )}
                         <Separator />
                         <div className="flex justify-between font-semibold">
                           <span>Total</span>
-                          <span>KSh {totalAmount}</span>
+                          <span className={discountAmount > 0 ? 'text-green-600' : ''}>KSh {totalAmount}</span>
                         </div>
+                        {discountAmount > 0 && (
+                          <p className="text-xs text-green-600">You're saving KSh {discountAmount}!</p>
+                        )}
                       </div>
                     </>
                   )}
@@ -798,7 +960,6 @@ export function BookingModal({ court, isOpen, onClose }: BookingModalProps) {
             </Card>
           </div>
         </div>
-        )}
       </DialogContent>
       
       {/* Equipment Rental Modal */}
