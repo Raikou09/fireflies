@@ -65,6 +65,9 @@ export const users = pgTable("users", {
   rejectionReason: text("rejection_reason"), // Reason for rejection if applicable
   verificationDate: timestamp("verification_date"), // Date when verified/rejected
   
+  // First booking discount tracking
+  hasUsedFirstDiscount: boolean("has_used_first_discount").default(false), // Track if user has used their 10% signup discount
+  
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -115,7 +118,7 @@ export const equipment = pgTable("equipment", {
 
 export const bookings = pgTable("bookings", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  customerId: varchar("customer_id").notNull().references(() => users.id),
+  customerId: varchar("customer_id").references(() => users.id), // Nullable for guest bookings
   courtId: varchar("court_id").notNull().references(() => courts.id),
   selectedSport: varchar("selected_sport").default("General"), // The primary sport for display/backwards compatibility
   sportSegments: jsonb("sport_segments"), // Array of {sport, hour} for multi-sport bookings - e.g., [{sport: "Cricket", hour: 14}, {sport: "Basketball", hour: 15}]
@@ -130,6 +133,18 @@ export const bookings = pgTable("bookings", {
   equipmentRentals: jsonb("equipment_rentals"), // Array of {equipmentId, quantity, duration, price}
   customerPhone: varchar("customer_phone"),
   customerEmail: varchar("customer_email"),
+  
+  // Guest booking fields
+  isGuestBooking: boolean("is_guest_booking").default(false),
+  guestName: varchar("guest_name"),
+  guestEmail: varchar("guest_email"),
+  guestPhone: varchar("guest_phone"),
+  
+  // Discount fields
+  discountAmount: decimal("discount_amount", { precision: 10, scale: 2 }).default("0.00"), // Amount discounted
+  discountType: varchar("discount_type"), // "first_booking" or null
+  originalAmount: decimal("original_amount", { precision: 10, scale: 2 }), // Amount before discount
+  
   paymentMethod: varchar("payment_method", { enum: ["mpesa", "card"] }).default("mpesa"),
   paymentStatus: varchar("payment_status", { enum: ["pending", "completed", "failed"] }).default("pending"),
   mpesaReceiptNumber: varchar("mpesa_receipt_number"),
