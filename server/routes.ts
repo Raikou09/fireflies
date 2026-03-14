@@ -1,5 +1,6 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
+import multer from "multer";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 // import { setupGoogleAuth } from "./googleAuth"; // Disabled - using Replit Auth instead
@@ -297,6 +298,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error generating upload URL:', error);
       res.status(500).json({ error: 'Failed to generate upload URL', message: error.message });
+    }
+  });
+
+  const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
+
+  app.post("/api/objects/upload-file", isAuthenticated, upload.single("file"), async (req: any, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: "No file provided" });
+      }
+
+      const objectStorageService = new ObjectStorageService();
+      const { randomUUID } = await import("crypto");
+      const objectId = randomUUID();
+      const privateObjectDir = objectStorageService.getPrivateObjectDir();
+      const fullPath = `${privateObjectDir}/uploads/${objectId}`;
+
+      const pathParts = fullPath.startsWith("/") ? fullPath.split("/") : `/${fullPath}`.split("/");
+      const bucketName = pathParts[1];
+      const objectName = pathParts.slice(2).join("/");
+
+      const { objectStorageClient } = await import("./objectStorage");
+      const bucket = objectStorageClient.bucket(bucketName);
+      const file = bucket.file(objectName);
+
+      await file.save(req.file.buffer, {
+        contentType: req.file.mimetype,
+        resumable: false,
+      });
+
+      const servingUrl = `/objects/uploads/${objectId}`;
+      res.json({ url: servingUrl });
+    } catch (error: any) {
+      console.error("Error uploading file:", error);
+      res.status(500).json({ error: "Failed to upload file", message: error.message });
     }
   });
 

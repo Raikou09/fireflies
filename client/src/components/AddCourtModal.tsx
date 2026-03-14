@@ -10,10 +10,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { apiRequest } from "@/lib/queryClient";
-import { ObjectUploader } from "./ObjectUploader";
 import { LocationPicker } from "./LocationPicker";
-import type { UploadResult } from "@uppy/core";
-import { CloudUpload, X, Info, Package, Plus, Trash2 } from "lucide-react";
+import { CloudUpload, X, Info, Package, Plus, Trash2, Loader2 } from "lucide-react";
 
 interface CourtData {
   id: string;
@@ -131,13 +129,17 @@ export default function AddCourtModal({ isOpen, onClose, courtToEdit }: AddCourt
       return response.json();
     },
     onSuccess: () => {
-      toast({
-        title: "Court Updated Successfully!",
-        description: "Your court details have been updated.",
-      });
-      queryClient.invalidateQueries({ queryKey: ["/api/vendor/courts"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/courts"] });
-      onClose();
+      if (imageUrl && courtToEdit?.id) {
+        imageUpdateMutation.mutate({ courtId: courtToEdit.id, imageURL: imageUrl });
+      } else {
+        toast({
+          title: "Court Updated Successfully!",
+          description: "Your court details have been updated.",
+        });
+        queryClient.invalidateQueries({ queryKey: ["/api/vendor/courts"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/courts"] });
+        onClose();
+      }
     },
     onError: (error: any) => {
       if (isUnauthorizedError(error)) {
@@ -385,23 +387,41 @@ export default function AddCourtModal({ isOpen, onClose, courtToEdit }: AddCourt
     }
   };
 
-  const getUploadParameters = async () => {
-    const response = await apiRequest("POST", "/api/objects/upload", {});
-    const data = await response.json();
-    return {
-      method: "PUT" as const,
-      url: data.uploadURL,
-    };
-  };
+  const [isUploading, setIsUploading] = useState(false);
 
-  const handleUploadComplete = (result: UploadResult<Record<string, unknown>, Record<string, unknown>>) => {
-    if (result.successful && result.successful.length > 0) {
-      const uploadedFile = result.successful[0];
-      setImageUrl(uploadedFile.uploadURL as string);
-      toast({
-        title: "Image Uploaded",
-        description: "Court image has been uploaded successfully.",
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 10 * 1024 * 1024) {
+      toast({ title: "File too large", description: "Maximum file size is 10MB.", variant: "destructive" });
+      return;
+    }
+
+    setIsUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const response = await fetch("/api/objects/upload-file", {
+        method: "POST",
+        body: formData,
+        credentials: "include",
       });
+
+      if (!response.ok) {
+        throw new Error("Upload failed");
+      }
+
+      const data = await response.json();
+      setImageUrl(data.url);
+      toast({ title: "Image Uploaded", description: "Court image has been uploaded successfully." });
+    } catch (error) {
+      console.error("Upload error:", error);
+      toast({ title: "Upload Failed", description: "Failed to upload image. Please try again.", variant: "destructive" });
+    } finally {
+      setIsUploading(false);
+      e.target.value = "";
     }
   };
 
@@ -623,16 +643,24 @@ export default function AddCourtModal({ isOpen, onClose, courtToEdit }: AddCourt
             <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
               <CloudUpload className="h-12 w-12 text-gray-400 mx-auto mb-4" />
               <p className="text-gray-600 mb-2">Upload court photos</p>
-              <p className="text-sm text-gray-500 mb-4">Drag and drop or click to select files</p>
-              <ObjectUploader
-                maxNumberOfFiles={1}
-                maxFileSize={10485760} // 10MB
-                onGetUploadParameters={getUploadParameters}
-                onComplete={handleUploadComplete}
-                buttonClassName="bg-primary text-white hover:bg-green-700"
-              >
-                Choose Files
-              </ObjectUploader>
+              <p className="text-sm text-gray-500 mb-4">Max file size: 10MB</p>
+              <label className="inline-flex items-center gap-2 cursor-pointer bg-primary text-white hover:bg-green-700 px-4 py-2 rounded-md text-sm font-medium">
+                {isUploading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Uploading...
+                  </>
+                ) : (
+                  "Choose File"
+                )}
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleFileUpload}
+                  disabled={isUploading}
+                />
+              </label>
               {imageUrl && (
                 <p className="text-sm text-green-600 mt-2">Image uploaded successfully!</p>
               )}
