@@ -115,6 +115,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ...validatedData
       });
 
+      try {
+        const vendorName = `${validatedData.firstName || ''} ${validatedData.lastName || ''}`.trim() || 'Vendor';
+        const businessName = validatedData.businessName || 'Unknown Business';
+        const vendorEmail = user.email || '';
+
+        await Promise.all([
+          EmailService.sendNewVendorAlertToAdmin({ vendorName, businessName, vendorEmail }),
+          vendorEmail ? EmailService.sendVendorApplicationReceived({ vendorEmail, vendorName, businessName }) : Promise.resolve(false)
+        ]);
+      } catch (emailError) {
+        console.warn('Failed to send vendor onboarding emails:', emailError);
+      }
+
       res.json(updatedUser);
     } catch (error) {
       console.error("Error during vendor onboarding:", error);
@@ -1735,6 +1748,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!updatedVendor) {
         return res.status(404).json({ message: "Vendor not found" });
       }
+
+      try {
+        const vendorEmail = updatedVendor.email || '';
+        const vendorName = `${updatedVendor.firstName || ''} ${updatedVendor.lastName || ''}`.trim() || 'Vendor';
+        if (vendorEmail) {
+          await EmailService.sendVendorApproved({ vendorEmail, vendorName });
+        }
+      } catch (emailError) {
+        console.warn('Failed to send vendor approval email:', emailError);
+      }
+
       res.json({ message: "Vendor approved successfully", vendor: updatedVendor });
     } catch (error) {
       console.error("Error approving vendor:", error);
@@ -1750,6 +1774,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!updatedVendor) {
         return res.status(404).json({ message: "Vendor not found" });
       }
+
+      try {
+        const vendorEmail = updatedVendor.email || '';
+        const vendorName = `${updatedVendor.firstName || ''} ${updatedVendor.lastName || ''}`.trim() || 'Vendor';
+        if (vendorEmail) {
+          await EmailService.sendVendorRejected({ vendorEmail, vendorName, reason });
+        }
+      } catch (emailError) {
+        console.warn('Failed to send vendor rejection email:', emailError);
+      }
+
       res.json({ message: "Vendor rejected successfully", vendor: updatedVendor });
     } catch (error) {
       console.error("Error rejecting vendor:", error);

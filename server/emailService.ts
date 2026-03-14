@@ -307,6 +307,192 @@ export class EmailService {
     return this.sendEmail(template);
   }
 
+  static async sendNewVendorAlertToAdmin(params: {
+    vendorName: string;
+    businessName: string;
+    vendorEmail: string;
+  }): Promise<boolean> {
+    const adminEmail = process.env.ADMIN_EMAIL;
+    if (!adminEmail) {
+      console.warn('ADMIN_EMAIL not set, skipping admin notification');
+      return false;
+    }
+
+    const template: EmailTemplate = {
+      to: adminEmail,
+      subject: `New Vendor Application - ${params.businessName}`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <div style="background: #2563eb; color: white; padding: 20px; text-align: center;">
+            <h1>🏀 SportsBox Kenya</h1>
+            <h2>New Vendor Application</h2>
+          </div>
+          
+          <div style="padding: 20px; background: #f9f9f9;">
+            <h3>Hello Admin,</h3>
+            <p>A new vendor has submitted an onboarding application and is waiting for your approval.</p>
+            
+            <div style="background: white; padding: 15px; border-radius: 8px; margin: 20px 0;">
+              <h4 style="color: #2563eb; margin-top: 0;">Vendor Details</h4>
+              <p><strong>Name:</strong> ${params.vendorName}</p>
+              <p><strong>Business Name:</strong> ${params.businessName}</p>
+              <p><strong>Email:</strong> ${params.vendorEmail}</p>
+            </div>
+            
+            <p>Please review this application in the admin dashboard at your earliest convenience.</p>
+            
+            <div style="text-align: center; margin-top: 30px;">
+              <a href="https://sportsbox.co.ke/admin" style="background: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;">Go to Admin Dashboard</a>
+            </div>
+          </div>
+          
+          <div style="background: #333; color: white; padding: 15px; text-align: center; font-size: 14px;">
+            <p>SportsBox Kenya - Admin Notification</p>
+            <p>Email: admin@sportsbox.co.ke | Phone: +254 700 000 000</p>
+          </div>
+        </div>
+      `
+    };
+
+    return this.sendEmail(template);
+  }
+
+  static async sendVendorApplicationReceived(params: {
+    vendorEmail: string;
+    vendorName: string;
+    businessName: string;
+  }): Promise<boolean> {
+    const template: EmailTemplate = {
+      to: params.vendorEmail,
+      subject: `Application Received - ${params.businessName}`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <div style="background: #16a34a; color: white; padding: 20px; text-align: center;">
+            <h1>🏀 SportsBox Kenya</h1>
+            <h2>Application Received</h2>
+          </div>
+          
+          <div style="padding: 20px; background: #f9f9f9;">
+            <h3>Hello ${params.vendorName},</h3>
+            <p>Thank you for submitting your vendor application for <strong>${params.businessName}</strong>!</p>
+            
+            <div style="background: #dcfce7; padding: 15px; border-radius: 8px; margin: 20px 0;">
+              <h4 style="color: #16a34a; margin-top: 0;">What Happens Next?</h4>
+              <ul>
+                <li>Our team will review your application</li>
+                <li>You will receive an email once a decision has been made</li>
+                <li>Review typically takes 1-2 business days</li>
+              </ul>
+            </div>
+            
+            <p>If you have any questions in the meantime, feel free to reach out to our support team.</p>
+          </div>
+          
+          <div style="background: #333; color: white; padding: 15px; text-align: center; font-size: 14px;">
+            <p>SportsBox Kenya - Empowering Sports Venue Owners</p>
+            <p>Email: vendor@sportsbox.co.ke | Phone: +254 700 000 000</p>
+          </div>
+        </div>
+      `
+    };
+
+    return this.sendEmail(template);
+  }
+
+  static async sendVendorApproved(params: {
+    vendorEmail: string;
+    vendorName: string;
+  }): Promise<boolean> {
+    const template: EmailTemplate = {
+      to: params.vendorEmail,
+      subject: `Account Approved - Welcome to SportsBox Kenya!`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <div style="background: #16a34a; color: white; padding: 20px; text-align: center;">
+            <h1>🏀 SportsBox Kenya</h1>
+            <h2>Account Approved!</h2>
+          </div>
+          
+          <div style="padding: 20px; background: #f9f9f9;">
+            <h3>Hello ${params.vendorName},</h3>
+            <p>Great news! Your vendor account has been approved. You can now list your venues on SportsBox Kenya.</p>
+            
+            <div style="background: #dcfce7; padding: 15px; border-radius: 8px; margin: 20px 0;">
+              <h4 style="color: #16a34a; margin-top: 0;">Get Started</h4>
+              <ul>
+                <li>Log into your vendor dashboard</li>
+                <li>Add your courts and venues</li>
+                <li>Set pricing and availability</li>
+                <li>Start receiving bookings</li>
+              </ul>
+            </div>
+            
+            <div style="text-align: center; margin-top: 30px;">
+              <a href="https://sportsbox.co.ke/vendor" style="background: #16a34a; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;">Go to Vendor Dashboard</a>
+            </div>
+          </div>
+          
+          <div style="background: #333; color: white; padding: 15px; text-align: center; font-size: 14px;">
+            <p>SportsBox Kenya - Empowering Sports Venue Owners</p>
+            <p>Email: vendor@sportsbox.co.ke | Phone: +254 700 000 000</p>
+          </div>
+        </div>
+      `
+    };
+
+    return this.sendEmail(template);
+  }
+
+  static async sendVendorRejected(params: {
+    vendorEmail: string;
+    vendorName: string;
+    reason?: string;
+  }): Promise<boolean> {
+    const template: EmailTemplate = {
+      to: params.vendorEmail,
+      subject: `Vendor Application Update - SportsBox Kenya`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <div style="background: #dc2626; color: white; padding: 20px; text-align: center;">
+            <h1>🏀 SportsBox Kenya</h1>
+            <h2>Application Not Approved</h2>
+          </div>
+          
+          <div style="padding: 20px; background: #f9f9f9;">
+            <h3>Hello ${params.vendorName},</h3>
+            <p>We regret to inform you that your vendor application has not been approved at this time.</p>
+            
+            ${params.reason ? `
+            <div style="background: #fee2e2; padding: 15px; border-radius: 8px; margin: 20px 0;">
+              <h4 style="color: #dc2626; margin-top: 0;">Reason</h4>
+              <p>${params.reason}</p>
+            </div>
+            ` : ''}
+            
+            <div style="background: #fef3c7; padding: 15px; border-radius: 8px; margin: 20px 0;">
+              <h4 style="color: #d97706; margin-top: 0;">What You Can Do</h4>
+              <ul>
+                <li>Review the feedback provided above</li>
+                <li>Update your application details</li>
+                <li>Contact our support team for more information</li>
+                <li>Reapply once the issues have been addressed</li>
+              </ul>
+            </div>
+            
+            <p>If you believe this decision was made in error or have questions, please contact our support team.</p>
+          </div>
+          
+          <div style="background: #333; color: white; padding: 15px; text-align: center; font-size: 14px;">
+            <p>SportsBox Kenya - Empowering Sports Venue Owners</p>
+            <p>Email: vendor@sportsbox.co.ke | Phone: +254 700 000 000</p>
+          </div>
+        </div>
+      `
+    };
+
+    return this.sendEmail(template);
+  }
+
   private static stripHtml(html: string): string {
     return html.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
   }
