@@ -513,7 +513,6 @@ export default function AdminInterface() {
                       <div>
                         <h4 className="font-medium mb-2 text-blue-700">Personal Information</h4>
                         <div className="text-sm text-gray-600 space-y-1">
-                          {vendor.nationalId && <p><strong>National ID:</strong> {vendor.nationalId}</p>}
                           {vendor.alternatePhoneNumber && <p><strong>Alt. Phone:</strong> {vendor.alternatePhoneNumber}</p>}
                           {vendor.emergencyContactName && <p><strong>Emergency Contact:</strong> {vendor.emergencyContactName}</p>}
                           {vendor.emergencyContactPhone && <p><strong>Emergency Phone:</strong> {vendor.emergencyContactPhone}</p>}
@@ -541,18 +540,6 @@ export default function AdminInterface() {
                       <div>
                         <h4 className="font-medium mb-2 text-orange-700">Required Documents</h4>
                         <div className="text-sm space-y-2">
-                          {vendor.nationalIdDocument && (
-                            <a 
-                              href={vendor.nationalIdDocument} 
-                              target="_blank" 
-                              rel="noopener noreferrer"
-                              className="flex items-center gap-2 text-blue-600 hover:text-blue-800"
-                              data-testid={`link-national-id-${vendor.id}`}
-                            >
-                              <FileText className="h-4 w-4" />
-                              National ID
-                            </a>
-                          )}
                           {vendor.businessLicense && (
                             <a 
                               href={vendor.businessLicense} 
@@ -575,18 +562,6 @@ export default function AdminInterface() {
                             >
                               <FileText className="h-4 w-4" />
                               Tax Certificate
-                            </a>
-                          )}
-                          {vendor.bankStatement && (
-                            <a 
-                              href={vendor.bankStatement} 
-                              target="_blank" 
-                              rel="noopener noreferrer"
-                              className="flex items-center gap-2 text-blue-600 hover:text-blue-800"
-                              data-testid={`link-bank-statement-${vendor.id}`}
-                            >
-                              <FileText className="h-4 w-4" />
-                              Bank Statement
                             </a>
                           )}
                         </div>

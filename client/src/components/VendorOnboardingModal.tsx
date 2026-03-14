@@ -48,7 +48,6 @@ export default function VendorOnboardingModal({ isOpen, onClose }: VendorOnboard
     defaultValues: {
       phoneNumber: "",
       alternatePhoneNumber: "",
-      nationalId: "",
       businessName: "",
       businessAddress: "",
       businessType: "Individual" as const,
@@ -60,10 +59,8 @@ export default function VendorOnboardingModal({ isOpen, onClose }: VendorOnboard
       bankAccountName: "",
       mpesaNumber: "",
       paymentPreference: "mpesa" as const,
-      nationalIdDocument: "",
       businessLicense: "",
       taxCertificate: "",
-      bankStatement: "",
     },
   });
 
@@ -295,24 +292,6 @@ export default function VendorOnboardingModal({ isOpen, onClose }: VendorOnboard
                   )}
                 />
 
-
-                <FormField
-                  control={form.control}
-                  name="nationalId"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>National ID Number</FormLabel>
-                      <FormControl>
-                        <Input 
-                          placeholder="12345678" 
-                          {...field} 
-                          data-testid="input-national-id"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
 
                 <FormField
                   control={form.control}
@@ -558,22 +537,6 @@ export default function VendorOnboardingModal({ isOpen, onClose }: VendorOnboard
                 <p className="text-sm text-gray-600">Upload supporting documents for verification. You can choose which documents to provide. All documents must be clear and readable.</p>
               </CardHeader>
               <CardContent className="space-y-6">
-                <DocumentUpload
-                  documentType="nationalIdDocument"
-                  label="National ID"
-                  required={false}
-                  description="Upload a clear photo or scan of your National ID (both sides if needed). Accepted formats: PDF, JPG, PNG (Max 5MB)"
-                />
-                
-                {(paymentPreference === "bank" || paymentPreference === "both") && (
-                  <DocumentUpload
-                    documentType="bankStatement"
-                    label="Bank Statement"
-                    required={false}
-                    description="Upload a recent bank statement (not older than 3 months) showing your account details. Optional supporting document. Accepted formats: PDF, JPG, PNG (Max 5MB)"
-                  />
-                )}
-                
                 <DocumentUpload
                   documentType="businessLicense"
                   label="Business License/Registration Certificate"

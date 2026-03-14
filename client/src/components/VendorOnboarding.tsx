@@ -103,7 +103,6 @@ export default function VendorOnboarding({ isOpen, onClose, existingData, isEdit
     defaultValues: {
       phoneNumber: existingData?.phoneNumber || "",
       alternatePhoneNumber: existingData?.alternatePhoneNumber || "",
-      nationalId: existingData?.nationalId || "",
       businessName: existingData?.businessName || "",
       businessAddress: existingData?.businessAddress || "",
       businessType: existingData?.businessType || "Individual",
@@ -115,10 +114,8 @@ export default function VendorOnboarding({ isOpen, onClose, existingData, isEdit
       bankAccountName: existingData?.bankAccountName || "",
       mpesaNumber: existingData?.mpesaNumber || "",
       paymentPreference: existingData?.paymentPreference || "mpesa",
-      nationalIdDocument: existingData?.nationalIdDocument || "",
       businessLicense: existingData?.businessLicense || "",
       taxCertificate: existingData?.taxCertificate || "",
-      bankStatement: existingData?.bankStatement || "",
     },
   });
 
@@ -132,10 +129,8 @@ export default function VendorOnboarding({ isOpen, onClose, existingData, isEdit
       });
       // Set uploaded docs for existing documents
       const docs: {[key: string]: string} = {};
-      if (existingData.nationalIdDocument) docs.nationalIdDocument = existingData.nationalIdDocument;
       if (existingData.businessLicense) docs.businessLicense = existingData.businessLicense;
       if (existingData.taxCertificate) docs.taxCertificate = existingData.taxCertificate;
-      if (existingData.bankStatement) docs.bankStatement = existingData.bankStatement;
       setUploadedDocs(docs);
       
       // When editing, mark all steps as completed so user can navigate freely
@@ -262,13 +257,9 @@ export default function VendorOnboarding({ isOpen, onClose, existingData, isEdit
     
     switch (stepId) {
       case "basic":
-        // Required: phone number and national ID
+        // Required: phone number
         if (!values.phoneNumber || values.phoneNumber.trim() === "") {
           form.setError("phoneNumber", { message: "Phone number is required" });
-          return false;
-        }
-        if (!values.nationalId || values.nationalId.trim() === "") {
-          form.setError("nationalId", { message: "National ID is required" });
           return false;
         }
         // Basic phone validation
@@ -501,19 +492,6 @@ export default function VendorOnboarding({ isOpen, onClose, existingData, isEdit
               />
             </div>
 
-            <FormField
-              control={form.control}
-              name="nationalId"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>National ID Number <span className="text-red-500">*</span></FormLabel>
-                  <FormControl>
-                    <Input placeholder="Enter your national ID number" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
           </motion.div>
         );
 
@@ -795,10 +773,8 @@ export default function VendorOnboarding({ isOpen, onClose, existingData, isEdit
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {[
-                { key: "nationalIdDocument", label: "National ID Copy", required: true },
                 { key: "businessLicense", label: "Business License", required: false },
                 { key: "taxCertificate", label: "Tax Certificate (KRA)", required: false },
-                { key: "bankStatement", label: "Bank Statement", required: false },
               ].map((doc) => (
                 <div 
                   key={doc.key}

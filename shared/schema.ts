@@ -593,7 +593,6 @@ export const vendorOnboardingSchema = z.object({
   // Personal Information (Required)
   phoneNumber: z.string().min(10, "Phone number must be at least 10 digits"),
   alternatePhoneNumber: z.string().optional(),
-  nationalId: z.string().min(1, "National ID is required"),
   
   // Business Information (Required)
   businessName: z.string().min(2, "Business name must be at least 2 characters"),
@@ -616,10 +615,8 @@ export const vendorOnboardingSchema = z.object({
   paymentPreference: z.enum(["bank", "mpesa", "both"]),
   
   // Optional Documents for verification
-  nationalIdDocument: z.string().optional(),
   businessLicense: z.string().optional(),
   taxCertificate: z.string().optional(),
-  bankStatement: z.string().optional(),
 }).refine(
   (data) => {
     if (data.paymentPreference === "bank" || data.paymentPreference === "both") {

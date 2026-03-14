@@ -198,11 +198,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         canCreate,
         userType: user.userType,
         verificationStatus: user.vendorVerificationStatus,
-        hasNationalId: !!user.nationalIdDocument,
-        hasBankStatement: !!user.bankStatement,
         hasBusinessLicense: !!user.businessLicense,
-        hasRequiredDocuments: !!user.nationalIdDocument && 
-          (user.paymentPreference !== "bank" && user.paymentPreference !== "both" || !!user.bankStatement)
       };
       
       res.json({ ...verificationDetails, user });
@@ -228,21 +224,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const missingRequirements = [];
       
-      // Check document requirements
-      if (!user.nationalIdDocument) {
-        missingRequirements.push("National ID document");
-      }
-      
-      if ((user.paymentPreference === "bank" || user.paymentPreference === "both") && !user.bankStatement) {
-        missingRequirements.push("Bank statement");
-      }
-      
       // Check basic info requirements
       if (!user.phoneNumber) missingRequirements.push("Phone number");
       if (!user.businessName) missingRequirements.push("Business name");
       if (!user.businessAddress) missingRequirements.push("Business address");
       if (!user.kraPin) missingRequirements.push("KRA PIN");
-      if (!user.nationalId) missingRequirements.push("National ID number");
 
       const verificationStatus = {
         status: user.vendorVerificationStatus,
@@ -250,8 +236,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         isComplete: missingRequirements.length === 0,
         missingRequirements,
         documentsUploaded: {
-          nationalId: !!user.nationalIdDocument,
-          bankStatement: !!user.bankStatement,
           businessLicense: !!user.businessLicense
         }
       };
@@ -965,21 +949,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           message: statusMessages[vendor.vendorVerificationStatus as keyof typeof statusMessages] || "Vendor verification required.",
           code: "NOT_VERIFIED",
           verificationStatus: vendor.vendorVerificationStatus
-        });
-      }
-      
-      // Additional document verification check
-      const missingDocs = [];
-      if (!vendor.nationalIdDocument) missingDocs.push("National ID");
-      if ((vendor.paymentPreference === "bank" || vendor.paymentPreference === "both") && !vendor.bankStatement) {
-        missingDocs.push("Bank statement");
-      }
-      
-      if (missingDocs.length > 0) {
-        return res.status(403).json({
-          message: `Missing required documents: ${missingDocs.join(", ")}. Please complete your verification.`,
-          code: "MISSING_DOCUMENTS",
-          missingDocuments: missingDocs
         });
       }
       
