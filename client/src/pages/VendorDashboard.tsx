@@ -674,8 +674,6 @@ export default function VendorDashboard() {
                     <div className="flex gap-2">
                       <button
                         onClick={() => {
-                          alert('BUTTON WORKING!');
-                          console.log('DIRECT CLICK - Court:', court);
                           setCourtToUpdate(court);
                         }}
                         style={{
@@ -1217,21 +1215,6 @@ export default function VendorDashboard() {
             </div>
           </TabsContent>
         </Tabs>
-      </div>
-      
-      {/* Debug Info */}
-      <div style={{ 
-        position: 'fixed', 
-        top: '10px', 
-        right: '10px', 
-        backgroundColor: 'yellow', 
-        padding: '5px', 
-        fontSize: '12px',
-        zIndex: 10000 
-      }}>
-        Modal State: {courtToUpdate ? 'OPEN' : 'CLOSED'}
-        <br />
-        Court: {courtToUpdate?.name || 'None'}
       </div>
       
       {/* Modals */}

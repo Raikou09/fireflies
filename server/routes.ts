@@ -970,7 +970,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.put("/api/courts/:id", isAuthenticated, async (req: any, res) => {
     try {
-      const vendorId = req.user.claims.sub;
+      const vendorId = req.user?.claims?.sub || req.user?.id;
       const courtData = insertCourtSchema.partial().parse(req.body);
       const court = await storage.updateCourt(req.params.id, vendorId, courtData);
       if (!court) {

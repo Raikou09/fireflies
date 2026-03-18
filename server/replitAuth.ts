@@ -60,7 +60,13 @@ async function upsertUser(
 ) {
   // Check if user already exists to preserve their userType
   const existingUser = await storage.getUserByEmail(claims["email"]);
-  
+
+  // If there's an existing user with a DIFFERENT id (pre-existing vendor with old ID),
+  // migrate their court ownership to the new Replit Auth ID before upserting.
+  if (existingUser && existingUser.id !== claims["sub"]) {
+    await storage.migrateVendorId(existingUser.id, claims["sub"]);
+  }
+
   await storage.upsertUser({
     id: claims["sub"],
     email: claims["email"],

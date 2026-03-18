@@ -75,6 +75,7 @@ export interface IStorage {
   updateCourt(id: string, vendorId: string, court: Partial<InsertCourt>): Promise<Court | undefined>;
   updateCourtDetails(id: string, vendorId: string, updates: Partial<InsertCourt>): Promise<Court | undefined>;
   deleteCourt(id: string, vendorId: string): Promise<boolean>;
+  migrateVendorId(oldId: string, newId: string): Promise<void>;
 
   // Equipment operations
   getEquipmentByCourt(courtId: string): Promise<Equipment[]>;
@@ -490,6 +491,13 @@ export class DatabaseStorage implements IStorage {
       .delete(courts)
       .where(and(eq(courts.id, id), eq(courts.vendorId, vendorId)));
     return (result.rowCount || 0) > 0;
+  }
+
+  async migrateVendorId(oldId: string, newId: string): Promise<void> {
+    await db
+      .update(courts)
+      .set({ vendorId: newId })
+      .where(eq(courts.vendorId, oldId));
   }
 
   // Equipment operations
