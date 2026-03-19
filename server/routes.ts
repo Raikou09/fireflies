@@ -836,6 +836,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Access denied. Vendor account required." });
       }
 
+      // Publicize gallery images before saving
+      if (req.body.images && Array.isArray(req.body.images) && req.body.images.length > 0) {
+        req.body.images = await publicizeCourtImages(userId, req.body.images);
+      }
+      if (req.body.imageUrl) {
+        const publicized = await publicizeCourtImages(userId, [req.body.imageUrl]);
+        req.body.imageUrl = publicized[0];
+      }
+
       const updatedCourt = await storage.updateCourtDetails(req.params.id, userId, req.body);
       if (!updatedCourt) {
         return res.status(404).json({ message: "Court not found or access denied" });
@@ -919,6 +928,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Helper: set public ACL for an array of image URLs (best-effort, errors are swallowed)
+  const publicizeCourtImages = async (vendorId: string, imageUrls: string[]): Promise<string[]> => {
+    const objectStorageService = new ObjectStorageService();
+    const publicPaths: string[] = [];
+    for (const url of imageUrls) {
+      try {
+        const publicPath = await objectStorageService.trySetObjectEntityAclPolicy(url, {
+          owner: vendorId,
+          visibility: "public",
+        });
+        publicPaths.push(publicPath);
+      } catch {
+        // If ACL fails (e.g. already public or external URL), keep original
+        publicPaths.push(url);
+      }
+    }
+    return publicPaths;
+  };
+
   app.post("/api/courts", isAuthenticated, async (req: any, res) => {
     try {
       const vendorId = req.user?.claims?.sub || req.user?.id;
@@ -953,6 +981,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       console.log('Creating court with data:', req.body);
+
+      // Publicize gallery images before saving
+      if (req.body.images && Array.isArray(req.body.images) && req.body.images.length > 0) {
+        req.body.images = await publicizeCourtImages(vendorId, req.body.images);
+      }
+      if (req.body.imageUrl) {
+        const publicized = await publicizeCourtImages(vendorId, [req.body.imageUrl]);
+        req.body.imageUrl = publicized[0];
+      }
+
       const courtData = insertCourtSchema.parse(req.body);
       console.log('Parsed court data:', courtData);
       
@@ -971,6 +1009,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put("/api/courts/:id", isAuthenticated, async (req: any, res) => {
     try {
       const vendorId = req.user?.claims?.sub || req.user?.id;
+
+      // Publicize gallery images before saving
+      if (req.body.images && Array.isArray(req.body.images) && req.body.images.length > 0) {
+        req.body.images = await publicizeCourtImages(vendorId, req.body.images);
+      }
+      if (req.body.imageUrl) {
+        const publicized = await publicizeCourtImages(vendorId, [req.body.imageUrl]);
+        req.body.imageUrl = publicized[0];
+      }
+
       const courtData = insertCourtSchema.partial().parse(req.body);
       const court = await storage.updateCourt(req.params.id, vendorId, courtData);
       if (!court) {
@@ -1029,6 +1077,87 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error setting court image:", error);
       res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Add image to court gallery
+  app.post("/api/courts/:id/images", isAuthenticated, upload.single("file"), async (req: any, res) => {
+    try {
+      const vendorId = req.user.claims.sub;
+      if (!req.file) {
+        return res.status(400).json({ error: "No file provided" });
+      }
+
+      // Verify court ownership BEFORE any storage writes
+      const court = await storage.getCourtById(req.params.id);
+      if (!court || court.vendorId !== vendorId) {
+        return res.status(404).json({ message: "Court not found or unauthorized" });
+      }
+
+      const objectStorageService = new ObjectStorageService();
+      const { randomUUID } = await import("crypto");
+      const objectId = randomUUID();
+      const privateObjectDir = objectStorageService.getPrivateObjectDir();
+      const fullPath = `${privateObjectDir}/uploads/${objectId}`;
+
+      const pathParts = fullPath.startsWith("/") ? fullPath.split("/") : `/${fullPath}`.split("/");
+      const bucketName = pathParts[1];
+      const objectName = pathParts.slice(2).join("/");
+
+      const { objectStorageClient } = await import("./objectStorage");
+      const bucket = objectStorageClient.bucket(bucketName);
+      const file = bucket.file(objectName);
+
+      await file.save(req.file.buffer, {
+        contentType: req.file.mimetype,
+        resumable: false,
+      });
+
+      const servingUrl = `/objects/uploads/${objectId}`;
+
+      // Make it public
+      await objectStorageService.trySetObjectEntityAclPolicy(servingUrl, {
+        owner: vendorId,
+        visibility: "public",
+      });
+
+      // Append to court's images array
+      const currentImages = court.images || [];
+      const updatedImages = [...currentImages, servingUrl];
+
+      await storage.updateCourt(req.params.id, vendorId, { images: updatedImages });
+
+      res.json({ url: servingUrl, images: updatedImages });
+    } catch (error: any) {
+      console.error("Error uploading gallery image:", error);
+      res.status(500).json({ error: "Failed to upload gallery image", message: error.message });
+    }
+  });
+
+  // Remove image from court gallery
+  app.delete("/api/courts/:id/images", isAuthenticated, async (req: any, res) => {
+    try {
+      const vendorId = req.user.claims.sub;
+      const { imageUrl } = req.body;
+
+      if (!imageUrl) {
+        return res.status(400).json({ error: "imageUrl is required" });
+      }
+
+      const court = await storage.getCourtById(req.params.id);
+      if (!court || court.vendorId !== vendorId) {
+        return res.status(404).json({ message: "Court not found or unauthorized" });
+      }
+
+      const currentImages = court.images || [];
+      const updatedImages = currentImages.filter((img: string) => img !== imageUrl);
+
+      await storage.updateCourt(req.params.id, vendorId, { images: updatedImages });
+
+      res.json({ images: updatedImages });
+    } catch (error: any) {
+      console.error("Error removing gallery image:", error);
+      res.status(500).json({ error: "Failed to remove gallery image", message: error.message });
     }
   });
 

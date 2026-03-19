@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { AlertTriangle, Clock } from "lucide-react";
+import { AlertTriangle, Clock, CloudUpload, X, Plus, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { LocationPicker } from "./LocationPicker";
@@ -45,6 +45,10 @@ export default function VendorCourtUpdateModal({ court, isOpen, onClose }: Vendo
     longitude: null,
   });
 
+  const [galleryImages, setGalleryImages] = useState<string[]>([]);
+  const [coverImageUrl, setCoverImageUrl] = useState<string>("");
+  const [isUploadingGallery, setIsUploadingGallery] = useState(false);
+
   React.useEffect(() => {
     console.log('VendorCourtUpdateModal - Court data:', court);
     if (court) {
@@ -62,6 +66,12 @@ export default function VendorCourtUpdateModal({ court, isOpen, onClose }: Vendo
         availableSports: court.availableSports || [],
         availableDays: court.availableDays || [],
       });
+
+      const existingImages = court.images && court.images.length > 0
+        ? court.images
+        : (court.imageUrl ? [court.imageUrl] : []);
+      setGalleryImages(existingImages);
+      setCoverImageUrl(court.imageUrl || existingImages[0] || "");
       
       // Set existing location data if available
       if (court.latitude && court.longitude) {
@@ -74,6 +84,65 @@ export default function VendorCourtUpdateModal({ court, isOpen, onClose }: Vendo
     }
   }, [court]);
 
+  const uploadImageFile = async (file: File): Promise<string> => {
+    const fd = new FormData();
+    fd.append("file", file);
+
+    const response = await fetch("/api/objects/upload-file", {
+      method: "POST",
+      body: fd,
+      credentials: "include",
+    });
+
+    if (!response.ok) throw new Error("Upload failed");
+    const data = await response.json();
+    return data.url;
+  };
+
+  const handleGalleryUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+
+    if (galleryImages.length + files.length > 8) {
+      toast({ title: "Too many images", description: "You can upload up to 8 images.", variant: "destructive" });
+      return;
+    }
+
+    const validFiles = files.filter(file => {
+      if (file.size > 10 * 1024 * 1024) {
+        toast({ title: "File too large", description: `${file.name} exceeds 10MB.`, variant: "destructive" });
+        return false;
+      }
+      return true;
+    });
+
+    if (validFiles.length === 0) {
+      e.target.value = "";
+      return;
+    }
+
+    setIsUploadingGallery(true);
+    try {
+      const urls = await Promise.all(validFiles.map(uploadImageFile));
+      setGalleryImages(prev => [...prev, ...urls].slice(0, 8));
+      if (!coverImageUrl && urls.length > 0) setCoverImageUrl(urls[0]);
+      toast({ title: "Images Uploaded", description: `${urls.length} image(s) added to gallery.` });
+    } catch (error) {
+      toast({ title: "Upload Failed", description: "Failed to upload some images.", variant: "destructive" });
+    } finally {
+      setIsUploadingGallery(false);
+      e.target.value = "";
+    }
+  };
+
+  const removeGalleryImage = (url: string) => {
+    setGalleryImages(prev => prev.filter(img => img !== url));
+    if (coverImageUrl === url) {
+      const remaining = galleryImages.filter(img => img !== url);
+      setCoverImageUrl(remaining[0] || "");
+    }
+  };
+
   const updateCourtMutation = useMutation({
     mutationFn: async (data: any) => {
       console.log('Mutation - Updating court with data:', data, 'Court ID:', court?.id);
@@ -83,6 +152,8 @@ export default function VendorCourtUpdateModal({ court, isOpen, onClose }: Vendo
         peakHourRate: data.peakHourRate ? parseFloat(data.peakHourRate) : null,
         latitude: locationData.latitude,
         longitude: locationData.longitude,
+        images: galleryImages,
+        imageUrl: coverImageUrl || galleryImages[0] || null,
       });
       console.log('Mutation - API response status:', response.status);
       if (!response.ok) {
@@ -344,6 +415,73 @@ export default function VendorCourtUpdateModal({ court, isOpen, onClose }: Vendo
               initialLng={locationData.longitude || undefined}
               className="w-full"
             />
+          </div>
+
+          {/* Court Photos */}
+          <div>
+            <Label className="mb-2 block">Court Photos (up to 8)</Label>
+            {galleryImages.length > 0 && (
+              <div className="grid grid-cols-3 md:grid-cols-4 gap-3 mb-3">
+                {galleryImages.map((url, idx) => (
+                  <div key={idx} className="relative group">
+                    <img
+                      src={url}
+                      alt={`Court image ${idx + 1}`}
+                      className={`w-full h-24 object-cover rounded-lg border-2 ${url === coverImageUrl ? 'border-primary' : 'border-transparent'}`}
+                    />
+                    {url === coverImageUrl && (
+                      <span className="absolute top-1 left-1 bg-primary text-white text-xs px-1 rounded">Cover</span>
+                    )}
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center gap-1">
+                      {url !== coverImageUrl && (
+                        <button
+                          type="button"
+                          onClick={() => setCoverImageUrl(url)}
+                          className="bg-white text-gray-800 text-xs px-2 py-1 rounded hover:bg-gray-100"
+                        >
+                          Set Cover
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => removeGalleryImage(url)}
+                        className="bg-red-500 text-white p-1 rounded hover:bg-red-600"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            {galleryImages.length < 8 && (
+              <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+                <CloudUpload className="h-10 w-10 text-gray-400 mx-auto mb-2" />
+                <p className="text-gray-600 mb-1 text-sm">Add more court photos</p>
+                <p className="text-xs text-gray-500 mb-3">Max 10MB per image • {galleryImages.length}/8 uploaded</p>
+                <label className="inline-flex items-center gap-2 cursor-pointer bg-primary text-white hover:bg-green-700 px-4 py-2 rounded-md text-sm font-medium">
+                  {isUploadingGallery ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Uploading...
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="h-4 w-4" />
+                      Add Photos
+                    </>
+                  )}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    className="hidden"
+                    onChange={handleGalleryUpload}
+                    disabled={isUploadingGallery}
+                  />
+                </label>
+              </div>
+            )}
           </div>
 
           <div className="flex gap-2 pt-6 border-t">

@@ -90,6 +90,7 @@ export const courts = pgTable("courts", {
   closingTime: varchar("closing_time").notNull(),
   availableDays: text("available_days").array().notNull().default(["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]),
   imageUrl: varchar("image_url"),
+  images: text("images").array().default([]),
   rules: text("rules"),
   isActive: boolean("is_active").default(true),
   approvalStatus: varchar("approval_status", { enum: ["pending", "approved", "rejected"] }).default("pending"),

@@ -1,13 +1,10 @@
-import { useEffect, useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useRoute, Link } from 'wouter';
-import { useAuth } from '@/hooks/useAuth';
-import { apiRequest } from '@/lib/queryClient';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { useToast } from '@/hooks/use-toast';
 import { 
   MapPin, 
   Star, 
@@ -25,51 +22,13 @@ import {
   Heart,
   Share2,
   MessageSquare,
-  Package
+  Package,
+  CheckCircle2
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import EquipmentRentalModal from '@/components/EquipmentRentalModal';
-
-interface Court {
-  id: string;
-  name: string;
-  description: string;
-  address: string;
-  city: string;
-  area: string;
-  latitude: number;
-  longitude: number;
-  hourlyRate: string;
-  peakHourRate: string;
-  availableSports: string[];
-  amenities: string[];
-  images: string[];
-  contactNumber: string;
-  operatingHours: {
-    open: string;
-    close: string;
-  };
-  rating: number;
-  totalBookings: number;
-  isActive: boolean;
-  approvalStatus: string;
-  createdAt: string;
-  vendor: {
-    id: string;
-    firstName: string;
-    lastName: string;
-    email: string;
-    profileImageUrl?: string;
-  };
-  equipment: Array<{
-    id: string;
-    name: string;
-    quantity: number;
-    condition: string;
-    hourlyRate?: string;
-  }>;
-  distance?: number;
-}
+import { BookingModal } from '@/components/BookingModal';
+import type { CourtWithDetails } from '@shared/schema';
 
 interface Review {
   id: string;
@@ -85,22 +44,17 @@ interface Review {
 
 export default function CourtDetails() {
   const [match, params] = useRoute('/court/:id');
-  const { user, isAuthenticated } = useAuth();
-  const { toast } = useToast();
-  const queryClient = useQueryClient();
   const [selectedImage, setSelectedImage] = useState(0);
   const [isEquipmentModalOpen, setIsEquipmentModalOpen] = useState(false);
-  const [selectedEquipment, setSelectedEquipment] = useState<Array<{equipmentId: string, quantity: number, pricePerHour: number, name: string}>>([]);
+  const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
 
   const courtId = params?.id;
 
-  // Fetch court details
-  const { data: court, isLoading } = useQuery<Court>({
+  const { data: court, isLoading } = useQuery<CourtWithDetails>({
     queryKey: ['/api/courts', courtId],
     enabled: !!courtId,
   });
 
-  // Fetch court reviews
   const { data: reviews = [] } = useQuery<Review[]>({
     queryKey: ['/api/courts', courtId, 'reviews'],
     enabled: !!courtId,
@@ -144,9 +98,14 @@ export default function CourtDetails() {
     );
   }
 
+  // Build gallery: use images array if non-empty, fallback to imageUrl
+  const galleryImages: string[] = (court.images && court.images.length > 0)
+    ? court.images
+    : (court.imageUrl ? [court.imageUrl] : []);
+
   const averageRating = reviews.length > 0 
     ? reviews.reduce((sum, review) => sum + review.rating, 0) / reviews.length 
-    : court.rating || 0;
+    : Number(court.rating) || 0;
 
   const getAmenityIcon = (amenity: string) => {
     const lowerAmenity = amenity.toLowerCase();
@@ -157,6 +116,13 @@ export default function CourtDetails() {
     if (lowerAmenity.includes('security') || lowerAmenity.includes('guard')) return <Shield size={16} />;
     return null;
   };
+
+  const DAY_ABBREVIATIONS: Record<string, string> = {
+    Monday: 'Mon', Tuesday: 'Tue', Wednesday: 'Wed', Thursday: 'Thu',
+    Friday: 'Fri', Saturday: 'Sat', Sunday: 'Sun'
+  };
+
+  const ALL_DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -174,28 +140,28 @@ export default function CourtDetails() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Main Content */}
           <div className="lg:col-span-2 space-y-6">
-            {/* Images */}
+            {/* Gallery */}
             <Card>
               <CardContent className="p-0">
                 <div className="relative">
-                  {court.images && court.images.length > 0 ? (
+                  {galleryImages.length > 0 ? (
                     <>
                       <img
-                        src={court.images[selectedImage]}
+                        src={galleryImages[selectedImage]}
                         alt={court.name}
-                        className="w-full h-96 object-cover rounded-t-lg"
+                        className="w-full h-80 md:h-96 object-cover rounded-t-lg"
                         data-testid="court-main-image"
                       />
-                      {court.images.length > 1 && (
-                        <div className="absolute bottom-4 left-4 flex gap-2">
-                          {court.images.map((image, index) => (
+                      {galleryImages.length > 1 && (
+                        <div className="p-3 flex gap-2 overflow-x-auto bg-white dark:bg-gray-800 rounded-b-lg">
+                          {galleryImages.map((image, index) => (
                             <button
                               key={index}
                               onClick={() => setSelectedImage(index)}
-                              className={`w-16 h-16 rounded-lg overflow-hidden border-2 ${
+                              className={`flex-shrink-0 w-16 h-16 rounded-lg overflow-hidden border-2 transition-all ${
                                 selectedImage === index 
-                                  ? 'border-white' 
-                                  : 'border-transparent opacity-70'
+                                  ? 'border-primary shadow-md' 
+                                  : 'border-transparent opacity-60 hover:opacity-90'
                               }`}
                               data-testid={`button-image-${index}`}
                             >
@@ -289,18 +255,39 @@ export default function CourtDetails() {
                   </div>
                 </div>
 
-                {/* Amenities */}
-                {court.amenities && court.amenities.length > 0 && (
+                {/* Available Days */}
+                {court.availableDays && court.availableDays.length > 0 && (
                   <div>
-                    <h3 className="font-semibold mb-2">Amenities</h3>
-                    <div className="grid grid-cols-2 gap-2">
-                      {court.amenities.map((amenity, index) => (
-                        <div key={index} className="flex items-center gap-2 text-sm">
-                          {getAmenityIcon(amenity)}
-                          <span data-testid={`amenity-${index}`}>{amenity}</span>
-                        </div>
-                      ))}
+                    <h3 className="font-semibold mb-2">Available Days</h3>
+                    <div className="flex flex-wrap gap-2">
+                      {ALL_DAYS.map((day) => {
+                        const isOpen = court.availableDays.includes(day);
+                        return (
+                          <div
+                            key={day}
+                            className={`flex items-center gap-1 px-3 py-1 rounded-full text-sm border ${
+                              isOpen
+                                ? 'border-primary bg-primary/10 text-primary'
+                                : 'border-gray-200 bg-gray-100 text-gray-400 dark:border-gray-700 dark:bg-gray-800'
+                            }`}
+                            data-testid={`day-${day.toLowerCase()}`}
+                          >
+                            {isOpen && <CheckCircle2 size={12} />}
+                            {DAY_ABBREVIATIONS[day]}
+                          </div>
+                        );
+                      })}
                     </div>
+                  </div>
+                )}
+
+                {/* Rules */}
+                {court.rules && (
+                  <div>
+                    <h3 className="font-semibold mb-2">Court Rules</h3>
+                    <p className="text-gray-700 dark:text-gray-300 text-sm whitespace-pre-line" data-testid="court-rules">
+                      {court.rules}
+                    </p>
                   </div>
                 )}
 
@@ -316,16 +303,16 @@ export default function CourtDetails() {
                               {item.name}
                             </h4>
                             <Badge 
-                              variant={item.condition === 'excellent' ? 'default' : 'secondary'}
+                              variant={item.isAvailable ? 'default' : 'secondary'}
                               className="text-xs"
                             >
-                              {item.condition}
+                              {item.isAvailable ? 'Available' : 'Unavailable'}
                             </Badge>
                           </div>
                           <p className="text-sm text-gray-600 dark:text-gray-400">
-                            Qty: {item.quantity}
-                            {item.hourlyRate && (
-                              <span className="ml-2">• KSh {item.hourlyRate}/hr</span>
+                            Qty: {item.quantityAvailable}
+                            {item.pricePerHour && (
+                              <span className="ml-2">• KSh {item.pricePerHour}/hr</span>
                             )}
                           </p>
                         </div>
@@ -334,23 +321,16 @@ export default function CourtDetails() {
                   </div>
                 )}
 
-                {/* Contact & Hours */}
+                {/* Operating Hours */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <h3 className="font-semibold mb-2">Contact</h3>
-                    <div className="flex items-center gap-2 text-sm">
-                      <Phone size={16} />
-                      <span data-testid="court-contact">{court.contactNumber || 'Not provided'}</span>
-                    </div>
-                  </div>
                   <div>
                     <h3 className="font-semibold mb-2">Operating Hours</h3>
                     <div className="flex items-center gap-2 text-sm">
                       <Clock size={16} />
                       <span data-testid="court-hours">
-                        {court.operatingHours ? 
-                          `${court.operatingHours.open} - ${court.operatingHours.close}` : 
-                          '24 hours'
+                        {court.openingTime && court.closingTime
+                          ? `${court.openingTime} - ${court.closingTime}`
+                          : '24 hours'
                         }
                       </span>
                     </div>
@@ -444,6 +424,32 @@ export default function CourtDetails() {
 
                 <Separator />
 
+                {/* Operating Hours & Days Summary */}
+                <div className="space-y-1 text-sm text-gray-600 dark:text-gray-400">
+                  <div className="flex items-center gap-2">
+                    <Clock size={14} />
+                    <span>
+                      {court.openingTime && court.closingTime
+                        ? `${court.openingTime} – ${court.closingTime}`
+                        : 'Hours not specified'
+                      }
+                    </span>
+                  </div>
+                  {court.availableDays && court.availableDays.length > 0 && (
+                    <div className="flex items-center gap-2">
+                      <Calendar size={14} />
+                      <span>
+                        {court.availableDays.length === 7
+                          ? 'Open every day'
+                          : court.availableDays.map((d: string) => DAY_ABBREVIATIONS[d] || d).join(', ')
+                        }
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                <Separator />
+
                 {/* Vendor Info */}
                 <div className="flex items-center gap-3">
                   <img
@@ -470,7 +476,7 @@ export default function CourtDetails() {
                         <div key={item.id} className="flex items-center justify-between text-sm">
                           <span>{item.name}</span>
                           <span className="text-primary font-medium">
-                            {item.hourlyRate ? `KSh ${item.hourlyRate}/hr` : 'Included'}
+                            {item.pricePerHour ? `KSh ${item.pricePerHour}/hr` : 'Included'}
                           </span>
                         </div>
                       ))}
@@ -490,7 +496,7 @@ export default function CourtDetails() {
                   </div>
                 )}
 
-                <Separator />
+                {court.equipment && court.equipment.length > 0 && <Separator />}
 
                 {/* Booking Buttons */}
                 <div className="space-y-3">
@@ -498,6 +504,7 @@ export default function CourtDetails() {
                     className="w-full" 
                     size="lg"
                     disabled={!court.isActive || court.approvalStatus !== 'approved'}
+                    onClick={() => setIsBookingModalOpen(true)}
                     data-testid="button-book-now"
                   >
                     <Calendar className="mr-2" size={16} />
@@ -506,13 +513,6 @@ export default function CourtDetails() {
                       : 'Currently Unavailable'
                     }
                   </Button>
-                  
-                  {court.contactNumber && (
-                    <Button variant="outline" className="w-full" data-testid="button-contact">
-                      <Phone className="mr-2" size={16} />
-                      Contact Owner
-                    </Button>
-                  )}
                 </div>
 
                 {/* Status badges */}
@@ -548,10 +548,17 @@ export default function CourtDetails() {
         isOpen={isEquipmentModalOpen}
         onClose={() => setIsEquipmentModalOpen(false)}
         courtId={courtId}
-        equipmentList={court?.equipment || []}
-        selectedEquipment={selectedEquipment}
-        onEquipmentChange={setSelectedEquipment}
+        onEquipmentSelected={() => {}}
       />
+
+      {/* Booking Modal */}
+      {isBookingModalOpen && (
+        <BookingModal
+          court={court}
+          isOpen={isBookingModalOpen}
+          onClose={() => setIsBookingModalOpen(false)}
+        />
+      )}
     </div>
   );
 }

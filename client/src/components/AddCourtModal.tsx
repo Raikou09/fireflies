@@ -29,6 +29,7 @@ interface CourtData {
   facilityType?: 'separate_areas' | 'shared_area';
   availableDays?: string[];
   imageUrl?: string | null;
+  images?: string[] | null;
   latitude?: number | null;
   longitude?: number | null;
 }
@@ -78,6 +79,7 @@ export default function AddCourtModal({ isOpen, onClose, courtToEdit }: AddCourt
     "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"
   ]);
   const [imageUrl, setImageUrl] = useState("");
+  const [galleryImages, setGalleryImages] = useState<string[]>([]);
   
   // Equipment setup state
   const [includeEquipment, setIncludeEquipment] = useState(false);
@@ -108,6 +110,10 @@ export default function AddCourtModal({ isOpen, onClose, courtToEdit }: AddCourt
       setFacilityType(courtToEdit.facilityType || "shared_area");
       setAvailableDays(courtToEdit.availableDays || ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]);
       setImageUrl(courtToEdit.imageUrl || "");
+      const existingGallery = courtToEdit.images && courtToEdit.images.length > 0
+        ? courtToEdit.images
+        : (courtToEdit.imageUrl ? [courtToEdit.imageUrl] : []);
+      setGalleryImages(existingGallery);
       setLocationData({
         latitude: courtToEdit.latitude || null,
         longitude: courtToEdit.longitude || null,
@@ -129,17 +135,13 @@ export default function AddCourtModal({ isOpen, onClose, courtToEdit }: AddCourt
       return response.json();
     },
     onSuccess: () => {
-      if (imageUrl && courtToEdit?.id) {
-        imageUpdateMutation.mutate({ courtId: courtToEdit.id, imageURL: imageUrl });
-      } else {
-        toast({
-          title: "Court Updated Successfully!",
-          description: "Your court details have been updated.",
-        });
-        queryClient.invalidateQueries({ queryKey: ["/api/vendor/courts"] });
-        queryClient.invalidateQueries({ queryKey: ["/api/courts"] });
-        onClose();
-      }
+      toast({
+        title: "Court Updated Successfully!",
+        description: "Your court details have been updated.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/vendor/courts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/courts"] });
+      onClose();
     },
     onError: (error: any) => {
       if (isUnauthorizedError(error)) {
@@ -175,22 +177,17 @@ export default function AddCourtModal({ isOpen, onClose, courtToEdit }: AddCourt
         createEquipmentForCourt(court.id);
       }
       
-      // If there's an image, update the court with the image
-      if (imageUrl) {
-        setCourtImage(court.id);
-      } else {
-        const hasEquipment = includeEquipment && equipmentItems.length > 0;
-        toast({
-          title: "Court Created Successfully!",
-          description: hasEquipment 
-            ? "Your court and equipment have been submitted for admin approval!" 
-            : "Your court has been submitted for admin approval. Add equipment later to boost revenue!",
-        });
-        queryClient.invalidateQueries({ queryKey: ["/api/vendor/courts"] });
-        queryClient.invalidateQueries({ queryKey: ["/api/vendor/stats"] });
-        onClose();
-        resetForm();
-      }
+      const hasEquipment = includeEquipment && equipmentItems.length > 0;
+      toast({
+        title: "Court Created Successfully!",
+        description: hasEquipment 
+          ? "Your court and equipment have been submitted for admin approval!" 
+          : "Your court has been submitted for admin approval. Add equipment later to boost revenue!",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/vendor/courts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/vendor/stats"] });
+      onClose();
+      resetForm();
     },
     onError: (error: any) => {
       console.error('Court creation mutation error:', error);
@@ -213,39 +210,6 @@ export default function AddCourtModal({ isOpen, onClose, courtToEdit }: AddCourt
     },
   });
 
-  const imageUpdateMutation = useMutation({
-    mutationFn: async ({ courtId, imageURL }: { courtId: string; imageURL: string }) => {
-      await apiRequest(`/api/courts/${courtId}/image`, "PUT", { imageURL });
-    },
-    onSuccess: () => {
-      const hasEquipment = includeEquipment && equipmentItems.length > 0;
-      toast({
-        title: "Court Created Successfully!",
-        description: hasEquipment 
-          ? "Your court with image and equipment have been submitted for approval!" 
-          : "Your court with image has been submitted for approval. Add equipment later to boost revenue!",
-      });
-      queryClient.invalidateQueries({ queryKey: ["/api/vendor/courts"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/vendor/stats"] });
-      onClose();
-      resetForm();
-    },
-    onError: () => {
-      toast({
-        title: "Warning",
-        description: "Court created but image upload failed.",
-        variant: "destructive",
-      });
-      onClose();
-      resetForm();
-    },
-  });
-
-  const setCourtImage = (courtId: string) => {
-    if (imageUrl) {
-      imageUpdateMutation.mutate({ courtId, imageURL: imageUrl });
-    }
-  };
 
   const resetForm = () => {
     setFormData({
@@ -264,6 +228,7 @@ export default function AddCourtModal({ isOpen, onClose, courtToEdit }: AddCourt
     setFacilityType("shared_area");
     setAvailableDays(["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]);
     setImageUrl("");
+    setGalleryImages([]);
     setIncludeEquipment(false);
     setEquipmentItems([]);
   };
@@ -373,6 +338,7 @@ export default function AddCourtModal({ isOpen, onClose, courtToEdit }: AddCourt
       closingTime: formData.closingTime,
       availableDays,
       imageUrl: imageUrl || null,
+      images: galleryImages,
       rules: formData.rules || "",
       isActive: true,
       commissionRate: (commissionData?.defaultCommissionRate || 15).toString()
@@ -388,6 +354,25 @@ export default function AddCourtModal({ isOpen, onClose, courtToEdit }: AddCourt
   };
 
   const [isUploading, setIsUploading] = useState(false);
+  const [isUploadingGallery, setIsUploadingGallery] = useState(false);
+
+  const uploadImageFile = async (file: File): Promise<string> => {
+    const fd = new FormData();
+    fd.append("file", file);
+
+    const response = await fetch("/api/objects/upload-file", {
+      method: "POST",
+      body: fd,
+      credentials: "include",
+    });
+
+    if (!response.ok) {
+      throw new Error("Upload failed");
+    }
+
+    const data = await response.json();
+    return data.url;
+  };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -400,21 +385,11 @@ export default function AddCourtModal({ isOpen, onClose, courtToEdit }: AddCourt
 
     setIsUploading(true);
     try {
-      const formData = new FormData();
-      formData.append("file", file);
-
-      const response = await fetch("/api/objects/upload-file", {
-        method: "POST",
-        body: formData,
-        credentials: "include",
-      });
-
-      if (!response.ok) {
-        throw new Error("Upload failed");
+      const url = await uploadImageFile(file);
+      setImageUrl(url);
+      if (!galleryImages.includes(url)) {
+        setGalleryImages(prev => [url, ...prev]);
       }
-
-      const data = await response.json();
-      setImageUrl(data.url);
       toast({ title: "Image Uploaded", description: "Court image has been uploaded successfully." });
     } catch (error) {
       console.error("Upload error:", error);
@@ -422,6 +397,56 @@ export default function AddCourtModal({ isOpen, onClose, courtToEdit }: AddCourt
     } finally {
       setIsUploading(false);
       e.target.value = "";
+    }
+  };
+
+  const handleGalleryUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+
+    if (galleryImages.length + files.length > 8) {
+      toast({ title: "Too many images", description: "You can upload up to 8 images.", variant: "destructive" });
+      return;
+    }
+
+    const validFiles = files.filter(file => {
+      if (file.size > 10 * 1024 * 1024) {
+        toast({ title: "File too large", description: `${file.name} exceeds 10MB.`, variant: "destructive" });
+        return false;
+      }
+      return true;
+    });
+
+    if (validFiles.length === 0) {
+      e.target.value = "";
+      return;
+    }
+
+    setIsUploadingGallery(true);
+    try {
+      const urls = await Promise.all(validFiles.map(uploadImageFile));
+      setGalleryImages(prev => {
+        const combined = [...prev, ...urls];
+        return combined.slice(0, 8);
+      });
+      if (!imageUrl && urls.length > 0) {
+        setImageUrl(urls[0]);
+      }
+      toast({ title: "Images Uploaded", description: `${urls.length} image(s) added to gallery.` });
+    } catch (error) {
+      console.error("Gallery upload error:", error);
+      toast({ title: "Upload Failed", description: "Failed to upload some images.", variant: "destructive" });
+    } finally {
+      setIsUploadingGallery(false);
+      e.target.value = "";
+    }
+  };
+
+  const removeGalleryImage = (url: string) => {
+    setGalleryImages(prev => prev.filter(img => img !== url));
+    if (imageUrl === url) {
+      const remaining = galleryImages.filter(img => img !== url);
+      setImageUrl(remaining[0] || "");
     }
   };
 
@@ -639,32 +664,69 @@ export default function AddCourtModal({ isOpen, onClose, courtToEdit }: AddCourt
 
           {/* Court Images */}
           <div>
-            <Label className="mb-2 block">Court Images</Label>
-            <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
-              <CloudUpload className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-600 mb-2">Upload court photos</p>
-              <p className="text-sm text-gray-500 mb-4">Max file size: 10MB</p>
-              <label className="inline-flex items-center gap-2 cursor-pointer bg-primary text-white hover:bg-green-700 px-4 py-2 rounded-md text-sm font-medium">
-                {isUploading ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Uploading...
-                  </>
-                ) : (
-                  "Choose File"
-                )}
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={handleFileUpload}
-                  disabled={isUploading}
-                />
-              </label>
-              {imageUrl && (
-                <p className="text-sm text-green-600 mt-2">Image uploaded successfully!</p>
-              )}
-            </div>
+            <Label className="mb-2 block">Court Photos (up to 8)</Label>
+            {galleryImages.length > 0 && (
+              <div className="grid grid-cols-3 md:grid-cols-4 gap-3 mb-3">
+                {galleryImages.map((url, idx) => (
+                  <div key={idx} className="relative group">
+                    <img
+                      src={url}
+                      alt={`Court image ${idx + 1}`}
+                      className={`w-full h-24 object-cover rounded-lg border-2 ${url === imageUrl ? 'border-primary' : 'border-transparent'}`}
+                    />
+                    {url === imageUrl && (
+                      <span className="absolute top-1 left-1 bg-primary text-white text-xs px-1 rounded">Cover</span>
+                    )}
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center gap-1">
+                      {url !== imageUrl && (
+                        <button
+                          type="button"
+                          onClick={() => setImageUrl(url)}
+                          className="bg-white text-gray-800 text-xs px-2 py-1 rounded hover:bg-gray-100"
+                        >
+                          Set Cover
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => removeGalleryImage(url)}
+                        className="bg-red-500 text-white p-1 rounded hover:bg-red-600"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            {galleryImages.length < 8 && (
+              <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+                <CloudUpload className="h-10 w-10 text-gray-400 mx-auto mb-2" />
+                <p className="text-gray-600 mb-1 text-sm">Upload court photos</p>
+                <p className="text-xs text-gray-500 mb-3">Max 10MB per image • {galleryImages.length}/8 uploaded</p>
+                <label className="inline-flex items-center gap-2 cursor-pointer bg-primary text-white hover:bg-green-700 px-4 py-2 rounded-md text-sm font-medium">
+                  {isUploadingGallery ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Uploading...
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="h-4 w-4" />
+                      Add Photos
+                    </>
+                  )}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    className="hidden"
+                    onChange={handleGalleryUpload}
+                    disabled={isUploadingGallery}
+                  />
+                </label>
+              </div>
+            )}
           </div>
 
           {/* Court Rules */}
@@ -825,9 +887,9 @@ export default function AddCourtModal({ isOpen, onClose, courtToEdit }: AddCourt
             <Button 
               type="submit" 
               className="flex-1 bg-primary text-white hover:bg-green-700"
-              disabled={mutation.isPending || imageUpdateMutation.isPending}
+              disabled={mutation.isPending}
             >
-              {mutation.isPending || imageUpdateMutation.isPending ? "Creating..." : "Create Court"}
+              {mutation.isPending ? "Creating..." : "Create Court"}
             </Button>
           </div>
         </form>
