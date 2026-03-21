@@ -421,9 +421,12 @@ export default function VendorInterface() {
                     <div key={court.id} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
                       <div className="flex items-center space-x-4">
                         <img 
-                          src={court.imageUrl || "https://images.unsplash.com/photo-1546519638-68e109498ffc?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=80&h=80"} 
+                          src={court.imageUrl || court.images?.[0] || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80'%3E%3Crect width='80' height='80' fill='%23e8f5e9'/%3E%3Ccircle cx='40' cy='35' r='14' fill='%2366bb6a' opacity='0.5'/%3E%3Ctext x='40' y='65' text-anchor='middle' font-family='sans-serif' font-size='9' fill='%23388e3c'%3ENo photo%3C/text%3E%3C/svg%3E"} 
                           alt={court.name}
                           className="w-16 h-16 rounded-lg object-cover"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80'%3E%3Crect width='80' height='80' fill='%23e8f5e9'/%3E%3Ccircle cx='40' cy='35' r='14' fill='%2366bb6a' opacity='0.5'/%3E%3Ctext x='40' y='65' text-anchor='middle' font-family='sans-serif' font-size='9' fill='%23388e3c'%3ENo photo%3C/text%3E%3C/svg%3E";
+                          }}
                         />
                         <div>
                           <h4 className="font-semibold text-gray-900">{court.name}</h4>

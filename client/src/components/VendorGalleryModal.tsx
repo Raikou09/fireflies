@@ -45,6 +45,7 @@ export default function VendorGalleryModal({ court, isOpen, onClose }: VendorGal
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/vendor/courts"] });
       queryClient.invalidateQueries({ queryKey: ["/api/courts", court?.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/courts"] });
       onClose();
       toast({ title: "Gallery Saved", description: "Court photos updated successfully." });
     },
