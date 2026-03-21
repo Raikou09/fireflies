@@ -293,6 +293,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "No file provided" });
       }
 
+      const userId = req.user?.claims?.sub || req.user?.id;
       const objectStorageService = new ObjectStorageService();
       const { randomUUID } = await import("crypto");
       const objectId = randomUUID();
@@ -312,7 +313,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         resumable: false,
       });
 
+      // Set ACL to public immediately so images can be served without re-processing
       const servingUrl = `/objects/uploads/${objectId}`;
+      try {
+        const { setObjectAclPolicy } = await import("./objectAcl");
+        await setObjectAclPolicy(file, { owner: userId || "anonymous", visibility: "public" });
+      } catch (aclErr) {
+        console.warn("Could not set ACL on uploaded file (image may not display):", aclErr);
+      }
+
       res.json({ url: servingUrl });
     } catch (error: any) {
       console.error("Error uploading file:", error);
@@ -845,8 +854,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const imageList: string[] = Array.isArray(images) ? images : [];
       const coverUrl: string | null = imageUrl || (imageList.length > 0 ? imageList[0] : null);
 
-      // Publicize images and collect any failures
-      const publicizeErrors: string[] = [];
+      // Attempt to publicize images (ACL failures are non-fatal — images served via /objects/uploads/:id)
       const publicizedImages: string[] = [];
       const objectStorageService = new ObjectStorageService();
       for (const url of imageList) {
@@ -856,8 +864,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             visibility: "public",
           });
           publicizedImages.push(publicPath);
-        } catch (err: any) {
-          publicizeErrors.push(url);
+        } catch {
           publicizedImages.push(url);
         }
       }
@@ -870,15 +877,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             visibility: "public",
           });
         } catch {
-          publicizeErrors.push(coverUrl);
+          // Keep original URL if ACL fails
         }
-      }
-
-      if (publicizeErrors.length > 0) {
-        return res.status(500).json({
-          message: `Failed to make ${publicizeErrors.length} image(s) public. Please try again or remove those images.`,
-          failedUrls: publicizeErrors,
-        });
       }
 
       const updatedCourt = await storage.updateCourt(req.params.id, userId, {
