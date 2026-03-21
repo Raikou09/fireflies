@@ -823,6 +823,80 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Vendor gallery-only update route (no re-approval needed)
+  app.put("/api/vendor/courts/:id/gallery", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub || req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+
+      const user = await storage.getUser(userId);
+      if (!user || user.userType !== "vendor") {
+        return res.status(403).json({ message: "Access denied. Vendor account required." });
+      }
+
+      const court = await storage.getCourtById(req.params.id);
+      if (!court || court.vendorId !== userId) {
+        return res.status(404).json({ message: "Court not found or access denied" });
+      }
+
+      const { images, imageUrl } = req.body;
+      const imageList: string[] = Array.isArray(images) ? images : [];
+      const coverUrl: string | null = imageUrl || (imageList.length > 0 ? imageList[0] : null);
+
+      // Publicize images and collect any failures
+      const publicizeErrors: string[] = [];
+      const publicizedImages: string[] = [];
+      const objectStorageService = new ObjectStorageService();
+      for (const url of imageList) {
+        try {
+          const publicPath = await objectStorageService.trySetObjectEntityAclPolicy(url, {
+            owner: userId,
+            visibility: "public",
+          });
+          publicizedImages.push(publicPath);
+        } catch (err: any) {
+          publicizeErrors.push(url);
+          publicizedImages.push(url);
+        }
+      }
+
+      let publicCoverUrl = coverUrl;
+      if (coverUrl && !publicizedImages.includes(coverUrl)) {
+        try {
+          publicCoverUrl = await objectStorageService.trySetObjectEntityAclPolicy(coverUrl, {
+            owner: userId,
+            visibility: "public",
+          });
+        } catch {
+          publicizeErrors.push(coverUrl);
+        }
+      }
+
+      if (publicizeErrors.length > 0) {
+        return res.status(500).json({
+          message: `Failed to make ${publicizeErrors.length} image(s) public. Please try again or remove those images.`,
+          failedUrls: publicizeErrors,
+        });
+      }
+
+      const updatedCourt = await storage.updateCourt(req.params.id, userId, {
+        images: publicizedImages,
+        imageUrl: publicCoverUrl ?? null,
+      });
+
+      if (!updatedCourt) {
+        return res.status(404).json({ message: "Court not found or access denied" });
+      }
+
+      res.json({ ...updatedCourt, message: "Gallery updated successfully." });
+    } catch (error) {
+      console.error("Error updating court gallery:", error);
+      res.status(500).json({ message: "Failed to update gallery" });
+    }
+  });
+
   // Vendor court update routes (requires re-approval)
   app.put("/api/vendor/courts/:id", isAuthenticated, async (req: any, res) => {
     try {

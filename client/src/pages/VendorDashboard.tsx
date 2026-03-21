@@ -39,6 +39,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
 import EquipmentManager from "@/components/EquipmentManager";
 import VendorCourtUpdateModal from "@/components/VendorCourtUpdateModal";
+import VendorGalleryModal from "@/components/VendorGalleryModal";
 import AddCourtModal from "@/components/AddCourtModal";
 import { NotificationTestPanel } from "@/components/NotificationTestPanel";
 import VendorOnboarding from "@/components/VendorOnboarding";
@@ -89,12 +90,8 @@ export default function VendorDashboard() {
   const [vendorCheckLoading, setVendorCheckLoading] = useState(true);
   const [selectedCourtForEquipment, setSelectedCourtForEquipment] = useState<string | null>(null);
   const [courtToUpdate, setCourtToUpdate] = useState<CourtWithDetails | null>(null);
+  const [courtForGallery, setCourtForGallery] = useState<CourtWithDetails | null>(null);
   const [showAddCourtModal, setShowAddCourtModal] = useState(false);
-
-  // Debug courtToUpdate state changes
-  React.useEffect(() => {
-    console.log('courtToUpdate state changed:', courtToUpdate);
-  }, [courtToUpdate]);
 
   // Check if current user is a vendor
   useEffect(() => {
@@ -671,28 +668,29 @@ export default function VendorDashboard() {
                       </div>
                     )}
                     
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => {
-                          setCourtToUpdate(court);
-                        }}
-                        style={{
-                          padding: '8px 16px',
-                          backgroundColor: '#007bff',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: '4px',
-                          cursor: 'pointer',
-                          fontSize: '14px'
-                        }}
-                      >
-                        🔧 Update Details - FIXED
-                      </button>
+                    <div className="flex gap-2 flex-wrap">
                       <Button
-                        onClick={() => {
-                          alert('Equipment button works!');
-                          setSelectedCourtForEquipment(court.id);
-                        }}
+                        onClick={() => setCourtToUpdate(court)}
+                        variant="default"
+                        size="sm"
+                        className="flex items-center gap-2"
+                        data-testid={`update-court-${court.id}`}
+                      >
+                        <Edit className="h-4 w-4" />
+                        Update Details
+                      </Button>
+                      <Button
+                        onClick={() => setCourtForGallery(court)}
+                        variant="outline"
+                        size="sm"
+                        className="flex items-center gap-2"
+                        data-testid={`manage-court-gallery-${court.id}`}
+                      >
+                        <FileEdit className="h-4 w-4" />
+                        Manage Photos
+                      </Button>
+                      <Button
+                        onClick={() => setSelectedCourtForEquipment(court.id)}
                         variant="outline"
                         size="sm"
                         className="flex items-center gap-2"
@@ -1221,10 +1219,13 @@ export default function VendorDashboard() {
       <VendorCourtUpdateModal
         court={courtToUpdate}
         isOpen={!!courtToUpdate}
-        onClose={() => {
-          console.log('Closing modal, setting courtToUpdate to null');
-          setCourtToUpdate(null);
-        }}
+        onClose={() => setCourtToUpdate(null)}
+      />
+
+      <VendorGalleryModal
+        court={courtForGallery}
+        isOpen={!!courtForGallery}
+        onClose={() => setCourtForGallery(null)}
       />
       
       <AddCourtModal
