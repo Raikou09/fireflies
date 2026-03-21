@@ -287,6 +287,15 @@ export function LocationAwareCourts({ city, sport, searchQuery }: LocationAwareC
                     >
                       Book Now
                     </Button>
+                    <Link href={`/court/${court.id}`} className="flex-1 sm:flex-none">
+                      <Button
+                        variant="outline"
+                        className="w-full"
+                        data-testid={`button-view-details-${court.id}`}
+                      >
+                        View Details
+                      </Button>
+                    </Link>
                     <Button
                       variant="outline"
                       onClick={() => {
