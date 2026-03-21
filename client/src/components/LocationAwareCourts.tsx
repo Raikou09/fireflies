@@ -182,25 +182,27 @@ export function LocationAwareCourts({ city, sport, searchQuery }: LocationAwareC
       <div className="space-y-3 md:space-y-4">
         {courts && courts.length > 0 ? (
           courts.map((court) => (
-            <Card key={court.id} className="hover:shadow-md md:hover:shadow-lg transition-shadow overflow-hidden">
-              <Link href={`/court/${court.id}`}>
-                <img
-                  src={court.imageUrl || court.images?.[0] || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='200'%3E%3Crect width='400' height='200' fill='%23e8f5e9'/%3E%3Ccircle cx='200' cy='85' r='30' fill='%2366bb6a' opacity='0.5'/%3E%3Cellipse cx='200' cy='130' rx='60' ry='15' fill='%2366bb6a' opacity='0.3'/%3E%3Ctext x='200' y='165' text-anchor='middle' font-family='sans-serif' font-size='13' fill='%23388e3c'%3ENo photo yet%3C/text%3E%3C/svg%3E"}
-                  alt={court.name}
-                  className="w-full h-40 object-cover cursor-pointer hover:opacity-90 transition-opacity"
-                  data-testid={`court-image-${court.id}`}
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='200'%3E%3Crect width='400' height='200' fill='%23e8f5e9'/%3E%3Ccircle cx='200' cy='85' r='30' fill='%2366bb6a' opacity='0.5'/%3E%3Cellipse cx='200' cy='130' rx='60' ry='15' fill='%2366bb6a' opacity='0.3'/%3E%3Ctext x='200' y='165' text-anchor='middle' font-family='sans-serif' font-size='13' fill='%23388e3c'%3ENo photo yet%3C/text%3E%3C/svg%3E";
-                  }}
-                />
-              </Link>
+            <Card key={court.id} className="relative hover:shadow-md md:hover:shadow-lg transition-shadow overflow-hidden cursor-pointer">
+              {/* Stretched link covers the entire card; buttons sit above it via z-10 */}
+              <Link
+                href={`/court/${court.id}`}
+                className="absolute inset-0 z-0"
+                aria-label={`View details for ${court.name}`}
+              />
+              <img
+                src={court.imageUrl || court.images?.[0] || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='200'%3E%3Crect width='400' height='200' fill='%23e8f5e9'/%3E%3Ccircle cx='200' cy='85' r='30' fill='%2366bb6a' opacity='0.5'/%3E%3Cellipse cx='200' cy='130' rx='60' ry='15' fill='%2366bb6a' opacity='0.3'/%3E%3Ctext x='200' y='165' text-anchor='middle' font-family='sans-serif' font-size='13' fill='%23388e3c'%3ENo photo yet%3C/text%3E%3C/svg%3E"}
+                alt={court.name}
+                className="w-full h-40 object-cover"
+                data-testid={`court-image-${court.id}`}
+                onError={(e) => {
+                  (e.target as HTMLImageElement).src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='200'%3E%3Crect width='400' height='200' fill='%23e8f5e9'/%3E%3Ccircle cx='200' cy='85' r='30' fill='%2366bb6a' opacity='0.5'/%3E%3Cellipse cx='200' cy='130' rx='60' ry='15' fill='%2366bb6a' opacity='0.3'/%3E%3Ctext x='200' y='165' text-anchor='middle' font-family='sans-serif' font-size='13' fill='%23388e3c'%3ENo photo yet%3C/text%3E%3C/svg%3E";
+                }}
+              />
               <CardContent className="p-4 md:p-6">
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3 mb-4">
                   <div className="flex-1">
                     <h3 className="text-lg md:text-xl font-semibold mb-2" data-testid={`text-court-name-${court.id}`}>
-                      <Link href={`/court/${court.id}`} className="hover:text-primary transition-colors">
-                        {court.name}
-                      </Link>
+                      {court.name}
                     </h3>
                     <div className="flex flex-wrap items-center gap-2 text-gray-600 mb-2 text-sm">
                       <div className="flex items-center gap-1">
@@ -273,8 +275,8 @@ export function LocationAwareCourts({ city, sport, searchQuery }: LocationAwareC
                     </div>
                   </div>
 
-                  {/* Action Buttons - Mobile Full Width */}
-                  <div className="flex flex-col sm:flex-row gap-2">
+                  {/* Action Buttons - sit above the stretched link via z-10 */}
+                  <div className="relative z-10 flex flex-col sm:flex-row gap-2">
                     <Button 
                       onClick={() => {
                         setSelectedCourt(court);
@@ -285,15 +287,6 @@ export function LocationAwareCourts({ city, sport, searchQuery }: LocationAwareC
                     >
                       Book Now
                     </Button>
-                    <Link href={`/court/${court.id}`} className="flex-1 sm:flex-none">
-                      <Button
-                        variant="outline"
-                        className="w-full"
-                        data-testid={`button-view-details-${court.id}`}
-                      >
-                        View Details
-                      </Button>
-                    </Link>
                     <Button
                       variant="outline"
                       onClick={() => {
@@ -316,7 +309,7 @@ export function LocationAwareCourts({ city, sport, searchQuery }: LocationAwareC
 
                 {/* Expanded Court Details with Reviews */}
                 {showCourtDetails === court.id && (
-                  <div className="mt-4 pt-4 border-t space-y-4">
+                  <div className="relative z-10 mt-4 pt-4 border-t space-y-4">
                     <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
                       <h4 className="font-semibold text-base">Reviews & Ratings</h4>
                       <Button
