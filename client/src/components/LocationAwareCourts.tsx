@@ -192,7 +192,7 @@ export function LocationAwareCourts({ city, sport, searchQuery }: LocationAwareC
               <img
                 src={court.imageUrl || court.images?.[0] || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='200'%3E%3Crect width='400' height='200' fill='%23e8f5e9'/%3E%3Ccircle cx='200' cy='85' r='30' fill='%2366bb6a' opacity='0.5'/%3E%3Cellipse cx='200' cy='130' rx='60' ry='15' fill='%2366bb6a' opacity='0.3'/%3E%3Ctext x='200' y='165' text-anchor='middle' font-family='sans-serif' font-size='13' fill='%23388e3c'%3ENo photo yet%3C/text%3E%3C/svg%3E"}
                 alt={court.name}
-                className="w-full h-40 object-cover"
+                className="w-full h-40 object-cover hover:opacity-90 transition-opacity"
                 data-testid={`court-image-${court.id}`}
                 onError={(e) => {
                   (e.target as HTMLImageElement).src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='200'%3E%3Crect width='400' height='200' fill='%23e8f5e9'/%3E%3Ccircle cx='200' cy='85' r='30' fill='%2366bb6a' opacity='0.5'/%3E%3Cellipse cx='200' cy='130' rx='60' ry='15' fill='%2366bb6a' opacity='0.3'/%3E%3Ctext x='200' y='165' text-anchor='middle' font-family='sans-serif' font-size='13' fill='%23388e3c'%3ENo photo yet%3C/text%3E%3C/svg%3E";
