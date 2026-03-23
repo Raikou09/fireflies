@@ -212,7 +212,7 @@ export default function CourtDetails() {
                         {court.address}
                       </p>
                     )}
-                    {court.latitude && court.longitude && (
+                    {court.latitude != null && court.longitude != null && (
                       <a
                         href={`https://www.google.com/maps/dir/?api=1&destination=${court.latitude},${court.longitude}`}
                         target="_blank"
@@ -559,7 +559,7 @@ export default function CourtDetails() {
             </Card>
 
             {/* Location card with map + directions */}
-            {court.latitude && court.longitude && (
+            {court.latitude != null && court.longitude != null && (
               <Card>
                 <CardHeader className="pb-2">
                   <CardTitle className="text-base flex items-center gap-2">

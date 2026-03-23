@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { Input } from "@/components/ui/input";
 import { useGoogleMapsScript } from "@/hooks/useGoogleMapsScript";
 
@@ -28,7 +28,6 @@ export function PlacesAutocompleteInput({
   const inputRef = useRef<HTMLInputElement>(null);
   const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
   const scriptStatus = useGoogleMapsScript();
-  const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
     if (scriptStatus !== "ready") return;
@@ -53,7 +52,6 @@ export function PlacesAutocompleteInput({
     });
 
     autocompleteRef.current = autocomplete;
-    setIsReady(true);
   }, [scriptStatus]);
 
   return (
@@ -64,13 +62,7 @@ export function PlacesAutocompleteInput({
         data-testid={dataTestId}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        placeholder={
-          scriptStatus === "loading"
-            ? "Loading address search..."
-            : scriptStatus === "error"
-            ? placeholder
-            : placeholder
-        }
+        placeholder={scriptStatus === "loading" ? "Loading address search..." : placeholder}
       />
       {scriptStatus === "error" && (
         <p className="text-xs text-gray-400 mt-1">

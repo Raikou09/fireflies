@@ -222,7 +222,7 @@ export function LocationAwareCourts({ city, sport, searchQuery }: LocationAwareC
                         {court.address}
                       </p>
                     )}
-                    {court.latitude && court.longitude && (
+                    {court.latitude != null && court.longitude != null && (
                       <a
                         href={`https://www.google.com/maps/dir/?api=1&destination=${court.latitude},${court.longitude}`}
                         target="_blank"

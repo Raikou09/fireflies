@@ -595,7 +595,7 @@ export default function AddCourtModal({ isOpen, onClose, courtToEdit }: AddCourt
           </div>
 
           {/* Map preview after address/location is set */}
-          {locationData.latitude && locationData.longitude && (
+          {locationData.latitude != null && locationData.longitude != null && (
             <MapPreview
               lat={locationData.latitude}
               lng={locationData.longitude}

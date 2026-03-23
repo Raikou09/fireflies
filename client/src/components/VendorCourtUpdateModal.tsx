@@ -76,7 +76,7 @@ export default function VendorCourtUpdateModal({ court, isOpen, onClose }: Vendo
       setCoverImageUrl(court.imageUrl || existingImages[0] || "");
       
       // Set existing location data if available
-      if (court.latitude && court.longitude) {
+      if (court.latitude != null && court.longitude != null) {
         setLocationData({
           latitude: court.latitude,
           longitude: court.longitude,
@@ -309,7 +309,7 @@ export default function VendorCourtUpdateModal({ court, isOpen, onClose }: Vendo
           </div>
 
           {/* Map preview after address / GPS location is set */}
-          {locationData.latitude && locationData.longitude && (
+          {locationData.latitude != null && locationData.longitude != null && (
             <MapPreview
               lat={locationData.latitude}
               lng={locationData.longitude}
