@@ -64,7 +64,7 @@ export function PlacesAutocompleteInput({
         onChange={(e) => onChange(e.target.value)}
         placeholder={scriptStatus === "loading" ? "Loading address search..." : placeholder}
       />
-      {scriptStatus === "error" && (
+      {scriptStatus === "error" && import.meta.env.VITE_GOOGLE_MAPS_API_KEY && (
         <p className="text-xs text-gray-400 mt-1">
           Address suggestions unavailable — type address manually.
         </p>
