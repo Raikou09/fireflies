@@ -129,3 +129,9 @@
     -webkit-overflow-scrolling: touch;
   }
 }
+
+/* Google Places Autocomplete dropdown — must sit above modals */
+.pac-container {
+  z-index: 10000 !important;
+  pointer-events: auto !important;
+}

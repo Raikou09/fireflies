@@ -456,7 +456,14 @@ export default function AddCourtModal({ isOpen, onClose, courtToEdit }: AddCourt
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent
+        className="max-w-4xl max-h-[90vh] overflow-y-auto"
+        onInteractOutside={(e) => {
+          if ((e.target as Element)?.closest?.(".pac-container")) {
+            e.preventDefault();
+          }
+        }}
+      >
         <DialogHeader>
           <DialogTitle className="flex items-center justify-between">
             {courtToEdit ? 'Edit Court' : 'Add New Court'}
