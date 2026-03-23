@@ -14,7 +14,7 @@ export function useGoogleMapsScript(): ScriptStatus {
   const [status, setStatus] = useState<ScriptStatus>(scriptStatus);
 
   useEffect(() => {
-    const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefined;
+    const apiKey = import.meta.env.VITE_GOOGLE_API_KEY as string | undefined;
 
     if (!apiKey) {
       setStatus("error");

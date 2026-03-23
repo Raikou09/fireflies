@@ -568,7 +568,7 @@ export default function CourtDetails() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3 pt-0">
-                  {import.meta.env.VITE_GOOGLE_MAPS_API_KEY ? (
+                  {import.meta.env.VITE_GOOGLE_API_KEY ? (
                     <a
                       href={`https://www.google.com/maps/search/?api=1&query=${court.latitude},${court.longitude}`}
                       target="_blank"
@@ -576,7 +576,7 @@ export default function CourtDetails() {
                       className="block"
                     >
                       <img
-                        src={`https://maps.googleapis.com/maps/api/staticmap?center=${court.latitude},${court.longitude}&zoom=15&size=400x180&maptype=roadmap&markers=color:red%7C${court.latitude},${court.longitude}&key=${import.meta.env.VITE_GOOGLE_MAPS_API_KEY}`}
+                        src={`https://maps.googleapis.com/maps/api/staticmap?center=${court.latitude},${court.longitude}&zoom=15&size=400x180&maptype=roadmap&markers=color:red%7C${court.latitude},${court.longitude}&key=${import.meta.env.VITE_GOOGLE_API_KEY}`}
                         alt="Court location"
                         className="w-full rounded-lg h-36 object-cover"
                         data-testid="court-map-preview"

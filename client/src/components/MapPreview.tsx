@@ -8,7 +8,7 @@ interface MapPreviewProps {
 }
 
 export function MapPreview({ lat, lng, address, className = "" }: MapPreviewProps) {
-  const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefined;
+  const apiKey = import.meta.env.VITE_GOOGLE_API_KEY as string | undefined;
   const directionsUrl = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
   const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
 
