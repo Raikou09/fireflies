@@ -410,8 +410,8 @@ export default function CourtDetails() {
           </div>
 
           {/* Booking Sidebar */}
-          <div className="lg:col-span-1">
-            <Card className="sticky top-6">
+          <div className="lg:col-span-1 space-y-4 sticky top-6 self-start">
+            <Card>
               <CardHeader>
                 <CardTitle>Book this court</CardTitle>
               </CardHeader>
