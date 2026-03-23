@@ -218,9 +218,21 @@ export function LocationAwareCourts({ city, sport, searchQuery }: LocationAwareC
                       )}
                     </div>
                     {court.address && (
-                      <p className="text-xs md:text-sm text-gray-500 mb-1" data-testid={`text-court-address-${court.id}`}>
+                      <a
+                        href={
+                          court.latitude != null && court.longitude != null
+                            ? `https://www.google.com/maps/search/?api=1&query=${court.latitude},${court.longitude}`
+                            : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(court.address)}`
+                        }
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="relative z-10 flex items-center gap-1 text-xs md:text-sm text-gray-500 hover:text-primary hover:underline mb-1 transition-colors"
+                        data-testid={`text-court-address-${court.id}`}
+                      >
+                        <MapPin className="h-3 w-3 shrink-0" />
                         {court.address}
-                      </p>
+                      </a>
                     )}
                     {court.latitude != null && court.longitude != null && (
                       <a

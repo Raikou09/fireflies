@@ -30,28 +30,40 @@ export function PlacesAutocompleteInput({
   const scriptStatus = useGoogleMapsScript();
 
   useEffect(() => {
-    if (scriptStatus !== "ready") return;
-    if (!inputRef.current) return;
+    if (scriptStatus !== "ready") {
+      console.log("[Autocomplete] Script not ready yet:", scriptStatus);
+      return;
+    }
+    if (!inputRef.current) {
+      console.warn("[Autocomplete] Input ref not available.");
+      return;
+    }
     if (autocompleteRef.current) return;
 
-    const autocomplete = new google.maps.places.Autocomplete(inputRef.current, {
-      componentRestrictions: { country: "ke" },
-      fields: ["formatted_address", "geometry", "name"],
-    });
+    try {
+      console.log("[Autocomplete] Initializing Places Autocomplete...");
+      const autocomplete = new google.maps.places.Autocomplete(inputRef.current, {
+        componentRestrictions: { country: "ke" },
+        fields: ["formatted_address", "geometry", "name"],
+      });
 
-    autocomplete.addListener("place_changed", () => {
-      const place = autocomplete.getPlace();
-      if (!place.geometry?.location) return;
+      autocomplete.addListener("place_changed", () => {
+        const place = autocomplete.getPlace();
+        if (!place.geometry?.location) return;
 
-      const address = place.formatted_address || place.name || inputRef.current?.value || "";
-      const lat = place.geometry.location.lat();
-      const lng = place.geometry.location.lng();
+        const address = place.formatted_address || place.name || inputRef.current?.value || "";
+        const lat = place.geometry.location.lat();
+        const lng = place.geometry.location.lng();
 
-      onChange(address);
-      onPlaceSelect({ address, lat, lng });
-    });
+        onChange(address);
+        onPlaceSelect({ address, lat, lng });
+      });
 
-    autocompleteRef.current = autocomplete;
+      autocompleteRef.current = autocomplete;
+      console.log("[Autocomplete] Ready.");
+    } catch (err) {
+      console.error("[Autocomplete] Failed to initialize:", err);
+    }
   }, [scriptStatus]);
 
   return (
