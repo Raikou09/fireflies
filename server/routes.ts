@@ -181,6 +181,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Update payment details for verified vendors
+  app.put('/api/vendor/payment-details', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub || req.user?.id;
+      const user = await storage.getUser(userId);
+
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      if (user.userType !== "vendor") {
+        return res.status(403).json({ message: "Only vendors can update payment details" });
+      }
+
+      const paymentDetailsSchema = z.object({
+        paymentPreference: z.enum(["bank", "mpesa", "both"]),
+        mpesaNumber: z.string().optional(),
+        bankName: z.string().optional(),
+        bankAccountNumber: z.string().optional(),
+        bankAccountName: z.string().optional(),
+      }).superRefine((data, ctx) => {
+        if (data.paymentPreference === "mpesa" || data.paymentPreference === "both") {
+          if (!data.mpesaNumber || data.mpesaNumber.length < 10) {
+            ctx.addIssue({ code: z.ZodIssueCode.custom, message: "M-Pesa number is required (min 10 digits)", path: ["mpesaNumber"] });
+          }
+        }
+        if (data.paymentPreference === "bank" || data.paymentPreference === "both") {
+          if (!data.bankName) ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Bank name is required", path: ["bankName"] });
+          if (!data.bankAccountNumber) ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Account number is required", path: ["bankAccountNumber"] });
+          if (!data.bankAccountName) ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Account holder name is required", path: ["bankAccountName"] });
+        }
+      });
+
+      const validatedData = paymentDetailsSchema.parse(req.body);
+
+      const updatedUser = await storage.upsertUser({
+        ...user,
+        paymentPreference: validatedData.paymentPreference,
+        mpesaNumber: validatedData.mpesaNumber || user.mpesaNumber,
+        bankName: validatedData.bankName || user.bankName,
+        bankAccountNumber: validatedData.bankAccountNumber || user.bankAccountNumber,
+        bankAccountName: validatedData.bankAccountName || user.bankAccountName,
+      });
+
+      res.json(updatedUser);
+    } catch (error: any) {
+      console.error("Error updating payment details:", error);
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ message: "Invalid payment data", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to update payment details" });
+    }
+  });
+
   // Check if user can create courts (must be verified vendor)
   app.get('/api/vendor/can-create-courts', isAuthenticated, async (req: any, res) => {
     try {

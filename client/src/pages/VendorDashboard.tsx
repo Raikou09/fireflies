@@ -1,5 +1,25 @@
 import React, { useState, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import { 
   Card, 
   CardContent, 
@@ -32,7 +52,11 @@ import {
   UserPlus,
   FileEdit,
   CheckCircle,
-  Mail
+  Mail,
+  CreditCard,
+  Smartphone,
+  Landmark,
+  Save,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
@@ -75,6 +99,26 @@ interface CityAnalytics {
   revenue: number;
   popularSports: Array<{ sport: string; bookings: number }>;
 }
+
+const paymentDetailsSchema = z.object({
+  paymentPreference: z.enum(["bank", "mpesa", "both"]),
+  mpesaNumber: z.string().optional(),
+  bankName: z.string().optional(),
+  bankAccountNumber: z.string().optional(),
+  bankAccountName: z.string().optional(),
+}).superRefine((data, ctx) => {
+  if (data.paymentPreference === "mpesa" || data.paymentPreference === "both") {
+    if (!data.mpesaNumber || data.mpesaNumber.length < 10) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "M-Pesa number required (min 10 digits)", path: ["mpesaNumber"] });
+    }
+  }
+  if (data.paymentPreference === "bank" || data.paymentPreference === "both") {
+    if (!data.bankName) ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Bank name is required", path: ["bankName"] });
+    if (!data.bankAccountNumber) ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Account number is required", path: ["bankAccountNumber"] });
+    if (!data.bankAccountName) ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Account holder name is required", path: ["bankAccountName"] });
+  }
+});
+type PaymentDetailsForm = z.infer<typeof paymentDetailsSchema>;
 
 export default function VendorDashboard() {
   const { user, isAuthenticated, isLoading } = useAuth();
@@ -161,6 +205,32 @@ export default function VendorDashboard() {
   const { data: vendorEventBookings = [] } = useQuery<any[]>({
     queryKey: ['/api/vendor/event-bookings'],
     enabled: isAuthenticated && isVendor,
+  });
+
+  // Payment details form
+  const paymentForm = useForm<PaymentDetailsForm>({
+    resolver: zodResolver(paymentDetailsSchema),
+    defaultValues: {
+      paymentPreference: ((user as any)?.paymentPreference as "bank" | "mpesa" | "both") || "mpesa",
+      mpesaNumber: (user as any)?.mpesaNumber || "",
+      bankName: (user as any)?.bankName || "",
+      bankAccountNumber: (user as any)?.bankAccountNumber || "",
+      bankAccountName: (user as any)?.bankAccountName || "",
+    },
+  });
+
+  const paymentPreference = paymentForm.watch("paymentPreference");
+
+  const updatePaymentMutation = useMutation({
+    mutationFn: (data: PaymentDetailsForm) =>
+      apiRequest("PUT", "/api/vendor/payment-details", data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+      toast({ title: "Payment details updated", description: "Your payment information has been saved successfully." });
+    },
+    onError: () => {
+      toast({ title: "Update failed", description: "Could not save payment details. Please try again.", variant: "destructive" });
+    },
   });
 
   const handleGoogleLogin = () => {
@@ -500,7 +570,7 @@ export default function VendorDashboard() {
 
         {/* Detailed Analytics */}
         <Tabs defaultValue="courts" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-8">
+          <TabsList className="grid w-full grid-cols-9">
             <TabsTrigger value="courts">Court Analytics</TabsTrigger>
             <TabsTrigger value="manage">Manage Courts</TabsTrigger>
             <TabsTrigger value="equipment">Equipment</TabsTrigger>
@@ -509,6 +579,10 @@ export default function VendorDashboard() {
             <TabsTrigger value="events">Event Bookings</TabsTrigger>
             <TabsTrigger value="overview">Business Overview</TabsTrigger>
             <TabsTrigger value="notifications">Notifications</TabsTrigger>
+            <TabsTrigger value="payment" data-testid="tab-payment-settings">
+              <CreditCard className="h-4 w-4 mr-1 inline" />
+              Payment
+            </TabsTrigger>
           </TabsList>
 
           {/* Court Analytics Tab */}
@@ -1210,6 +1284,198 @@ export default function VendorDashboard() {
                   </CardContent>
                 </Card>
               </div>
+            </div>
+          </TabsContent>
+
+          {/* Payment Settings Tab */}
+          <TabsContent value="payment" className="space-y-6">
+            <div className="max-w-2xl">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <CreditCard className="h-5 w-5" />
+                    Payment Receiving Details
+                  </CardTitle>
+                  <p className="text-sm text-gray-500">
+                    Update how you receive payouts from court bookings. Changes take effect immediately.
+                  </p>
+                </CardHeader>
+                <CardContent>
+                  <Form {...paymentForm}>
+                    <form
+                      onSubmit={paymentForm.handleSubmit((data) => updatePaymentMutation.mutate(data))}
+                      className="space-y-6"
+                      data-testid="payment-settings-form"
+                    >
+                      {/* Payment Preference */}
+                      <FormField
+                        control={paymentForm.control}
+                        name="paymentPreference"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Payment Method Preference</FormLabel>
+                            <Select onValueChange={field.onChange} defaultValue={field.value}>
+                              <FormControl>
+                                <SelectTrigger data-testid="select-payment-preference">
+                                  <SelectValue placeholder="Select payment preference" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="mpesa">
+                                  <span className="flex items-center gap-2">
+                                    <Smartphone className="h-4 w-4" />
+                                    M-Pesa only
+                                  </span>
+                                </SelectItem>
+                                <SelectItem value="bank">
+                                  <span className="flex items-center gap-2">
+                                    <Landmark className="h-4 w-4" />
+                                    Bank Transfer only
+                                  </span>
+                                </SelectItem>
+                                <SelectItem value="both">
+                                  <span className="flex items-center gap-2">
+                                    <CreditCard className="h-4 w-4" />
+                                    Both M-Pesa & Bank
+                                  </span>
+                                </SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      {/* M-Pesa Section */}
+                      {(paymentPreference === "mpesa" || paymentPreference === "both") && (
+                        <div className="p-4 bg-green-50 border border-green-200 rounded-lg space-y-4">
+                          <h4 className="font-semibold text-green-900 flex items-center gap-2">
+                            <Smartphone className="h-4 w-4" />
+                            M-Pesa Details
+                          </h4>
+                          <FormField
+                            control={paymentForm.control}
+                            name="mpesaNumber"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>M-Pesa Phone Number</FormLabel>
+                                <FormControl>
+                                  <Input
+                                    placeholder="e.g. 254712345678"
+                                    data-testid="input-mpesa-number"
+                                    {...field}
+                                  />
+                                </FormControl>
+                                <p className="text-xs text-gray-500">Use format 254XXXXXXXXX (Kenyan number)</p>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                      )}
+
+                      {/* Bank Section */}
+                      {(paymentPreference === "bank" || paymentPreference === "both") && (
+                        <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg space-y-4">
+                          <h4 className="font-semibold text-blue-900 flex items-center gap-2">
+                            <Landmark className="h-4 w-4" />
+                            Bank Account Details
+                          </h4>
+                          <FormField
+                            control={paymentForm.control}
+                            name="bankName"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Bank Name</FormLabel>
+                                <FormControl>
+                                  <Input placeholder="e.g. Equity Bank, KCB, Co-op Bank" data-testid="input-bank-name" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={paymentForm.control}
+                            name="bankAccountNumber"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Account Number</FormLabel>
+                                <FormControl>
+                                  <Input placeholder="Your bank account number" data-testid="input-bank-account-number" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={paymentForm.control}
+                            name="bankAccountName"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Account Holder Name</FormLabel>
+                                <FormControl>
+                                  <Input placeholder="Name as it appears on the account" data-testid="input-bank-account-name" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                      )}
+
+                      <Button
+                        type="submit"
+                        disabled={updatePaymentMutation.isPending}
+                        className="w-full sm:w-auto"
+                        data-testid="button-save-payment-details"
+                      >
+                        <Save className="h-4 w-4 mr-2" />
+                        {updatePaymentMutation.isPending ? "Saving..." : "Save Payment Details"}
+                      </Button>
+                    </form>
+                  </Form>
+                </CardContent>
+              </Card>
+
+              {/* Current Details Summary */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Current Payment Setup</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Preference</span>
+                    <span className="font-medium capitalize">{(user as any)?.paymentPreference || "Not set"}</span>
+                  </div>
+                  {(user as any)?.mpesaNumber && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">M-Pesa Number</span>
+                      <span className="font-medium">{(user as any).mpesaNumber}</span>
+                    </div>
+                  )}
+                  {(user as any)?.bankName && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Bank</span>
+                      <span className="font-medium">{(user as any).bankName}</span>
+                    </div>
+                  )}
+                  {(user as any)?.bankAccountNumber && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Account Number</span>
+                      <span className="font-medium">{(user as any).bankAccountNumber}</span>
+                    </div>
+                  )}
+                  {(user as any)?.bankAccountName && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Account Holder</span>
+                      <span className="font-medium">{(user as any).bankAccountName}</span>
+                    </div>
+                  )}
+                  {!(user as any)?.paymentPreference && !(user as any)?.mpesaNumber && !(user as any)?.bankName && (
+                    <p className="text-gray-500 italic">No payment details on file. Please fill in the form above.</p>
+                  )}
+                </CardContent>
+              </Card>
             </div>
           </TabsContent>
         </Tabs>
