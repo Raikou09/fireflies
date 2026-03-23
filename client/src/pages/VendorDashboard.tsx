@@ -58,7 +58,7 @@ import {
   Landmark,
   Save,
 } from "lucide-react";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth, type AuthUser } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
 import EquipmentManager from "@/components/EquipmentManager";
@@ -211,19 +211,32 @@ export default function VendorDashboard() {
   const paymentForm = useForm<PaymentDetailsForm>({
     resolver: zodResolver(paymentDetailsSchema),
     defaultValues: {
-      paymentPreference: ((user as any)?.paymentPreference as "bank" | "mpesa" | "both") || "mpesa",
-      mpesaNumber: (user as any)?.mpesaNumber || "",
-      bankName: (user as any)?.bankName || "",
-      bankAccountNumber: (user as any)?.bankAccountNumber || "",
-      bankAccountName: (user as any)?.bankAccountName || "",
+      paymentPreference: "mpesa" as "bank" | "mpesa" | "both",
+      mpesaNumber: "",
+      bankName: "",
+      bankAccountNumber: "",
+      bankAccountName: "",
     },
   });
+
+  // Pre-fill payment form once the user data is available
+  useEffect(() => {
+    if (user) {
+      paymentForm.reset({
+        paymentPreference: user.paymentPreference ?? "mpesa",
+        mpesaNumber: user.mpesaNumber ?? "",
+        bankName: user.bankName ?? "",
+        bankAccountNumber: user.bankAccountNumber ?? "",
+        bankAccountName: user.bankAccountName ?? "",
+      });
+    }
+  }, [user]);
 
   const paymentPreference = paymentForm.watch("paymentPreference");
 
   const updatePaymentMutation = useMutation({
     mutationFn: (data: PaymentDetailsForm) =>
-      apiRequest("PUT", "/api/vendor/payment-details", data),
+      apiRequest("/api/vendor/payment-details", "PUT", data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
       toast({ title: "Payment details updated", description: "Your payment information has been saved successfully." });
@@ -1445,33 +1458,33 @@ export default function VendorDashboard() {
                 <CardContent className="space-y-3 text-sm">
                   <div className="flex justify-between">
                     <span className="text-gray-600">Preference</span>
-                    <span className="font-medium capitalize">{(user as any)?.paymentPreference || "Not set"}</span>
+                    <span className="font-medium capitalize">{user?.paymentPreference ?? "Not set"}</span>
                   </div>
-                  {(user as any)?.mpesaNumber && (
+                  {user?.mpesaNumber && (
                     <div className="flex justify-between">
                       <span className="text-gray-600">M-Pesa Number</span>
-                      <span className="font-medium">{(user as any).mpesaNumber}</span>
+                      <span className="font-medium">{user.mpesaNumber}</span>
                     </div>
                   )}
-                  {(user as any)?.bankName && (
+                  {user?.bankName && (
                     <div className="flex justify-between">
                       <span className="text-gray-600">Bank</span>
-                      <span className="font-medium">{(user as any).bankName}</span>
+                      <span className="font-medium">{user.bankName}</span>
                     </div>
                   )}
-                  {(user as any)?.bankAccountNumber && (
+                  {user?.bankAccountNumber && (
                     <div className="flex justify-between">
                       <span className="text-gray-600">Account Number</span>
-                      <span className="font-medium">{(user as any).bankAccountNumber}</span>
+                      <span className="font-medium">{user.bankAccountNumber}</span>
                     </div>
                   )}
-                  {(user as any)?.bankAccountName && (
+                  {user?.bankAccountName && (
                     <div className="flex justify-between">
                       <span className="text-gray-600">Account Holder</span>
-                      <span className="font-medium">{(user as any).bankAccountName}</span>
+                      <span className="font-medium">{user.bankAccountName}</span>
                     </div>
                   )}
-                  {!(user as any)?.paymentPreference && !(user as any)?.mpesaNumber && !(user as any)?.bankName && (
+                  {!user?.paymentPreference && !user?.mpesaNumber && !user?.bankName && (
                     <p className="text-gray-500 italic">No payment details on file. Please fill in the form above.</p>
                   )}
                 </CardContent>
