@@ -11,6 +11,8 @@ import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { apiRequest } from "@/lib/queryClient";
 import { LocationPicker } from "./LocationPicker";
+import { PlacesAutocompleteInput } from "./PlacesAutocompleteInput";
+import { MapPreview } from "./MapPreview";
 import { CloudUpload, X, Info, Package, Plus, Trash2, Loader2 } from "lucide-react";
 
 interface CourtData {
@@ -579,13 +581,27 @@ export default function AddCourtModal({ isOpen, onClose, courtToEdit }: AddCourt
             </div>
             <div>
               <Label>Street Address</Label>
-              <Input 
-                placeholder="Full address (auto-filled from map)"
+              <PlacesAutocompleteInput
                 value={formData.address}
-                onChange={(e) => handleInputChange("address", e.target.value)}
+                onChange={(value) => handleInputChange("address", value)}
+                onPlaceSelect={({ address, lat, lng }) => {
+                  handleInputChange("address", address);
+                  setLocationData({ latitude: lat, longitude: lng, address });
+                }}
+                placeholder="Search for address (e.g. Westlands, Nairobi)"
+                data-testid="input-court-address"
               />
             </div>
           </div>
+
+          {/* Map preview after address/location is set */}
+          {locationData.latitude && locationData.longitude && (
+            <MapPreview
+              lat={locationData.latitude}
+              lng={locationData.longitude}
+              address={formData.address || locationData.address}
+            />
+          )}
 
           {/* Pricing */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

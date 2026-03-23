@@ -11,6 +11,8 @@ import { AlertTriangle, Clock, CloudUpload, X, Plus, Loader2 } from "lucide-reac
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { LocationPicker } from "./LocationPicker";
+import { PlacesAutocompleteInput } from "./PlacesAutocompleteInput";
+import { MapPreview } from "./MapPreview";
 import type { CourtWithDetails } from "@shared/schema";
 
 interface VendorCourtUpdateModalProps {
@@ -293,14 +295,27 @@ export default function VendorCourtUpdateModal({ court, isOpen, onClose }: Vendo
 
           <div>
             <Label htmlFor="address">Full Address</Label>
-            <Input
+            <PlacesAutocompleteInput
               id="address"
               value={formData.address}
-              onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-              placeholder="Complete address for directions"
+              onChange={(value) => setFormData({ ...formData, address: value })}
+              onPlaceSelect={({ address, lat, lng }) => {
+                setFormData((prev) => ({ ...prev, address }));
+                setLocationData({ latitude: lat, longitude: lng, address });
+              }}
+              placeholder="Search for address (e.g. Westlands, Nairobi)"
               data-testid="input-court-address"
             />
           </div>
+
+          {/* Map preview after address / GPS location is set */}
+          {locationData.latitude && locationData.longitude && (
+            <MapPreview
+              lat={locationData.latitude}
+              lng={locationData.longitude}
+              address={formData.address || locationData.address}
+            />
+          )}
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>

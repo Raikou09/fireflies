@@ -23,7 +23,8 @@ import {
   Share2,
   MessageSquare,
   Package,
-  CheckCircle2
+  CheckCircle2,
+  ExternalLink
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import EquipmentRentalModal from '@/components/EquipmentRentalModal';
@@ -206,6 +207,23 @@ export default function CourtDetails() {
                         </div>
                       )}
                     </div>
+                    {court.address && (
+                      <p className="text-sm text-gray-500 dark:text-gray-400 mt-1" data-testid="court-full-address">
+                        {court.address}
+                      </p>
+                    )}
+                    {court.latitude && court.longitude && (
+                      <a
+                        href={`https://www.google.com/maps/dir/?api=1&destination=${court.latitude},${court.longitude}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-sm text-primary hover:underline mt-1"
+                        data-testid="link-get-directions"
+                      >
+                        <ExternalLink size={14} />
+                        Get Directions
+                      </a>
+                    )}
                   </div>
                   <div className="flex items-center gap-2">
                     <Button variant="ghost" size="sm">
@@ -539,6 +557,48 @@ export default function CourtDetails() {
                 </div>
               </CardContent>
             </Card>
+
+            {/* Location card with map + directions */}
+            {court.latitude && court.longitude && (
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <MapPin size={16} />
+                    Location
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3 pt-0">
+                  {import.meta.env.VITE_GOOGLE_MAPS_API_KEY ? (
+                    <a
+                      href={`https://www.google.com/maps/search/?api=1&query=${court.latitude},${court.longitude}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block"
+                    >
+                      <img
+                        src={`https://maps.googleapis.com/maps/api/staticmap?center=${court.latitude},${court.longitude}&zoom=15&size=400x180&maptype=roadmap&markers=color:red%7C${court.latitude},${court.longitude}&key=${import.meta.env.VITE_GOOGLE_MAPS_API_KEY}`}
+                        alt="Court location"
+                        className="w-full rounded-lg h-36 object-cover"
+                        data-testid="court-map-preview"
+                      />
+                    </a>
+                  ) : null}
+                  {court.address && (
+                    <p className="text-sm text-gray-600 dark:text-gray-400">{court.address}</p>
+                  )}
+                  <a
+                    href={`https://www.google.com/maps/dir/?api=1&destination=${court.latitude},${court.longitude}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-center gap-2 w-full py-2 px-4 rounded-md border border-primary text-primary text-sm font-medium hover:bg-primary/5 transition-colors"
+                    data-testid="sidebar-link-get-directions"
+                  >
+                    <ExternalLink size={14} />
+                    Get Directions
+                  </a>
+                </CardContent>
+              </Card>
+            )}
           </div>
         </div>
       </div>

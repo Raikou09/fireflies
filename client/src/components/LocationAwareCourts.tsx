@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { MapPin, Navigation, Clock, Star } from 'lucide-react';
+import { MapPin, Navigation, Clock, Star, ExternalLink } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'wouter';
 import { BookingModal } from './BookingModal';
@@ -218,9 +218,22 @@ export function LocationAwareCourts({ city, sport, searchQuery }: LocationAwareC
                       )}
                     </div>
                     {court.address && (
-                      <p className="text-xs md:text-sm text-gray-500 mb-2" data-testid={`text-court-address-${court.id}`}>
+                      <p className="text-xs md:text-sm text-gray-500 mb-1" data-testid={`text-court-address-${court.id}`}>
                         {court.address}
                       </p>
+                    )}
+                    {court.latitude && court.longitude && (
+                      <a
+                        href={`https://www.google.com/maps/dir/?api=1&destination=${court.latitude},${court.longitude}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="relative z-10 inline-flex items-center gap-1 text-xs text-primary hover:underline mb-2"
+                        data-testid={`link-get-directions-${court.id}`}
+                      >
+                        <ExternalLink className="h-3 w-3" />
+                        Get Directions
+                      </a>
                     )}
                   </div>
                   
