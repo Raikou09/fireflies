@@ -623,41 +623,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const booking = await storage.createBooking(bookingData);
 
-      // Send booking confirmation email
-      try {
-        const court = await storage.getCourtById(courtId);
-        
-        // Determine email recipient and name
-        let recipientEmail: string | undefined;
-        let recipientName: string;
-        
-        if (customerId) {
-          const customer = await storage.getUser(customerId);
-          recipientEmail = customer?.email ?? undefined;
-          recipientName = `${customer?.firstName || ''} ${customer?.lastName || ''}`.trim() || 'Valued Customer';
-        } else {
-          recipientEmail = guestEmail;
-          recipientName = guestName || 'Valued Guest';
-        }
-        
-        if (recipientEmail && court) {
-          await EmailService.sendBookingConfirmation({
-            customerEmail: recipientEmail,
-            customerName: recipientName,
-            courtName: court.name,
-            bookingDate: date,
-            startTime: timeSlot,
-            endTime: endTime,
-            totalAmount: totalAmount.toString(),
-            bookingId: booking.id,
-          });
-          console.log('Booking confirmation email sent to:', recipientEmail);
-        }
-      } catch (emailError) {
-        console.error('Failed to send booking confirmation email:', emailError);
-        // Don't fail the booking if email fails
-      }
-
       res.status(201).json(booking);
     } catch (error) {
       console.error("Error creating booking:", error);
@@ -2842,6 +2807,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
             mpesaTransactionDate: callbackData.transactionDate,
           });
           console.log("Court booking payment updated:", booking.id);
+
+          // Send confirmation email only after payment is confirmed
+          try {
+            const court = await storage.getCourtById(booking.courtId);
+            let recipientEmail: string | undefined;
+            let recipientName: string;
+
+            if (booking.isGuestBooking) {
+              recipientEmail = booking.guestEmail ?? undefined;
+              recipientName = booking.guestName || 'Valued Guest';
+            } else if (booking.customerId) {
+              const customer = await storage.getUser(booking.customerId);
+              recipientEmail = customer?.email ?? undefined;
+              recipientName = `${customer?.firstName || ''} ${customer?.lastName || ''}`.trim() || 'Valued Customer';
+            }
+
+            if (recipientEmail && court) {
+              await EmailService.sendBookingConfirmation({
+                customerEmail: recipientEmail,
+                customerName: recipientName!,
+                courtName: court.name,
+                bookingDate: booking.date,
+                startTime: booking.timeSlot,
+                endTime: booking.endTime,
+                totalAmount: booking.totalAmount?.toString() ?? '0',
+                bookingId: booking.id,
+              });
+              console.log("Post-payment confirmation email sent to:", recipientEmail);
+            }
+          } catch (emailError) {
+            console.error("Failed to send post-payment confirmation email:", emailError);
+          }
         }
         
         // Try to find and update event booking
