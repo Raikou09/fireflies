@@ -44,7 +44,7 @@ integrations = ["javascript_object_storage:1.0.0", "javascript_log_in_with_repli
 [userenv]
 
 [userenv.shared]
-MPESA_SIMULATION_MODE = "true"
+MPESA_SIMULATION_MODE = "false"
 ADMIN_EMAIL = "tavish@dreamcatchers.tv"
 
 [postMerge]
