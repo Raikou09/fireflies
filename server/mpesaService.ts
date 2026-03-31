@@ -18,7 +18,7 @@ const simulatedPayments: Map<string, {
 }> = new Map();
 
 const getBaseUrl = () => {
-  return process.env.NODE_ENV === 'production' ? PRODUCTION_BASE_URL : SANDBOX_BASE_URL;
+  return process.env.MPESA_ENVIRONMENT === 'production' ? PRODUCTION_BASE_URL : SANDBOX_BASE_URL;
 };
 
 const getTimestamp = (): string => {
