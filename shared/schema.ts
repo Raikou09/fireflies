@@ -78,6 +78,7 @@ export const courts = pgTable("courts", {
   name: text("name").notNull(),
   availableSports: text("available_sports").array().notNull(), // Array of sports available at this location
   facilityType: varchar("facility_type", { enum: ["separate_areas", "shared_area"] }).default("shared_area"), // Whether different sports have separate areas or share one space
+  sportCapacities: jsonb("sport_capacities").default({}), // Maps sport name → number of concurrent courts, e.g. {"Tennis": 2, "Football": 1}
   city: varchar("city").notNull(),
   area: varchar("area").notNull(),
   address: text("address"),
@@ -128,6 +129,7 @@ export const bookings = pgTable("bookings", {
   startTime: varchar("start_time"), // e.g., "14:00"
   endTime: varchar("end_time"), // e.g., "16:00"
   duration: integer("duration").default(1), // hours
+  courtsBooked: integer("courts_booked").default(1), // Number of concurrent courts booked (for large groups)
   courtAmount: decimal("court_amount", { precision: 10, scale: 2 }).notNull(),
   equipmentAmount: decimal("equipment_amount", { precision: 10, scale: 2 }).default("0.00"),
   totalAmount: decimal("total_amount", { precision: 10, scale: 2 }).notNull(),

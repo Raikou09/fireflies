@@ -36,6 +36,7 @@ interface BookingData {
   totalAmount: number;
   selectedSport: string;
   sportSegments?: Array<{hour: number, sport: string}>;
+  courtsBooked?: number;
   // Guest booking fields
   isGuestBooking?: boolean;
   guestName?: string;
@@ -65,6 +66,9 @@ export function BookingModal({ court, isOpen, onClose }: BookingModalProps) {
   const [createdBookingId, setCreatedBookingId] = useState<string | null>(null);
   const [customerPhone, setCustomerPhone] = useState('');
   
+  // Court count state (for large groups booking multiple courts)
+  const [selectedCourtsCount, setSelectedCourtsCount] = useState(1);
+
   // Multi-sport booking state
   const [isAddingMoreSports, setIsAddingMoreSports] = useState(false);
   
@@ -112,9 +116,12 @@ export function BookingModal({ court, isOpen, onClose }: BookingModalProps) {
       duration: number;
       selectedSport: string;
       sportSegments?: Array<{hour: number, sport: string}>;
+      courtsBooked?: number;
+      status?: string;
     }>;
     facilityType: 'separate_areas' | 'shared_area';
     availableSports: string[];
+    sportCapacities: Record<string, number>;
   }>({
     queryKey: ['/api/bookings/availability', court.id, selectedDate?.toISOString().split('T')[0]],
     enabled: !!selectedDate,
@@ -127,41 +134,57 @@ export function BookingModal({ court, isOpen, onClose }: BookingModalProps) {
 
   const existingBookings = availabilityData?.bookings || [];
   const facilityType = availabilityData?.facilityType || 'shared_area';
+  const sportCapacities: Record<string, number> = availabilityData?.sportCapacities || {};
 
-  // Check if a time slot is available based on existing bookings (considers multi-sport via sportSegments)
-  const isSlotAvailable = (time: string): boolean => {
-    // If no sport selected yet, assume available (will be checked again after selection)
-    if (!selectedSport) return true;
-    
-    const hour = parseInt(time.split(':')[0]);
-    
+  // Get capacity for a sport (defaults to 1 if not configured)
+  const getSportCapacity = (sport: string): number => {
+    if (facilityType !== 'separate_areas') return 1;
+    return sportCapacities[sport] ?? 1;
+  };
+
+  // Count how many courts are already booked for a sport at a given hour
+  const getCourtsBookedAtHour = (sport: string, hour: number): number => {
+    let count = 0;
     for (const booking of existingBookings) {
-      const bookingStart = parseInt(booking.startTime?.split(':')[0] || booking.timeSlot.split(':')[0]);
-      const bookingEnd = bookingStart + (booking.duration || 1);
-      
-      // Check if hour falls within booking range
-      if (hour >= bookingStart && hour < bookingEnd) {
-        // For shared areas, any booking blocks the slot
-        if (facilityType === 'shared_area') {
-          return false;
-        }
-        
-        // For separate areas, check sportSegments for per-hour blocking
-        let sportForThisHour = booking.selectedSport;
-        if (booking.sportSegments && Array.isArray(booking.sportSegments)) {
-          const segmentForHour = booking.sportSegments.find((seg: {hour: number, sport: string}) => seg.hour === hour);
-          if (segmentForHour) {
-            sportForThisHour = segmentForHour.sport;
-          }
-        }
-        
-        // Block if same sport is booked for this hour
-        if (sportForThisHour === selectedSport) {
-          return false;
-        }
+      if (booking.status === 'cancelled') continue;
+      const bStart = parseInt((booking.startTime || booking.timeSlot).split(':')[0]);
+      const bEnd = bStart + (booking.duration || 1);
+      if (hour < bStart || hour >= bEnd) continue;
+      let sportAtHour = booking.selectedSport;
+      if (booking.sportSegments && Array.isArray(booking.sportSegments)) {
+        const seg = booking.sportSegments.find((s: {hour: number, sport: string}) => s.hour === hour);
+        if (seg) sportAtHour = seg.sport;
       }
+      if (sportAtHour === sport) count += (booking.courtsBooked ?? 1);
     }
-    return true;
+    return count;
+  };
+
+  // Returns remaining available courts for a sport at a given hour
+  const getRemainingCourts = (sport: string, hour: number): number => {
+    const cap = getSportCapacity(sport);
+    const booked = getCourtsBookedAtHour(sport, hour);
+    return Math.max(0, cap - booked);
+  };
+
+  // Check if a time slot is available based on existing bookings and capacities
+  const isSlotAvailable = (time: string): boolean => {
+    if (!selectedSport) return true;
+    const hour = parseInt(time.split(':')[0]);
+
+    if (facilityType === 'shared_area') {
+      // Shared area: any booking at this hour blocks it
+      for (const booking of existingBookings) {
+        if (booking.status === 'cancelled') continue;
+        const bStart = parseInt((booking.startTime || booking.timeSlot).split(':')[0]);
+        const bEnd = bStart + (booking.duration || 1);
+        if (hour >= bStart && hour < bEnd) return false;
+      }
+      return true;
+    }
+
+    // Separate areas: check remaining capacity for this sport
+    return getRemainingCourts(selectedSport, hour) > 0;
   };
 
   // Calculate max consecutive hours available from a given time slot
@@ -200,36 +223,19 @@ export function BookingModal({ court, isOpen, onClose }: BookingModalProps) {
     return (court.availableSports || []).filter(sport => !bookedSports.has(sport) && sport !== selectedSport);
   };
 
-  // Get all available sports for a specific hour (considers multi-sport bookings via sportSegments)
+  // Get all available sports for a specific hour (capacity-aware)
   const getAvailableSportsForHour = (hour: number): string[] => {
-    const bookedSports = new Set<string>();
-    
-    for (const booking of existingBookings) {
-      const bookingStart = parseInt(booking.startTime?.split(':')[0] || booking.timeSlot.split(':')[0]);
-      const bookingEnd = bookingStart + (booking.duration || 1);
-      
-      if (hour >= bookingStart && hour < bookingEnd) {
-        if (facilityType === 'shared_area') {
-          return []; // Shared area - if any booking exists, no sports available
-        }
-        
-        // Check sportSegments for per-hour sport assignments
-        if (booking.sportSegments && Array.isArray(booking.sportSegments)) {
-          const segmentForHour = booking.sportSegments.find((seg: {hour: number, sport: string}) => seg.hour === hour);
-          if (segmentForHour) {
-            bookedSports.add(segmentForHour.sport);
-          } else {
-            // Fallback to selectedSport if no segment for this hour
-            bookedSports.add(booking.selectedSport);
-          }
-        } else {
-          // No segments, use selectedSport for all hours
-          bookedSports.add(booking.selectedSport);
-        }
+    if (facilityType === 'shared_area') {
+      for (const booking of existingBookings) {
+        if (booking.status === 'cancelled') continue;
+        const bStart = parseInt((booking.startTime || booking.timeSlot).split(':')[0]);
+        const bEnd = bStart + (booking.duration || 1);
+        if (hour >= bStart && hour < bEnd) return [];
       }
+      return court.availableSports || [];
     }
-    
-    return (court.availableSports || []).filter(sport => !bookedSports.has(sport));
+    // Separate areas: a sport is available if remaining capacity > 0
+    return (court.availableSports || []).filter(sport => getRemainingCourts(sport, hour) > 0);
   };
 
   // Check if a duration is possible with multi-sport booking
@@ -372,8 +378,8 @@ export function BookingModal({ court, isOpen, onClose }: BookingModalProps) {
   const selectedSlot = timeSlots.find(slot => slot.time === selectedTimeSlot);
   const maxConsecutiveHours = selectedTimeSlot ? getMaxConsecutiveHours(selectedTimeSlot) : 4;
   
-  // Calculate total amount including equipment and discount
-  const courtCost = selectedSlot ? selectedSlot.price * selectedDuration : 0;
+  // Calculate total amount including equipment, courts count, and discount
+  const courtCost = selectedSlot ? selectedSlot.price * selectedDuration * selectedCourtsCount : 0;
   const equipmentCost = selectedEquipment.reduce((total, item) => 
     total + (item.pricePerHour * item.quantity * selectedDuration), 0);
   const subtotal = courtCost + equipmentCost;
@@ -455,6 +461,7 @@ export function BookingModal({ court, isOpen, onClose }: BookingModalProps) {
       totalAmount,
       selectedSport,
       sportSegments: sportSegments.length > 0 ? sportSegments : undefined,
+      courtsBooked: selectedCourtsCount > 1 ? selectedCourtsCount : undefined,
       // Guest booking fields
       isGuestBooking: !isLoggedIn,
       guestName: !isLoggedIn ? guestName : undefined,
@@ -485,6 +492,7 @@ export function BookingModal({ court, isOpen, onClose }: BookingModalProps) {
     setSelectedSport('');
     setSportSegments([]);
     setSelectedEquipment([]);
+    setSelectedCourtsCount(1);
     setStep('datetime');
     setShowMpesaPayment(false);
     setCreatedBookingId(null);
@@ -586,6 +594,7 @@ export function BookingModal({ court, isOpen, onClose }: BookingModalProps) {
                             setSelectedSport(sport);
                             setSelectedTimeSlot('');
                             setSelectedDuration(1);
+                            setSelectedCourtsCount(1);
                           }}
                           className="h-auto py-3"
                           data-testid={`button-sport-${sport.toLowerCase().replace(/\s+/g, '-')}`}
@@ -620,24 +629,40 @@ export function BookingModal({ court, isOpen, onClose }: BookingModalProps) {
                       Available Time Slots - {selectedDate.toDateString()}
                     </h3>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                      {timeSlots.map((slot) => (
-                        <Button
-                          key={slot.time}
-                          variant={slot.isSelected ? "default" : "outline"}
-                          disabled={!slot.isAvailable}
-                          onClick={() => handleTimeSlotSelect(slot.time)}
-                          className="flex flex-col p-3 h-auto"
-                          data-testid={`button-timeslot-${slot.time}`}
-                        >
-                          <span className="font-medium">{slot.time}</span>
-                          <span className="text-xs">
-                            KSh {slot.price}/hr
-                          </span>
-                          {!slot.isAvailable && (
-                            <span className="text-xs text-red-500">Booked</span>
-                          )}
-                        </Button>
-                      ))}
+                      {timeSlots.map((slot) => {
+                        const hour = parseInt(slot.time.split(':')[0]);
+                        const capacity = selectedSport ? getSportCapacity(selectedSport) : 1;
+                        const remaining = selectedSport && facilityType === 'separate_areas'
+                          ? getRemainingCourts(selectedSport, hour)
+                          : slot.isAvailable ? 1 : 0;
+                        const showCapacity = facilityType === 'separate_areas' && capacity > 1 && selectedSport;
+                        return (
+                          <Button
+                            key={slot.time}
+                            variant={slot.isSelected ? "default" : "outline"}
+                            disabled={!slot.isAvailable}
+                            onClick={() => {
+                              handleTimeSlotSelect(slot.time);
+                              setSelectedCourtsCount(1);
+                            }}
+                            className="flex flex-col p-3 h-auto"
+                            data-testid={`button-timeslot-${slot.time}`}
+                          >
+                            <span className="font-medium">{slot.time}</span>
+                            <span className="text-xs">KSh {slot.price}/hr</span>
+                            {showCapacity && slot.isAvailable && (
+                              <span className="text-xs text-green-600">
+                                {remaining}/{capacity} courts
+                              </span>
+                            )}
+                            {!slot.isAvailable && (
+                              <span className="text-xs text-red-500">
+                                {showCapacity ? 'Full' : 'Booked'}
+                              </span>
+                            )}
+                          </Button>
+                        );
+                      })}
                     </div>
                   </div>
                 )}
@@ -691,6 +716,52 @@ export function BookingModal({ court, isOpen, onClose }: BookingModalProps) {
                     )}
                   </div>
                 )}
+
+                {/* Court Count Selector - shown for separate_areas courts with capacity > 1 */}
+                {selectedTimeSlot && facilityType === 'separate_areas' && selectedSport && (() => {
+                  const startHour = parseInt(selectedTimeSlot.split(':')[0]);
+                  // Find the minimum remaining courts across all booked hours
+                  const minRemaining = Math.min(
+                    ...Array.from({ length: selectedDuration }, (_, i) =>
+                      getRemainingCourts(selectedSport, startHour + i)
+                    )
+                  );
+                  const capacity = getSportCapacity(selectedSport);
+                  if (capacity <= 1) return null;
+                  return (
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                      <h3 className="text-md font-semibold mb-2 text-blue-800 flex items-center gap-2">
+                        <Users className="h-4 w-4" />
+                        Number of Courts
+                      </h3>
+                      <p className="text-sm text-blue-700 mb-3">
+                        {minRemaining} of {capacity} {selectedSport} courts available at this time. Book multiple courts for a large group.
+                      </p>
+                      <div className="flex items-center gap-3">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setSelectedCourtsCount(c => Math.max(1, c - 1))}
+                          disabled={selectedCourtsCount <= 1}
+                        >
+                          −
+                        </Button>
+                        <span className="text-lg font-bold w-8 text-center">{selectedCourtsCount}</span>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setSelectedCourtsCount(c => Math.min(minRemaining, c + 1))}
+                          disabled={selectedCourtsCount >= minRemaining}
+                        >
+                          +
+                        </Button>
+                        <span className="text-sm text-gray-600 ml-2">
+                          court{selectedCourtsCount > 1 ? 's' : ''} × KSh {selectedSlot?.price ?? 0}/hr
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 {/* Hour-by-Hour Sport Selection - shown when booking has multiple different sports */}
                 {selectedTimeSlot && sportSegments.length > 0 && (
@@ -1061,7 +1132,12 @@ export function BookingModal({ court, isOpen, onClose }: BookingModalProps) {
                           <span>{selectedDuration} hour{selectedDuration > 1 ? 's' : ''}</span>
                         </div>
                         <div className="flex justify-between text-sm">
-                          <span>Court Cost</span>
+                          <span>
+                            Court Cost
+                            {selectedCourtsCount > 1 && (
+                              <span className="text-xs text-blue-600 ml-1">×{selectedCourtsCount} courts</span>
+                            )}
+                          </span>
                           <span>KSh {courtCost}</span>
                         </div>
                         {equipmentCost > 0 && (

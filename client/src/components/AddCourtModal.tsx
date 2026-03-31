@@ -76,6 +76,7 @@ export default function AddCourtModal({ isOpen, onClose, courtToEdit }: AddCourt
 
   const [selectedSports, setSelectedSports] = useState<string[]>([]);
   const [facilityType, setFacilityType] = useState<"separate_areas" | "shared_area">("shared_area");
+  const [sportCapacities, setSportCapacities] = useState<Record<string, number>>({});
 
   const [availableDays, setAvailableDays] = useState<string[]>([
     "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"
@@ -110,6 +111,7 @@ export default function AddCourtModal({ isOpen, onClose, courtToEdit }: AddCourt
       });
       setSelectedSports(courtToEdit.availableSports || []);
       setFacilityType(courtToEdit.facilityType || "shared_area");
+      setSportCapacities((courtToEdit as any).sportCapacities || {});
       setAvailableDays(courtToEdit.availableDays || ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]);
       setImageUrl(courtToEdit.imageUrl || "");
       const existingGallery = courtToEdit.images && courtToEdit.images.length > 0
@@ -228,6 +230,7 @@ export default function AddCourtModal({ isOpen, onClose, courtToEdit }: AddCourt
     });
     setSelectedSports([]);
     setFacilityType("shared_area");
+    setSportCapacities({});
     setAvailableDays(["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]);
     setImageUrl("");
     setGalleryImages([]);
@@ -328,6 +331,7 @@ export default function AddCourtModal({ isOpen, onClose, courtToEdit }: AddCourt
       name: formData.name,
       availableSports: selectedSports,
       facilityType,
+      sportCapacities: facilityType === 'separate_areas' ? sportCapacities : {},
       city: formData.city,
       area: formData.area,
       address: formData.address || "",
@@ -559,6 +563,35 @@ export default function AddCourtModal({ isOpen, onClose, courtToEdit }: AddCourt
               </div>
             )}
           </div>
+
+          {/* Sport Capacities - only for separate_areas */}
+          {facilityType === 'separate_areas' && selectedSports.length > 0 && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <h3 className="font-semibold text-blue-800 mb-1">Court Count per Sport</h3>
+              <p className="text-sm text-blue-700 mb-3">
+                Set how many separate courts/areas are available for each sport. Customers can book multiple courts simultaneously.
+              </p>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                {selectedSports.map(sport => (
+                  <div key={sport} className="flex items-center gap-2">
+                    <Label className="w-24 shrink-0 text-sm">{sport}</Label>
+                    <Input
+                      type="number"
+                      min={1}
+                      max={20}
+                      value={sportCapacities[sport] ?? 1}
+                      onChange={e => {
+                        const val = Math.max(1, parseInt(e.target.value) || 1);
+                        setSportCapacities(prev => ({ ...prev, [sport]: val }));
+                      }}
+                      className="w-20"
+                    />
+                    <span className="text-xs text-gray-500">courts</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Location */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

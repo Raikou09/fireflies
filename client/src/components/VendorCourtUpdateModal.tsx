@@ -50,6 +50,8 @@ export default function VendorCourtUpdateModal({ court, isOpen, onClose }: Vendo
   const [galleryImages, setGalleryImages] = useState<string[]>([]);
   const [coverImageUrl, setCoverImageUrl] = useState<string>("");
   const [isUploadingGallery, setIsUploadingGallery] = useState(false);
+  const [facilityType, setFacilityType] = useState<"separate_areas" | "shared_area">("shared_area");
+  const [sportCapacities, setSportCapacities] = useState<Record<string, number>>({});
 
   React.useEffect(() => {
     console.log('VendorCourtUpdateModal - Court data:', court);
@@ -83,6 +85,8 @@ export default function VendorCourtUpdateModal({ court, isOpen, onClose }: Vendo
           address: court.address || undefined
         });
       }
+      setFacilityType((court as any).facilityType || "shared_area");
+      setSportCapacities((court as any).sportCapacities || {});
     }
   }, [court]);
 
@@ -217,7 +221,11 @@ export default function VendorCourtUpdateModal({ court, isOpen, onClose }: Vendo
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     console.log('Submitting form data:', formData);
-    updateCourtMutation.mutate(formData);
+    updateCourtMutation.mutate({
+      ...formData,
+      facilityType,
+      sportCapacities: facilityType === 'separate_areas' ? sportCapacities : {},
+    });
   };
 
   console.log('VendorCourtUpdateModal - Props received:', { 
@@ -395,6 +403,35 @@ export default function VendorCourtUpdateModal({ court, isOpen, onClose }: Vendo
               ))}
             </div>
           </div>
+
+          {/* Sport Capacities - only for separate_areas */}
+          {facilityType === 'separate_areas' && formData.availableSports.length > 0 && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <h3 className="font-semibold text-blue-800 mb-1">Court Count per Sport</h3>
+              <p className="text-sm text-blue-700 mb-3">
+                How many separate courts/areas are available for each sport simultaneously?
+              </p>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                {formData.availableSports.map(sport => (
+                  <div key={sport} className="flex items-center gap-2">
+                    <Label className="w-24 shrink-0 text-sm">{sport}</Label>
+                    <Input
+                      type="number"
+                      min={1}
+                      max={20}
+                      value={sportCapacities[sport] ?? 1}
+                      onChange={e => {
+                        const val = Math.max(1, parseInt(e.target.value) || 1);
+                        setSportCapacities(prev => ({ ...prev, [sport]: val }));
+                      }}
+                      className="w-20"
+                    />
+                    <span className="text-xs text-gray-500">courts</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div>
             <Label>Available Days *</Label>

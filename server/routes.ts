@@ -522,11 +522,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const bookings = await storage.getBookingsByCourtAndDate(courtId, date as string);
       const court = await storage.getCourtById(courtId);
       
-      // Return bookings with court facility type for smart availability calculation
+      // Return bookings with court facility type and per-sport capacity for smart availability
       res.json({
         bookings,
         facilityType: court?.facilityType || 'shared_area',
-        availableSports: court?.availableSports || []
+        availableSports: court?.availableSports || [],
+        sportCapacities: (court as any)?.sportCapacities || {}
       });
     } catch (error) {
       console.error("Error fetching availability:", error);
@@ -540,10 +541,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { 
         courtId, date, timeSlot, duration, totalAmount, selectedSport, sportSegments,
+        courtsBooked: requestedCourts,
         // Guest booking fields
         isGuestBooking, guestName, guestEmail, guestPhone
         // Note: discount fields are NOT accepted from client - calculated server-side
       } = req.body;
+      const courtsBooked = Math.max(1, parseInt(requestedCourts) || 1);
       
       // Check if user is authenticated
       const customerId = req.user?.claims?.sub || req.user?.id || null;
@@ -621,6 +624,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
         bookingData.guestPhone = guestPhone;
       }
       
+      // Server-side capacity enforcement for separate_areas courts
+      const court = await storage.getCourtById(courtId);
+      if (court && (court as any).facilityType === 'separate_areas' && selectedSport) {
+        const sportCapacities: Record<string, number> = (court as any).sportCapacities || {};
+        const capacity = sportCapacities[selectedSport] ?? 1;
+        // Count courts already booked for this sport at overlapping times on the same date
+        const existingBookings = await storage.getBookingsByCourtAndDate(courtId, date);
+        const startHour = parseInt(timeSlot.split(':')[0]);
+        let alreadyBooked = 0;
+        for (const b of existingBookings) {
+          if (b.status === 'cancelled') continue;
+          const bStart = parseInt((b.startTime || b.timeSlot).split(':')[0]);
+          const bEnd = bStart + (b.duration || 1);
+          const overlapsSport = b.selectedSport === selectedSport ||
+            (Array.isArray(b.sportSegments) && b.sportSegments.some(
+              (seg: any) => seg.sport === selectedSport && seg.hour >= startHour && seg.hour < startHour + duration
+            ));
+          const overlapsTime = startHour < bEnd && (startHour + duration) > bStart;
+          if (overlapsTime && overlapsSport) {
+            alreadyBooked += (b as any).courtsBooked || 1;
+          }
+        }
+        if (alreadyBooked + courtsBooked > capacity) {
+          const remaining = Math.max(0, capacity - alreadyBooked);
+          return res.status(409).json({
+            message: remaining === 0
+              ? `All ${selectedSport} courts are fully booked at this time`
+              : `Only ${remaining} court${remaining === 1 ? '' : 's'} available for ${selectedSport} at this time`
+          });
+        }
+      }
+      bookingData.courtsBooked = courtsBooked;
+
       const booking = await storage.createBooking(bookingData);
 
       res.status(201).json(booking);
