@@ -112,7 +112,7 @@ export class EmailService {
               <ul>
                 <li>Please arrive 15 minutes before your booking time</li>
                 <li>Bring valid ID for verification</li>
-                <li>Court cancellations must be made 24 hours in advance</li>
+                <li>Cancellations must be made at least 2 hours before your booking time</li>
                 <li>Contact the venue directly for any special requirements</li>
               </ul>
             </div>
@@ -490,6 +490,99 @@ export class EmailService {
       `
     };
 
+    return this.sendEmail(template);
+  }
+
+  static async sendBookingCancellationCustomer(params: {
+    customerEmail: string;
+    customerName: string;
+    courtName: string;
+    bookingDate: string;
+    startTime: string;
+    endTime: string;
+    totalAmount: string;
+    bookingId: string;
+  }): Promise<boolean> {
+    const template: EmailTemplate = {
+      to: params.customerEmail,
+      subject: `Booking Cancelled - ${params.courtName}`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <div style="background: #dc2626; color: white; padding: 20px; text-align: center;">
+            <h1>🏀 SportsBox Kenya</h1>
+            <h2>Booking Cancelled</h2>
+          </div>
+          <div style="padding: 20px; background: #f9f9f9;">
+            <h3>Hello ${params.customerName},</h3>
+            <p>Your booking has been successfully cancelled. Here are the details of the cancelled booking:</p>
+            <div style="background: white; padding: 15px; border-radius: 8px; margin: 20px 0;">
+              <h4 style="color: #dc2626; margin-top: 0;">Cancelled Booking</h4>
+              <p><strong>Court:</strong> ${params.courtName}</p>
+              <p><strong>Date:</strong> ${params.bookingDate}</p>
+              <p><strong>Time:</strong> ${params.startTime} - ${params.endTime}</p>
+              <p><strong>Amount Paid:</strong> KES ${params.totalAmount}</p>
+              <p><strong>Booking ID:</strong> ${params.bookingId}</p>
+            </div>
+            <div style="background: #fef3c7; padding: 15px; border-radius: 8px; margin: 20px 0;">
+              <h4 style="color: #92400e; margin-top: 0;">Refund Information</h4>
+              <p>Refunds are processed manually within <strong>3–5 business days</strong> via M-Pesa reversal to the number used during payment. If you have not received your refund after 5 business days, please contact us at <strong>info@sportsbox.co.ke</strong>.</p>
+            </div>
+            <p>We hope to see you back on the court soon!</p>
+            <div style="text-align: center; margin-top: 30px;">
+              <a href="https://sportsbox.co.ke" style="background: #16a34a; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;">Browse Courts</a>
+            </div>
+          </div>
+          <div style="background: #333; color: white; padding: 15px; text-align: center; font-size: 14px;">
+            <p>SportsBox Kenya - Your Premier Sports Court Booking Platform</p>
+            <p>Email: info@sportsbox.co.ke | Phone: +254 700 000 000</p>
+          </div>
+        </div>
+      `
+    };
+    return this.sendEmail(template);
+  }
+
+  static async sendBookingCancellationVendor(params: {
+    vendorEmail: string;
+    vendorName: string;
+    courtName: string;
+    customerName: string;
+    bookingDate: string;
+    startTime: string;
+    endTime: string;
+    totalAmount: string;
+    bookingId: string;
+  }): Promise<boolean> {
+    const template: EmailTemplate = {
+      to: params.vendorEmail,
+      subject: `Booking Cancelled - ${params.courtName} on ${params.bookingDate}`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <div style="background: #dc2626; color: white; padding: 20px; text-align: center;">
+            <h1>🏀 SportsBox Kenya</h1>
+            <h2>Booking Cancelled by Customer</h2>
+          </div>
+          <div style="padding: 20px; background: #f9f9f9;">
+            <h3>Hello ${params.vendorName},</h3>
+            <p>A customer has cancelled their booking for <strong>${params.courtName}</strong>. The time slot is now available again.</p>
+            <div style="background: white; padding: 15px; border-radius: 8px; margin: 20px 0;">
+              <h4 style="color: #dc2626; margin-top: 0;">Cancelled Booking Details</h4>
+              <p><strong>Customer:</strong> ${params.customerName}</p>
+              <p><strong>Court:</strong> ${params.courtName}</p>
+              <p><strong>Date:</strong> ${params.bookingDate}</p>
+              <p><strong>Time:</strong> ${params.startTime} - ${params.endTime}</p>
+              <p><strong>Amount:</strong> KES ${params.totalAmount}</p>
+              <p><strong>Booking ID:</strong> ${params.bookingId}</p>
+            </div>
+            <p>Please log in to your vendor dashboard to view your updated bookings.</p>
+          </div>
+          <div style="background: #333; color: white; padding: 15px; text-align: center; font-size: 14px;">
+            <p>SportsBox Kenya - Empowering Sports Venue Owners</p>
+            <p>Email: vendor@sportsbox.co.ke | Phone: +254 700 000 000</p>
+          </div>
+        </div>
+      `
+    };
     return this.sendEmail(template);
   }
 

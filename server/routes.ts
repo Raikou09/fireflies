@@ -1328,6 +1328,97 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Customer booking cancellation (must be >2 hours before start time)
+  app.post("/api/bookings/:id/cancel", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const booking = await storage.getBooking(req.params.id);
+
+      if (!booking) {
+        return res.status(404).json({ message: "Booking not found" });
+      }
+      if (booking.customerId !== user.id) {
+        return res.status(403).json({ message: "You can only cancel your own bookings" });
+      }
+      if (booking.status === "cancelled") {
+        return res.status(400).json({ message: "Booking is already cancelled" });
+      }
+      if (booking.status === "completed") {
+        return res.status(400).json({ message: "Completed bookings cannot be cancelled" });
+      }
+
+      // Build booking datetime and enforce 2-hour window
+      const bookingDateTime = new Date(`${booking.bookingDate}T${booking.startTime}`);
+      const now = new Date();
+      const hoursUntilBooking = (bookingDateTime.getTime() - now.getTime()) / (1000 * 60 * 60);
+
+      if (hoursUntilBooking < 2) {
+        return res.status(400).json({
+          message: "Cancellations are only allowed up to 2 hours before the booking start time"
+        });
+      }
+
+      const cancelled = await storage.updateBookingStatus(booking.id, "cancelled");
+
+      // Send emails asynchronously — don't block the response
+      (async () => {
+        try {
+          const court = await storage.getCourt(booking.courtId);
+          const formatTime = (t: string) => {
+            const [h, m] = t.split(":");
+            const hour = parseInt(h);
+            return `${hour % 12 || 12}:${m} ${hour >= 12 ? "PM" : "AM"}`;
+          };
+          const formattedDate = new Date(booking.bookingDate).toLocaleDateString("en-US", {
+            year: "numeric", month: "long", day: "numeric"
+          });
+
+          // Customer email
+          const customerEmail = user.email;
+          const customerName = user.firstName || user.name || "Customer";
+          if (customerEmail) {
+            await EmailService.sendBookingCancellationCustomer({
+              customerEmail,
+              customerName,
+              courtName: court?.name || "Court",
+              bookingDate: formattedDate,
+              startTime: formatTime(booking.startTime || "00:00"),
+              endTime: formatTime(booking.endTime || "00:00"),
+              totalAmount: booking.totalAmount,
+              bookingId: booking.id,
+            });
+          }
+
+          // Vendor email
+          if (court?.vendorId) {
+            const vendor = await storage.getUser(court.vendorId);
+            const vendorEmail = vendor?.email;
+            if (vendorEmail) {
+              await EmailService.sendBookingCancellationVendor({
+                vendorEmail,
+                vendorName: vendor?.firstName || vendor?.name || "Vendor",
+                courtName: court.name,
+                customerName,
+                bookingDate: formattedDate,
+                startTime: formatTime(booking.startTime || "00:00"),
+                endTime: formatTime(booking.endTime || "00:00"),
+                totalAmount: booking.totalAmount,
+                bookingId: booking.id,
+              });
+            }
+          }
+        } catch (emailErr) {
+          console.error("Cancellation email error:", emailErr);
+        }
+      })();
+
+      res.json({ success: true, booking: cancelled });
+    } catch (error) {
+      console.error("Error cancelling booking:", error);
+      res.status(500).json({ message: "Failed to cancel booking" });
+    }
+  });
+
   // Admin authentication
   app.post("/api/admin/login", async (req, res) => {
     try {
