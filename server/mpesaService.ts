@@ -157,11 +157,16 @@ export const initiateSTKPush = async (request: STKPushRequest): Promise<STKPushR
     const timestamp = getTimestamp();
     const password = generatePassword(timestamp);
     const shortCode = process.env.MPESA_BUSINESS_SHORT_CODE;
-    const callbackUrl = process.env.MPESA_CALLBACK_URL;
+    // Use explicit secret if set, otherwise compute from the current deployment domain automatically
+    const deployedDomain = process.env.REPLIT_DOMAINS?.split(',')[0]?.trim();
+    const callbackUrl = process.env.MPESA_CALLBACK_URL ||
+      (deployedDomain ? `https://${deployedDomain}/api/mpesa/callback` : null);
     
     if (!shortCode || !callbackUrl) {
       throw new Error('M-Pesa configuration incomplete: Missing shortCode or callbackUrl');
     }
+    
+    console.log('M-Pesa callback URL resolved to:', callbackUrl);
     
     const payload = {
       BusinessShortCode: shortCode,
