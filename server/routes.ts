@@ -24,6 +24,7 @@ import { EnhancedNotificationService } from "./enhancedNotificationService";
 import { EmailService } from "./emailService";
 import { SMSService } from "./smsService";
 import { initiateSTKPush, querySTKPushStatus, parseCallbackData, formatPhoneNumber, getSimulatedReceiptNumber, isSimulationMode, type MPesaCallbackData } from "./mpesaService";
+import { generatePitchPDF } from "./pitchDocument";
 import { z } from "zod";
 
 // Admin middleware to check authentication
@@ -3123,6 +3124,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("M-Pesa query error:", error);
       res.status(500).json({ message: error.message || "Failed to query payment status" });
+    }
+  });
+
+  // Investor pitch PDF download
+  app.get("/api/pitch/download", (req, res) => {
+    try {
+      generatePitchPDF(res);
+    } catch (error: any) {
+      console.error("Pitch PDF generation error:", error);
+      res.status(500).json({ message: "Failed to generate pitch document" });
     }
   });
 
