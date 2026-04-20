@@ -1,0 +1,8 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "wsb_apMfEqUvpzqGz7kn7"
+uri = "file://attached_assets/sportsbox-fireflies-data-export.json"
+type = "unspecified"
+title = "SportsBox + Fireflies — Full Data Export"
