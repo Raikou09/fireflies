@@ -6,3 +6,9 @@ id = "wsb_apMfEqUvpzqGz7kn7"
 uri = "file://attached_assets/sportsbox-fireflies-data-export.json"
 type = "unspecified"
 title = "SportsBox + Fireflies — Full Data Export"
+
+[[outputs]]
+id = "mvlYoxJ795-lQEDGdfW9m"
+uri = "file://attached_assets/mpesaService.txt"
+type = "text"
+title = "mpesaService.ts"
