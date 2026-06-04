@@ -106,28 +106,23 @@ export default function VendorOnboardingModal({ isOpen, onClose }: VendorOnboard
       console.log('Starting document upload for:', documentType, 'File:', file.name);
       
       // Get upload parameters from the vendor-specific endpoint
+      const formData = new FormData();
+      formData.append("file", file);
+
       const uploadResponse = await fetch("/api/vendor/upload-document", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          fileName: file.name,
-          fileType: file.type,
-          fileSize: file.size
-        }),
+        body: formData,
         credentials: "include",
       });
-      
+
       if (!uploadResponse.ok) {
         const errorData = await uploadResponse.text();
-        console.error('Failed to get upload URL:', errorData);
-        throw new Error("Failed to get upload URL");
+        console.error('Failed to upload document:', errorData);
+        throw new Error("Failed to upload document");
       }
-      
-      const { uploadURL, documentUrl } = await uploadResponse.json();
-      console.log('Got upload URL:', uploadURL);
-      console.log('Document will be served at:', documentUrl);
+
+      const { documentUrl } = await uploadResponse.json();
+      console.log('Document uploaded successfully, URL:', documentUrl);
       
       // Upload the file directly to cloud storage
       const fileUploadResponse = await fetch(uploadURL, {
