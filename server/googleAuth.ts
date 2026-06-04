@@ -39,7 +39,8 @@ export function setupGoogleAuth(app: Express) {
     return;
   }
 
-  const callbackURL = "https://fireflies-production-ba72.up.railway.app/api/auth/google/callback";
+  const callbackURL = process.env.GOOGLE_CALLBACK_URL || 
+    "https://fireflies-production-ba72.up.railway.app/api/auth/google/callback";
 
   console.log("Google OAuth callback URL:", callbackURL);
 
