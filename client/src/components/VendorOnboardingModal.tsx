@@ -106,6 +106,11 @@ export default function VendorOnboardingModal({ isOpen, onClose }: VendorOnboard
       console.log('Starting document upload for:', documentType, 'File:', file.name);
       
       // Get upload parameters from the vendor-specific endpoint
+      console.log('File object:', file, typeof file);
+      const formData = new FormData();
+      formData.append("file", file);
+      console.log('FormData entries:', [...formData.entries()]);
+      
       const formData = new FormData();
       formData.append("file", file);
 
