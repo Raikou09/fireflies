@@ -179,50 +179,28 @@ export default function VendorOnboarding({ isOpen, onClose, existingData, isEdit
 
   const paymentPreference = form.watch("paymentPreference");
 
-  // Document upload function
+  // Document upload function - uploads via server to avoid CORS issues
   const uploadDocument = async (file: File, documentType: string) => {
     setUploadingDoc(documentType);
     try {
-      const uploadResponse = await fetch("/api/vendor/upload-document", {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const response = await fetch("/api/objects/upload-file", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        body: formData,
         credentials: "include",
-        body: JSON.stringify({
-          fileName: file.name,
-          fileType: file.type,
-          fileSize: file.size,
-        }),
-      });
-
-      if (!uploadResponse.ok) {
-        const errorData = await uploadResponse.json().catch(() => ({}));
-        throw new Error(errorData.error || "Failed to get upload URL");
-      }
-
-      const { uploadURL, documentUrl } = await uploadResponse.json();
-
-      const response = await fetch(uploadURL, {
-        method: "PUT",
-        body: file,
-        headers: {
-          'Content-Type': file.type || 'application/octet-stream',
-        },
       });
 
       if (!response.ok) {
-        throw new Error("Failed to upload document to storage");
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.error || "Failed to upload document");
       }
 
-      // Use the documentUrl from the server response
-      const finalDocumentUrl = documentUrl || uploadURL.split('?')[0];
-      setUploadedDocs(prev => ({
-        ...prev,
-        [documentType]: finalDocumentUrl
-      }));
-      
-      form.setValue(documentType as keyof VendorOnboarding, finalDocumentUrl);
+      const { url } = await response.json();
+
+      setUploadedDocs(prev => ({ ...prev, [documentType]: url }));
+      form.setValue(documentType as keyof VendorOnboarding, url);
 
       toast({
         title: "Document Uploaded",
