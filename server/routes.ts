@@ -347,36 +347,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "No file provided" });
       }
 
-      const userId = req.user?.claims?.sub || req.user?.id;
-      const objectStorageService = new ObjectStorageService();
-      const { randomUUID } = await import("crypto");
-      const objectId = randomUUID();
-      const privateObjectDir = objectStorageService.getPrivateObjectDir();
-      const fullPath = `${privateObjectDir}/uploads/${objectId}`;
-
-      const pathParts = fullPath.startsWith("/") ? fullPath.split("/") : `/${fullPath}`.split("/");
-      const bucketName = pathParts[1];
-      const objectName = pathParts.slice(2).join("/");
-
-      const { objectStorageClient } = await import("./objectStorage");
-      const bucket = objectStorageClient.bucket(bucketName);
-      const file = bucket.file(objectName);
-
-      await file.save(req.file.buffer, {
-        contentType: req.file.mimetype,
-        resumable: false,
-      });
-
-      // Set ACL to public immediately so images can be served without re-processing
-      const servingUrl = `/objects/uploads/${objectId}`;
-      try {
-        const { setObjectAclPolicy } = await import("./objectAcl");
-        await setObjectAclPolicy(file, { owner: userId || "anonymous", visibility: "public" });
-      } catch (aclErr) {
-        console.warn("Could not set ACL on uploaded file (image may not display):", aclErr);
-      }
-
-      res.json({ url: servingUrl });
+      const { uploadToCloudinary } = await import("./cloudinaryStorage");
+      const url = await uploadToCloudinary(req.file.buffer, req.file.mimetype, 'fireflies');
+      res.json({ url });
     } catch (error: any) {
       console.error("Error uploading file:", error);
       res.status(500).json({ error: "Failed to upload file", message: error.message });
@@ -411,53 +384,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Document upload endpoint specifically for vendor onboarding
-  app.post("/api/vendor/upload-document", isAuthenticated, async (req, res) => {
+  app.post("/api/vendor/upload-document", isAuthenticated, upload.single("file"), async (req: any, res) => {
     try {
-      const userId = (req.user as any)?.id || (req.user as any)?.claims?.sub;
-      console.log('Document upload request from user:', userId);
-      
-      const { fileName, fileType, fileSize } = req.body;
-      if (!fileName || !fileType) {
-        return res.status(400).json({ error: 'fileName and fileType are required' });
+      if (!req.file) {
+        return res.status(400).json({ error: "No file provided" });
       }
-      
-      // Generate a unique document ID and URL using object storage
-      const objectStorageService = new ObjectStorageService();
-      const uploadURL = await objectStorageService.getObjectEntityUploadURL();
-      
-      // Extract the object ID from the upload URL to create our serving URL
-      // The upload URL format is: https://storage.googleapis.com/bucket-name/uploads/uuid?signature...
-      const urlParts = uploadURL.split('/');
-      const objectId = urlParts[urlParts.length - 1].split('?')[0]; // Get the UUID without query params
-      const documentUrl = `/objects/uploads/${objectId}`;
-      
-      console.log('Generated upload URL:', uploadURL);
-      console.log('Document URL for serving:', documentUrl);
-      
-      res.json({ 
-        uploadURL,
-        documentUrl,
-        // Return the upload URL for the frontend to upload to, and documentUrl to save in the form
-      });
-    } catch (error) {
-      console.error('Error uploading document:', error);
-      res.status(500).json({ error: 'Failed to upload document', message: (error as Error).message });
+
+      const { uploadToCloudinary } = await import("./cloudinaryStorage");
+      const url = await uploadToCloudinary(req.file.buffer, req.file.mimetype, 'vendor-documents');
+      res.json({ uploadURL: url, documentUrl: url });
+    } catch (error: any) {
+      console.error("Error uploading document:", error);
+      res.status(500).json({ error: "Failed to upload document", message: error.message });
     }
   });
-
-  app.post("/api/objects/upload", isAuthenticated, async (req, res) => {
-    try {
-      console.log('Upload URL request received from user:', req.user?.claims?.sub);
-      const objectStorageService = new ObjectStorageService();
-      const uploadURL = await objectStorageService.getObjectEntityUploadURL();
-      console.log('Generated upload URL:', uploadURL);
-      res.json({ uploadURL });
-    } catch (error) {
-      console.error('Error generating upload URL:', error);
-      res.status(500).json({ error: 'Failed to generate upload URL', message: (error as Error).message });
-    }
-  });
-
+      
   // Court routes
   app.get("/api/courts", async (req, res) => {
     try {
