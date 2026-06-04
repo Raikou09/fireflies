@@ -183,7 +183,7 @@ export default function VendorOnboarding({ isOpen, onClose, existingData, isEdit
   const uploadDocument = async (file: File, documentType: string) => {
     setUploadingDoc(documentType);
     try {
-      const uploadResponse = await fetch("/api/vendor/upload-document", {
+      const uploadResponse = await fetch("https://fireflies-production-ba72.up.railway.app/api/vendor/upload-document", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
