@@ -47,7 +47,6 @@ integrations = ["javascript_object_storage:1.0.0", "javascript_log_in_with_repli
 MPESA_SIMULATION_MODE = "false"
 ADMIN_EMAIL = "tavish@dreamcatchers.tv"
 MPESA_ENVIRONMENT = "Production"
-MPESA_PASS_KEY = "df05b27832649249f97431796691949b49695bb73d30808327491562f601b861"
 
 [postMerge]
 path = "scripts/post-merge.sh"
