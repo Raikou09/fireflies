@@ -2,8 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import multer from "multer";
 import { storage } from "./storage";
-import { setupAuth, isAuthenticated } from "./replitAuth";
-// import { setupGoogleAuth } from "./googleAuth"; // Disabled - using Replit Auth instead
+import { setupGoogleAuth, isAuthenticated } from "./googleAuth";// import { setupGoogleAuth } from "./googleAuth"; // Disabled - using Replit Auth instead
 import {
   ObjectStorageService,
   ObjectNotFoundError,
@@ -74,14 +73,14 @@ const verifyVendorStatus = async (userId: string) => {
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware - using Replit's built-in authentication
-  await setupAuth(app);
+  setupGoogleAuth(app);
   // Google OAuth disabled - using Replit Auth instead
   // setupGoogleAuth(app);
 
   // Auth routes
   app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user?.claims?.sub || req.user?.id;
+      const userId = (req.user as any)?.id;
       console.log('Auth user route - extracted userId:', userId);
       console.log('Auth user route - req.user structure:', req.user);
       

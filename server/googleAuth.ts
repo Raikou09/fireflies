@@ -1,53 +1,74 @@
 import passport from "passport";
 import { Strategy as GoogleStrategy } from "passport-google-oauth20";
+import session from "express-session";
+import connectPg from "connect-pg-simple";
 import type { Express } from "express";
 import { storage } from "./storage";
 
-// Google OAuth configuration
+export function getSession() {
+  const sessionTtl = 7 * 24 * 60 * 60 * 1000; // 1 week
+  const pgStore = connectPg(session);
+  const sessionStore = new pgStore({
+    conString: process.env.DATABASE_URL,
+    createTableIfMissing: false,
+    ttl: sessionTtl,
+    tableName: "sessions",
+  });
+  return session({
+    secret: process.env.SESSION_SECRET!,
+    store: sessionStore,
+    resave: false,
+    saveUninitialized: true,
+    cookie: {
+      httpOnly: true,
+      secure: true,
+      maxAge: sessionTtl,
+      sameSite: 'none',
+    },
+  });
+}
+
 export function setupGoogleAuth(app: Express) {
-  // Only setup Google OAuth if credentials are provided
+  app.set("trust proxy", 1);
+  app.use(getSession());
+  app.use(passport.initialize());
+  app.use(passport.session());
+
   if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
-    console.log("Google OAuth credentials not provided. Skipping Google authentication setup.");
+    console.log("Google OAuth credentials not provided.");
     return;
   }
 
-  // Construct the full callback URL using Replit's domain
-  const callbackURL = process.env.REPLIT_DEV_DOMAIN 
-    ? `https://${process.env.REPLIT_DEV_DOMAIN}/api/auth/google/callback`
+  const callbackURL = process.env.REPLIT_DOMAINS
+    ? `https://${process.env.REPLIT_DOMAINS.split(",")[0].trim()}/api/auth/google/callback`
     : "/api/auth/google/callback";
-    
-  console.log("Setting up Google OAuth with callback URL:", callbackURL);
-  
-  // Google OAuth Strategy
+
+  console.log("Google OAuth callback URL:", callbackURL);
+
   passport.use(new GoogleStrategy({
     clientID: process.env.GOOGLE_CLIENT_ID,
     clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-    callbackURL: callbackURL
+    callbackURL,
   },
-  async (accessToken: string, refreshToken: string, profile: any, done: any) => {
+  async (accessToken, refreshToken, profile, done) => {
     try {
-      // Extract user info from Google profile
-      const googleId = profile.id;
       const email = profile.emails?.[0]?.value || "";
       const firstName = profile.name?.givenName || "";
       const lastName = profile.name?.familyName || "";
       const profileImageUrl = profile.photos?.[0]?.value || "";
 
-      // Check if user already exists
       let user = await storage.getUserByEmail(email);
-      
+
       if (!user) {
-        // Create new user with Google info
         user = await storage.upsertUser({
-          id: googleId,
+          id: profile.id,
           email,
           firstName,
           lastName,
           profileImageUrl,
-          userType: "customer" // Default to customer, can be changed later
+          userType: "customer",
         });
       } else {
-        // Update existing user with latest Google info
         user = await storage.upsertUser({
           ...user,
           firstName: firstName || user.firstName,
@@ -55,30 +76,45 @@ export function setupGoogleAuth(app: Express) {
           profileImageUrl: profileImageUrl || user.profileImageUrl,
         });
       }
-
       return done(null, user);
     } catch (error) {
       console.error("Google OAuth error:", error);
-      return done(error, null);
+      return done(error as Error, undefined);
     }
   }));
 
-  // Google OAuth routes
+  passport.serializeUser((user: any, cb) => cb(null, user));
+  passport.deserializeUser((user: any, cb) => cb(null, user));
+
   app.get("/api/auth/google",
-    passport.authenticate("google", { 
-      scope: ["profile", "email"] 
-    })
+    passport.authenticate("google", { scope: ["profile", "email"] })
   );
 
   app.get("/api/auth/google/callback",
-    passport.authenticate("google", { 
-      failureRedirect: "/?error=google_auth_failed" 
-    }),
+    passport.authenticate("google", { failureRedirect: "/?error=auth_failed" }),
     (req, res) => {
-      console.log("Google OAuth callback - successful authentication");
-      console.log("User:", req.user);
-      // Successful authentication, redirect to home
       res.redirect("/");
     }
   );
+
+  app.get("/api/login", (req, res) => {
+    res.redirect("/api/auth/google");
+  });
+
+  app.get("/api/logout", (req, res) => {
+    req.logout(() => {
+      res.redirect("/");
+    });
+  });
 }
+
+export const isAuthenticated = (req: any, res: any, next: any) => {
+  if (req.isAuthenticated()) {
+    return next();
+  }
+  // Check admin session as fallback
+  if ((req.session as any)?.adminAuthenticated) {
+    return next();
+  }
+  return res.status(401).json({ message: "Unauthorized" });
+};
