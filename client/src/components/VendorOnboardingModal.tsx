@@ -122,20 +122,6 @@ export default function VendorOnboardingModal({ isOpen, onClose }: VendorOnboard
       }
 
       const { documentUrl } = await uploadResponse.json();
-      console.log('Document uploaded successfully, URL:', documentUrl);
-      
-      // Upload the file directly to cloud storage
-      const fileUploadResponse = await fetch(uploadURL, {
-        method: "PUT",
-        body: file,
-        headers: {
-          'Content-Type': file.type,
-        },
-      });
-      
-      if (!fileUploadResponse.ok) {
-        throw new Error("Failed to upload file to storage");
-      }
       
       console.log('Document uploaded successfully, URL:', documentUrl);
       
