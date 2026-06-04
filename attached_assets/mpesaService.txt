@@ -52,6 +52,8 @@ export const getAccessToken = async (): Promise<string> => {
   try {
     const consumerKey = process.env.MPESA_CONSUMER_KEY;
     const consumerSecret = process.env.MPESA_CONSUMER_SECRET;
+    console.log('Key char codes:', [...(consumerKey || '')].map(c => c.charCodeAt(0)));
+    console.log('Secret char codes:', [...(consumerSecret || '')].map(c => c.charCodeAt(0)));
     
     if (!consumerKey || !consumerSecret) {
       throw new Error('M-Pesa credentials not configured');
