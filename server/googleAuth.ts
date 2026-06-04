@@ -34,20 +34,12 @@ export function setupGoogleAuth(app: Express) {
   app.use(passport.initialize());
   app.use(passport.session());
 
-  // Register serialize/deserialize before credential check so sessions always work
-  passport.serializeUser((user: any, cb) => cb(null, user));
-  passport.deserializeUser((user: any, cb) => cb(null, user));
-
   if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
     console.log("Google OAuth credentials not provided.");
     return;
   }
 
-  // Use the current Replit deployment domain dynamically
-  const replitDomain = process.env.REPLIT_DOMAINS?.split(',')[0]?.trim();
-  const callbackURL = replitDomain
-    ? `https://${replitDomain}/api/auth/google/callback`
-    : "https://fireflies-production-ba72.up.railway.app/api/auth/google/callback";
+  const callbackURL = "https://fireflies-production-ba72.up.railway.app/api/auth/google/callback";
 
   console.log("Google OAuth callback URL:", callbackURL);
 
@@ -88,6 +80,9 @@ export function setupGoogleAuth(app: Express) {
       return done(error as Error, undefined);
     }
   }));
+
+  passport.serializeUser((user: any, cb) => cb(null, user));
+  passport.deserializeUser((user: any, cb) => cb(null, user));
 
   app.get("/api/auth/google",
     passport.authenticate("google", { scope: ["profile", "email"] })

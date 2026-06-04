@@ -100,28 +100,54 @@ export default function VendorOnboardingModal({ isOpen, onClose }: VendorOnboard
 
   const paymentPreference = form.watch("paymentPreference");
 
-  // Document upload function - uploads via server to avoid CORS issues
+  // Document upload function using new vendor endpoint
   const uploadDocument = async (file: File, documentType: string) => {
     try {
-      const formData = new FormData();
-      formData.append("file", file);
-
-      const response = await fetch("/api/objects/upload-file", {
+      console.log('Starting document upload for:', documentType, 'File:', file.name);
+      
+      // Get upload parameters from the vendor-specific endpoint
+      const uploadResponse = await fetch("/api/vendor/upload-document", {
         method: "POST",
-        body: formData,
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          fileName: file.name,
+          fileType: file.type,
+          fileSize: file.size
+        }),
         credentials: "include",
       });
-
-      if (!response.ok) {
-        const err = await response.json().catch(() => ({}));
-        throw new Error(err.error || "Failed to upload document");
+      
+      if (!uploadResponse.ok) {
+        const errorData = await uploadResponse.text();
+        console.error('Failed to get upload URL:', errorData);
+        throw new Error("Failed to get upload URL");
       }
-
-      const { url } = await response.json();
-
-      form.setValue(documentType as keyof VendorOnboarding, url);
+      
+      const { uploadURL, documentUrl } = await uploadResponse.json();
+      console.log('Got upload URL:', uploadURL);
+      console.log('Document will be served at:', documentUrl);
+      
+      // Upload the file directly to cloud storage
+      const fileUploadResponse = await fetch(uploadURL, {
+        method: "PUT",
+        body: file,
+        headers: {
+          'Content-Type': file.type,
+        },
+      });
+      
+      if (!fileUploadResponse.ok) {
+        throw new Error("Failed to upload file to storage");
+      }
+      
+      console.log('Document uploaded successfully, URL:', documentUrl);
+      
+      // Update form and state
+      form.setValue(documentType as keyof VendorOnboarding, documentUrl);
       setUploadedDocs(prev => ({ ...prev, [documentType]: file.name }));
-
+      
       toast({
         title: "Document Uploaded",
         description: `${file.name} has been uploaded successfully.`,
