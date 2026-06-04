@@ -39,9 +39,7 @@ export function setupGoogleAuth(app: Express) {
     return;
   }
 
-  const callbackURL = process.env.NODE_ENV === "production"
-  ? "https://sportsbox.replit.app/api/auth/google/callback"
-  : `https://${process.env.REPLIT_DEV_DOMAIN}/api/auth/google/callback`;
+  const callbackURL = "https://fireflies-production-ba72.up.railway.app/api/auth/google/callback";
 
   console.log("Google OAuth callback URL:", callbackURL);
 
