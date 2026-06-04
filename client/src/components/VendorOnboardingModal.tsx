@@ -38,10 +38,15 @@ interface VendorOnboardingModalProps {
   onClose: () => void;
 }
 
-export default function VendorOnboardingModal({ isOpen, onClose }: VendorOnboardingModalProps) {
+export default function VendorOnboardingModal({
+  isOpen,
+  onClose,
+}: VendorOnboardingModalProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [uploadedDocs, setUploadedDocs] = useState<{[key: string]: string}>({});
+  const [uploadedDocs, setUploadedDocs] = useState<{ [key: string]: string }>(
+    {},
+  );
 
   const form = useForm<VendorOnboarding>({
     resolver: zodResolver(vendorOnboardingSchema),
@@ -74,17 +79,20 @@ export default function VendorOnboardingModal({ isOpen, onClose }: VendorOnboard
         body: JSON.stringify(data),
         credentials: "include", // Include cookies for authentication
       });
-      
+
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.message || "Failed to complete vendor onboarding");
+        throw new Error(
+          error.message || "Failed to complete vendor onboarding",
+        );
       }
       return response.json();
     },
     onSuccess: () => {
       toast({
         title: "Vendor Application Submitted",
-        description: "Your vendor application is under review. You'll be notified once approved.",
+        description:
+          "Your vendor application is under review. You'll be notified once approved.",
       });
       queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
       onClose();
@@ -103,65 +111,73 @@ export default function VendorOnboardingModal({ isOpen, onClose }: VendorOnboard
   // Document upload function using new vendor endpoint
   const uploadDocument = async (file: File, documentType: string) => {
     try {
-      console.log('Starting document upload for:', documentType, 'File:', file.name);
-      
-      // Get upload parameters from the vendor-specific endpoint
-      console.log('File object:', file, typeof file);
-      const formData = new FormData();
-      formData.append("file", file);
-      console.log('FormData entries:', [...formData.entries()]);
-      
-      const formData = new FormData();
-      formData.append("file", file);
+      console.log(
+        "Starting document upload for:",
+        documentType,
+        "File:",
+        file.name,
+      );
 
-      const uploadResponse = await fetch("https://fireflies-production-ba72.up.railway.app/api/vendor/upload-document", {
-        method: "POST",
-        body: formData,
-        credentials: "include",
-      });
+      // Get upload parameters from the vendor-specific endpoint
+      console.log("File object:", file, typeof file);
+      const formData = new FormData();
+      formData.append("file", file);
+      console.log("FormData entries:", [...formData.entries()]);
+
+      const uploadResponse = await fetch(
+        "https://fireflies-production-ba72.up.railway.app/api/vendor/upload-document",
+        {
+          method: "POST",
+          body: formData,
+          credentials: "include",
+        },
+      );
 
       if (!uploadResponse.ok) {
         const errorData = await uploadResponse.text();
-        console.error('Failed to upload document:', errorData);
+        console.error("Failed to upload document:", errorData);
         throw new Error("Failed to upload document");
       }
 
       const { documentUrl } = await uploadResponse.json();
-      
-      console.log('Document uploaded successfully, URL:', documentUrl);
-      
+
+      console.log("Document uploaded successfully, URL:", documentUrl);
+
       // Update form and state
       form.setValue(documentType as keyof VendorOnboarding, documentUrl);
-      setUploadedDocs(prev => ({ ...prev, [documentType]: file.name }));
-      
+      setUploadedDocs((prev) => ({ ...prev, [documentType]: file.name }));
+
       toast({
         title: "Document Uploaded",
         description: `${file.name} has been uploaded successfully.`,
       });
     } catch (error) {
-      console.error('Document upload error:', error);
+      console.error("Document upload error:", error);
       toast({
         title: "Upload Error",
-        description: error instanceof Error ? error.message : "Failed to upload document. Please try again.",
+        description:
+          error instanceof Error
+            ? error.message
+            : "Failed to upload document. Please try again.",
         variant: "destructive",
       });
     }
   };
 
-  const DocumentUpload = ({ 
-    documentType, 
-    label, 
+  const DocumentUpload = ({
+    documentType,
+    label,
     required = false,
-    description 
-  }: { 
-    documentType: string; 
-    label: string; 
+    description,
+  }: {
+    documentType: string;
+    label: string;
     required?: boolean;
     description: string;
   }) => {
     const [isUploading, setIsUploading] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
-    
+
     return (
       <div className="space-y-2">
         <div className="flex items-center justify-between">
@@ -176,11 +192,11 @@ export default function VendorOnboardingModal({ isOpen, onClose }: VendorOnboard
           )}
         </div>
         <p className="text-xs text-gray-500">{description}</p>
-        
-        <div 
+
+        <div
           className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center cursor-pointer hover:border-blue-400 transition-colors"
           onClick={() => {
-            console.log('Upload area clicked for:', documentType);
+            console.log("Upload area clicked for:", documentType);
             fileInputRef.current?.click();
           }}
         >
@@ -197,7 +213,9 @@ export default function VendorOnboardingModal({ isOpen, onClose }: VendorOnboard
           ) : (
             <div className="flex items-center justify-center space-x-2 text-gray-500">
               <Upload className="h-4 w-4" />
-              <span className="text-sm">Click to upload {label.toLowerCase()}</span>
+              <span className="text-sm">
+                Click to upload {label.toLowerCase()}
+              </span>
             </div>
           )}
         </div>
@@ -208,7 +226,8 @@ export default function VendorOnboardingModal({ isOpen, onClose }: VendorOnboard
           onChange={async (e) => {
             const file = e.target.files?.[0];
             if (file) {
-              if (file.size > 5 * 1024 * 1024) { // 5MB limit
+              if (file.size > 5 * 1024 * 1024) {
+                // 5MB limit
                 toast({
                   title: "File Too Large",
                   description: "Please select a file smaller than 5MB.",
@@ -235,7 +254,10 @@ export default function VendorOnboardingModal({ isOpen, onClose }: VendorOnboard
         </DialogHeader>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit((data) => mutation.mutate(data))} className="space-y-6">
+          <form
+            onSubmit={form.handleSubmit((data) => mutation.mutate(data))}
+            className="space-y-6"
+          >
             {/* Personal Information */}
             <Card>
               <CardHeader>
@@ -249,9 +271,9 @@ export default function VendorOnboardingModal({ isOpen, onClose }: VendorOnboard
                     <FormItem>
                       <FormLabel>Primary Phone Number *</FormLabel>
                       <FormControl>
-                        <Input 
-                          placeholder="+254 712 345 678" 
-                          {...field} 
+                        <Input
+                          placeholder="+254 712 345 678"
+                          {...field}
                           data-testid="input-phone-number"
                         />
                       </FormControl>
@@ -267,9 +289,9 @@ export default function VendorOnboardingModal({ isOpen, onClose }: VendorOnboard
                     <FormItem>
                       <FormLabel>Alternate Phone Number</FormLabel>
                       <FormControl>
-                        <Input 
-                          placeholder="+254 712 345 678" 
-                          {...field} 
+                        <Input
+                          placeholder="+254 712 345 678"
+                          {...field}
                           data-testid="input-alternate-phone"
                         />
                       </FormControl>
@@ -278,7 +300,6 @@ export default function VendorOnboardingModal({ isOpen, onClose }: VendorOnboard
                   )}
                 />
 
-
                 <FormField
                   control={form.control}
                   name="kraPin"
@@ -286,9 +307,9 @@ export default function VendorOnboardingModal({ isOpen, onClose }: VendorOnboard
                     <FormItem>
                       <FormLabel>KRA PIN</FormLabel>
                       <FormControl>
-                        <Input 
-                          placeholder="A012345678Z" 
-                          {...field} 
+                        <Input
+                          placeholder="A012345678Z"
+                          {...field}
                           data-testid="input-kra-pin"
                         />
                       </FormControl>
@@ -312,9 +333,9 @@ export default function VendorOnboardingModal({ isOpen, onClose }: VendorOnboard
                     <FormItem>
                       <FormLabel>Business Name</FormLabel>
                       <FormControl>
-                        <Input 
-                          placeholder="Sports Arena Ltd" 
-                          {...field} 
+                        <Input
+                          placeholder="Sports Arena Ltd"
+                          {...field}
                           data-testid="input-business-name"
                         />
                       </FormControl>
@@ -330,9 +351,9 @@ export default function VendorOnboardingModal({ isOpen, onClose }: VendorOnboard
                     <FormItem>
                       <FormLabel>Business Address *</FormLabel>
                       <FormControl>
-                        <Textarea 
-                          placeholder="Full business address including city" 
-                          {...field} 
+                        <Textarea
+                          placeholder="Full business address including city"
+                          {...field}
                           data-testid="textarea-business-address"
                         />
                       </FormControl>
@@ -347,17 +368,28 @@ export default function VendorOnboardingModal({ isOpen, onClose }: VendorOnboard
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Business Type *</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <Select
+                        onValueChange={field.onChange}
+                        defaultValue={field.value}
+                      >
                         <FormControl>
                           <SelectTrigger data-testid="select-business-type">
                             <SelectValue placeholder="Select business type" />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="Individual">Individual/Sole Proprietor</SelectItem>
-                          <SelectItem value="Partnership">Partnership</SelectItem>
-                          <SelectItem value="Company">Limited Company</SelectItem>
-                          <SelectItem value="LLC">Limited Liability Company</SelectItem>
+                          <SelectItem value="Individual">
+                            Individual/Sole Proprietor
+                          </SelectItem>
+                          <SelectItem value="Partnership">
+                            Partnership
+                          </SelectItem>
+                          <SelectItem value="Company">
+                            Limited Company
+                          </SelectItem>
+                          <SelectItem value="LLC">
+                            Limited Liability Company
+                          </SelectItem>
                         </SelectContent>
                       </Select>
                       <FormMessage />
@@ -372,9 +404,9 @@ export default function VendorOnboardingModal({ isOpen, onClose }: VendorOnboard
                     <FormItem>
                       <FormLabel>Business Registration Number *</FormLabel>
                       <FormControl>
-                        <Input 
-                          placeholder="e.g., CPR/2023/123456 or Certificate Number" 
-                          {...field} 
+                        <Input
+                          placeholder="e.g., CPR/2023/123456 or Certificate Number"
+                          {...field}
                           data-testid="input-business-registration-number"
                         />
                       </FormControl>
@@ -390,13 +422,15 @@ export default function VendorOnboardingModal({ isOpen, onClose }: VendorOnboard
                     <FormItem>
                       <FormLabel>Years in Business *</FormLabel>
                       <FormControl>
-                        <Input 
+                        <Input
                           type="number"
                           min="0"
                           max="100"
-                          placeholder="0" 
-                          {...field} 
-                          onChange={(e) => field.onChange(Number(e.target.value))}
+                          placeholder="0"
+                          {...field}
+                          onChange={(e) =>
+                            field.onChange(Number(e.target.value))
+                          }
                           data-testid="input-years-in-business"
                         />
                       </FormControl>
@@ -419,7 +453,10 @@ export default function VendorOnboardingModal({ isOpen, onClose }: VendorOnboard
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Preferred Payment Method</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <Select
+                        onValueChange={field.onChange}
+                        defaultValue={field.value}
+                      >
                         <FormControl>
                           <SelectTrigger data-testid="select-payment-preference">
                             <SelectValue placeholder="Select payment method" />
@@ -428,7 +465,9 @@ export default function VendorOnboardingModal({ isOpen, onClose }: VendorOnboard
                         <SelectContent>
                           <SelectItem value="bank">Bank Transfer</SelectItem>
                           <SelectItem value="mpesa">M-Pesa</SelectItem>
-                          <SelectItem value="both">Both Bank & M-Pesa</SelectItem>
+                          <SelectItem value="both">
+                            Both Bank & M-Pesa
+                          </SelectItem>
                         </SelectContent>
                       </Select>
                       <FormMessage />
@@ -436,7 +475,8 @@ export default function VendorOnboardingModal({ isOpen, onClose }: VendorOnboard
                   )}
                 />
 
-                {(paymentPreference === "bank" || paymentPreference === "both") && (
+                {(paymentPreference === "bank" ||
+                  paymentPreference === "both") && (
                   <>
                     <FormField
                       control={form.control}
@@ -445,9 +485,9 @@ export default function VendorOnboardingModal({ isOpen, onClose }: VendorOnboard
                         <FormItem>
                           <FormLabel>Bank Name</FormLabel>
                           <FormControl>
-                            <Input 
-                              placeholder="e.g., KCB Bank" 
-                              {...field} 
+                            <Input
+                              placeholder="e.g., KCB Bank"
+                              {...field}
                               data-testid="input-bank-name"
                             />
                           </FormControl>
@@ -463,9 +503,9 @@ export default function VendorOnboardingModal({ isOpen, onClose }: VendorOnboard
                         <FormItem>
                           <FormLabel>Account Number</FormLabel>
                           <FormControl>
-                            <Input 
-                              placeholder="1234567890" 
-                              {...field} 
+                            <Input
+                              placeholder="1234567890"
+                              {...field}
                               data-testid="input-bank-account-number"
                             />
                           </FormControl>
@@ -481,9 +521,9 @@ export default function VendorOnboardingModal({ isOpen, onClose }: VendorOnboard
                         <FormItem>
                           <FormLabel>Account Name</FormLabel>
                           <FormControl>
-                            <Input 
-                              placeholder="Name as appears on bank account" 
-                              {...field} 
+                            <Input
+                              placeholder="Name as appears on bank account"
+                              {...field}
                               data-testid="input-bank-account-name"
                             />
                           </FormControl>
@@ -494,7 +534,8 @@ export default function VendorOnboardingModal({ isOpen, onClose }: VendorOnboard
                   </>
                 )}
 
-                {(paymentPreference === "mpesa" || paymentPreference === "both") && (
+                {(paymentPreference === "mpesa" ||
+                  paymentPreference === "both") && (
                   <FormField
                     control={form.control}
                     name="mpesaNumber"
@@ -502,9 +543,9 @@ export default function VendorOnboardingModal({ isOpen, onClose }: VendorOnboard
                       <FormItem>
                         <FormLabel>M-Pesa Number</FormLabel>
                         <FormControl>
-                          <Input 
-                            placeholder="+254 712 345 678" 
-                            {...field} 
+                          <Input
+                            placeholder="+254 712 345 678"
+                            {...field}
                             data-testid="input-mpesa-number"
                           />
                         </FormControl>
@@ -520,7 +561,11 @@ export default function VendorOnboardingModal({ isOpen, onClose }: VendorOnboard
             <Card>
               <CardHeader>
                 <CardTitle className="text-lg">Document Verification</CardTitle>
-                <p className="text-sm text-gray-600">Upload supporting documents for verification. You can choose which documents to provide. All documents must be clear and readable.</p>
+                <p className="text-sm text-gray-600">
+                  Upload supporting documents for verification. You can choose
+                  which documents to provide. All documents must be clear and
+                  readable.
+                </p>
               </CardHeader>
               <CardContent className="space-y-6">
                 <DocumentUpload
@@ -543,8 +588,8 @@ export default function VendorOnboardingModal({ isOpen, onClose }: VendorOnboard
               <Button type="button" variant="outline" onClick={onClose}>
                 Cancel
               </Button>
-              <Button 
-                type="submit" 
+              <Button
+                type="submit"
                 disabled={mutation.isPending}
                 data-testid="button-submit-vendor-application"
               >
