@@ -369,9 +369,6 @@ export default function VendorOnboarding({ isOpen, onClose, existingData, isEdit
   };
 
   const onSubmit = async (data: VendorOnboarding) => {
-    // Validate documents step before submit
-    const isValid = await validateStep("documents");
-    if (!isValid) return;
 
     const formDataWithDocs = {
       ...data,
