@@ -905,11 +905,13 @@ export default function VendorOnboarding({ isOpen, onClose, existingData, isEdit
                   </Button>
 
                   {currentStep === "documents" ? (
-                    <Button
-                      type="submit"
-                      disabled={mutation.isPending}
-                      className="flex items-center gap-2 bg-green-600 hover:bg-green-700"
-                    >
+                  <Button
+                    type="button"
+                    onClick={() => form.handleSubmit(onSubmit)()}
+                    disabled={mutation.isPending}
+                    className="flex items-center gap-2 bg-green-600 hover:bg-green-700"
+                  >
+                    
                       {mutation.isPending ? "Submitting..." : (isEditing ? "Update Application" : "Submit Application")}
                     </Button>
                   ) : (
