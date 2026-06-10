@@ -183,46 +183,29 @@ export default function VendorOnboarding({ isOpen, onClose, existingData, isEdit
   const uploadDocument = async (file: File, documentType: string) => {
     setUploadingDoc(documentType);
     try {
+      const formData = new FormData();
+      formData.append("file", file);
+
       const uploadResponse = await fetch("https://fireflies-production-ba72.up.railway.app/api/vendor/upload-document", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        body: formData,
         credentials: "include",
-        body: JSON.stringify({
-          fileName: file.name,
-          fileType: file.type,
-          fileSize: file.size,
-        }),
       });
 
       if (!uploadResponse.ok) {
-        const errorData = await uploadResponse.json().catch(() => ({}));
-        throw new Error(errorData.error || "Failed to get upload URL");
+        const errorData = await uploadResponse.text();
+        console.error('Failed to upload document:', errorData);
+        throw new Error("Failed to upload document");
       }
 
-      const { uploadURL, documentUrl } = await uploadResponse.json();
+      const { documentUrl } = await uploadResponse.json();
 
-      const response = await fetch(uploadURL, {
-        method: "PUT",
-        body: file,
-        headers: {
-          'Content-Type': file.type || 'application/octet-stream',
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to upload document to storage");
-      }
-
-      // Use the documentUrl from the server response
-      const finalDocumentUrl = documentUrl || uploadURL.split('?')[0];
       setUploadedDocs(prev => ({
         ...prev,
-        [documentType]: finalDocumentUrl
+        [documentType]: documentUrl
       }));
-      
-      form.setValue(documentType as keyof VendorOnboarding, finalDocumentUrl);
+
+      form.setValue(documentType as keyof VendorOnboarding, documentUrl);
 
       toast({
         title: "Document Uploaded",
