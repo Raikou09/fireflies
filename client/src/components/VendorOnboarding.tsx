@@ -907,7 +907,15 @@ export default function VendorOnboarding({ isOpen, onClose, existingData, isEdit
                   {currentStep === "documents" ? (
                   <Button
                     type="button"
-                    onClick={() => form.handleSubmit(onSubmit)()}
+                    onClick={() => {
+                      console.log('Submit clicked');
+                      console.log('Form errors:', JSON.stringify(form.formState.errors));
+                      console.log('Form values:', JSON.stringify(form.getValues()));
+                      form.handleSubmit(
+                        (data) => { console.log('Valid - calling onSubmit', data); onSubmit(data); },
+                        (errors) => { console.log('Invalid - errors:', JSON.stringify(errors)); }
+                      )();
+                    }}
                     disabled={mutation.isPending}
                     className="flex items-center gap-2 bg-green-600 hover:bg-green-700"
                   >
