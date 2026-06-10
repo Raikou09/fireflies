@@ -1060,7 +1060,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const publicized = await publicizeCourtImages(vendorId, [req.body.imageUrl]);
         req.body.imageUrl = publicized[0];
       }
-
+      if (req.body.sportCapacities && Object.keys(req.body.sportCapacities).length === 0) {
+        req.body.sportCapacities = null;
+      }
       const courtData = insertCourtSchema.parse(req.body);
       console.log('Parsed court data:', courtData);
       
