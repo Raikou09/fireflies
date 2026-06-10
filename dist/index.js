@@ -5080,6 +5080,9 @@ async function registerRoutes(app2) {
       if (req.body.sportCapacities && Object.keys(req.body.sportCapacities).length === 0) {
         req.body.sportCapacities = null;
       }
+      if (!Array.isArray(req.body.images)) req.body.images = [];
+      if (!Array.isArray(req.body.availableSports)) req.body.availableSports = req.body.availableSports ? [req.body.availableSports] : [];
+      if (!Array.isArray(req.body.availableDays)) req.body.availableDays = req.body.availableDays ? [req.body.availableDays] : [];
       if (typeof req.body.availableSports === "string") {
         req.body.availableSports = [req.body.availableSports];
       }
