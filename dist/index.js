@@ -5080,6 +5080,15 @@ async function registerRoutes(app2) {
       if (req.body.sportCapacities && Object.keys(req.body.sportCapacities).length === 0) {
         req.body.sportCapacities = null;
       }
+      if (typeof req.body.availableSports === "string") {
+        req.body.availableSports = [req.body.availableSports];
+      }
+      if (typeof req.body.availableDays === "string") {
+        req.body.availableDays = [req.body.availableDays];
+      }
+      if (typeof req.body.images === "string") {
+        req.body.images = [req.body.images];
+      }
       const courtData = insertCourtSchema.parse(req.body);
       console.log("Parsed court data:", courtData);
       const court = await storage.createCourt(vendorId, courtData);
