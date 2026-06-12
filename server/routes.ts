@@ -645,7 +645,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/customer/reviews", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user?.claims?.sub;
+      const userId = req.user?.claims?.sub || req.user?.id;
       if (!userId) {
         return res.status(401).json({ message: "Authentication required" });
       }
@@ -661,7 +661,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Booking history and user profile routes
   app.get("/api/customer/bookings", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user?.claims?.sub;
+      const userId = req.user?.claims?.sub || req.user?.id;
       if (!userId) {
         return res.status(401).json({ message: "Authentication required" });
       }
@@ -676,7 +676,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/customer/profile", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user?.claims?.sub;
+      const userId = req.user?.claims?.sub || req.user?.id;
       if (!userId) {
         return res.status(401).json({ message: "Authentication required" });
       }
@@ -707,7 +707,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.put("/api/customer/profile", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user?.claims?.sub;
+      const userId = req.user?.claims?.sub || req.user?.id;
       if (!userId) {
         return res.status(401).json({ message: "Authentication required" });
       }

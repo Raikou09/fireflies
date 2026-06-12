@@ -4719,7 +4719,7 @@ async function registerRoutes(app2) {
   });
   app2.get("/api/customer/reviews", isAuthenticated, async (req, res) => {
     try {
-      const userId = req.user?.claims?.sub;
+      const userId = req.user?.claims?.sub || req.user?.id;
       if (!userId) {
         return res.status(401).json({ message: "Authentication required" });
       }
@@ -4732,7 +4732,7 @@ async function registerRoutes(app2) {
   });
   app2.get("/api/customer/bookings", isAuthenticated, async (req, res) => {
     try {
-      const userId = req.user?.claims?.sub;
+      const userId = req.user?.claims?.sub || req.user?.id;
       if (!userId) {
         return res.status(401).json({ message: "Authentication required" });
       }
@@ -4745,7 +4745,7 @@ async function registerRoutes(app2) {
   });
   app2.get("/api/customer/profile", isAuthenticated, async (req, res) => {
     try {
-      const userId = req.user?.claims?.sub;
+      const userId = req.user?.claims?.sub || req.user?.id;
       if (!userId) {
         return res.status(401).json({ message: "Authentication required" });
       }
@@ -4771,7 +4771,7 @@ async function registerRoutes(app2) {
   });
   app2.put("/api/customer/profile", isAuthenticated, async (req, res) => {
     try {
-      const userId = req.user?.claims?.sub;
+      const userId = req.user?.claims?.sub || req.user?.id;
       if (!userId) {
         return res.status(401).json({ message: "Authentication required" });
       }
