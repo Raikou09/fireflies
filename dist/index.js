@@ -4801,7 +4801,7 @@ async function registerRoutes(app2) {
   });
   app2.post("/api/equipment", isAuthenticated, async (req, res) => {
     try {
-      const userId = req.user?.claims?.sub;
+      const userId = req.user?.claims?.sub || req.user?.id;
       if (!userId) {
         return res.status(401).json({ message: "Authentication required" });
       }
@@ -4818,7 +4818,7 @@ async function registerRoutes(app2) {
   });
   app2.put("/api/equipment/:id", isAuthenticated, async (req, res) => {
     try {
-      const userId = req.user?.claims?.sub;
+      const userId = req.user?.claims?.sub || req.user?.id;
       if (!userId) {
         return res.status(401).json({ message: "Authentication required" });
       }
@@ -4840,7 +4840,7 @@ async function registerRoutes(app2) {
   });
   app2.delete("/api/equipment/:id", isAuthenticated, async (req, res) => {
     try {
-      const userId = req.user?.claims?.sub;
+      const userId = req.user?.claims?.sub || req.user?.id;
       if (!userId) {
         return res.status(401).json({ message: "Authentication required" });
       }
