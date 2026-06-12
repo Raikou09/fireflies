@@ -4317,9 +4317,6 @@ async function registerRoutes(app2) {
       if (!user) {
         return res.status(404).json({ message: "User not found" });
       }
-      if (user.vendorVerificationStatus === "verified") {
-        return res.status(403).json({ message: "Cannot update an already approved vendor application" });
-      }
       const { vendorOnboardingSchema: vendorOnboardingSchema2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
       const validatedData = vendorOnboardingSchema2.parse(req.body);
       const updatedUser = await storage.upsertUser({

@@ -152,10 +152,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "User not found" });
       }
 
-      // Only allow updates if vendor is pending (not yet approved)
-      if (user.vendorVerificationStatus === "verified") {
-        return res.status(403).json({ message: "Cannot update an already approved vendor application" });
-      }
+      // Allow verified vendors to update their profile details
 
       // Validate vendor onboarding data
       const { vendorOnboardingSchema } = await import("@shared/schema");
