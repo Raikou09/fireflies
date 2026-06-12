@@ -943,9 +943,12 @@ export default function AddCourtModal({ isOpen, onClose, courtToEdit }: AddCourt
             <Button 
               type="submit" 
               className="flex-1 bg-primary text-white hover:bg-green-700"
-              disabled={mutation.isPending}
+              disabled={mutation.isPending || updateMutation.isPending}
             >
-              {mutation.isPending ? "Creating..." : "Create Court"}
+              {courtToEdit 
+                ? (updateMutation.isPending ? "Updating..." : "Update Court")
+                : (mutation.isPending ? "Creating..." : "Create Court")
+              }
             </Button>
           </div>
         </form>
