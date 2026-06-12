@@ -2797,29 +2797,13 @@ init_schema();
 
 // server/emailService.ts
 import { Resend } from "resend";
-var connectionSettings;
-async function getCredentials() {
-  const hostname = process.env.REPLIT_CONNECTORS_HOSTNAME;
-  const xReplitToken = process.env.REPL_IDENTITY ? "repl " + process.env.REPL_IDENTITY : process.env.WEB_REPL_RENEWAL ? "depl " + process.env.WEB_REPL_RENEWAL : null;
-  if (!xReplitToken) {
-    throw new Error("X_REPLIT_TOKEN not found for repl/depl");
-  }
-  connectionSettings = await fetch(
-    "https://" + hostname + "/api/v2/connection?include_secrets=true&connector_names=resend",
-    {
-      headers: {
-        "Accept": "application/json",
-        "X_REPLIT_TOKEN": xReplitToken
-      }
-    }
-  ).then((res) => res.json()).then((data) => data.items?.[0]);
-  if (!connectionSettings || !connectionSettings.settings.api_key) {
-    throw new Error("Resend not connected");
-  }
-  return { apiKey: connectionSettings.settings.api_key, fromEmail: connectionSettings.settings.from_email };
-}
 async function getResendClient() {
-  const { apiKey, fromEmail } = await getCredentials();
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) throw new Error("RESEND_API_KEY not set");
+  return {
+    client: new Resend(apiKey),
+    fromEmail: process.env.RESEND_FROM_EMAIL || "hello@sportsbox.in"
+  };
   return {
     client: new Resend(apiKey),
     fromEmail: fromEmail || "hello@sportsbox.in"
@@ -2829,9 +2813,9 @@ var EmailService = class {
   static fromName = "SportsBox Kenya";
   static async sendEmail(template) {
     try {
-      const { client, fromEmail } = await getResendClient();
+      const { client, fromEmail: fromEmail2 } = await getResendClient();
       const { data, error } = await client.emails.send({
-        from: `${this.fromName} <${fromEmail}>`,
+        from: `${this.fromName} <${fromEmail2}>`,
         to: template.to,
         subject: template.subject,
         html: template.html,
