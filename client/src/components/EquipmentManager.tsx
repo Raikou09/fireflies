@@ -62,6 +62,7 @@ export default function EquipmentManager({ courtId, courtName }: EquipmentManage
     mutationFn: async (data: any) => {
       return apiRequest("PUT", `/api/equipment/${editingEquipment?.id}`, {
         ...data,
+        courtId,
         pricePerHour: parseFloat(data.pricePerHour),
         pricePerDay: data.pricePerDay ? parseFloat(data.pricePerDay) : null,
       });
