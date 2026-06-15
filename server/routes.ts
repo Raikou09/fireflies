@@ -26,14 +26,7 @@ import { initiateSTKPush, querySTKPushStatus, parseCallbackData, formatPhoneNumb
 import { generatePitchPDF } from "./pitchDocument";
 import { z } from "zod";
 
-// Admin middleware to check authentication
-const requireAdminAuth = (req: any, res: any, next: any) => {
-  if ((req.session as any)?.adminAuthenticated) {
-    next();
-  } else {
-    res.status(401).json({ message: "Admin authentication required" });
-  }
-};
+// Admin middleware moved to server/adminAuth.ts
 
 // Helper function to verify vendor status
 const verifyVendorStatus = async (userId: string) => {
@@ -76,6 +69,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   setupGoogleAuth(app);
   // Google OAuth disabled - using Replit Auth instead
   // setupGoogleAuth(app);
+  seedOwner();
 
   // Auth routes
   app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
@@ -1407,43 +1401,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Admin authentication
-  app.post("/api/admin/login", async (req, res) => {
-    try {
-      const { username, password } = req.body;
-      
-      // Simple admin credentials check (you can enhance this with proper hashing)
-      if (username === "admin" && password === "admin123") {
-        // Set admin session
-        (req.session as any).adminAuthenticated = true;
-        (req.session as any).adminId = "admin";
-        
-        res.json({ success: true, message: "Admin authenticated" });
-      } else {
-        res.status(401).json({ message: "Invalid credentials" });
-      }
-    } catch (error) {
-      console.error("Error during admin login:", error);
-      res.status(500).json({ message: "Authentication error" });
-    }
+  // ── Ops Center Auth (Google OAuth) ──────────────────────────────────
+  app.get("/api/admin/me", async (req: any, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ isAdmin: false });
+    const email = req.user?.email;
+    if (!email) return res.status(401).json({ isAdmin: false });
+    const admin = await isAdminEmail(email);
+    if (!admin) return res.status(403).json({ isAdmin: false });
+    res.json({ isAdmin: true, role: admin.role, email: admin.email });
   });
 
-  // Admin authentication check
-  app.get("/api/admin/auth", (req: any, res) => {
-    if ((req.session as any)?.adminAuthenticated) {
-      res.json({ authenticated: true, adminId: (req.session as any).adminId });
-    } else {
-      res.status(401).json({ authenticated: false, message: "Not authenticated" });
-    }
+  app.get("/api/admin/auth", async (req: any, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ authenticated: false });
+    const email = req.user?.email;
+    const admin = email ? await isAdminEmail(email) : null;
+    if (!admin) return res.status(403).json({ authenticated: false });
+    res.json({ authenticated: true, adminId: email, role: admin.role });
   });
 
-  // Admin logout
+  app.post("/api/admin/login", (req, res) => {
+    res.status(400).json({ message: "Use Google OAuth. Visit /api/auth/google" });
+  });
+
   app.post("/api/admin/logout", (req: any, res) => {
-    if (req.session) {
-      (req.session as any).adminAuthenticated = false;
-      (req.session as any).adminId = null;
-    }
-    res.json({ success: true, message: "Admin logged out" });
+    req.logout(() => { res.json({ success: true }); });
+  });
+
+  app.get("/api/admin/admins", requireOwner, async (req: any, res) => {
+    try {
+      const admins = await db.select().from(adminUsers);
+      res.json(admins);
+    } catch (error) { res.status(500).json({ message: "Failed to fetch admins" }); }
+  });
+
+  app.post("/api/admin/admins", requireOwner, async (req: any, res) => {
+    try {
+      const { email } = req.body;
+      if (!email) return res.status(400).json({ message: "Email required" });
+      const existing = await db.select().from(adminUsers).where(eqAdmin(adminUsers.email, email));
+      if (existing.length > 0) return res.status(409).json({ message: "Already an admin" });
+      const [newAdmin] = await db.insert(adminUsers).values({ email, role: "admin", addedBy: req.adminUser.email }).returning();
+      res.json(newAdmin);
+    } catch (error) { res.status(500).json({ message: "Failed to add admin" }); }
+  });
+
+  app.delete("/api/admin/admins/:email", requireOwner, async (req: any, res) => {
+    try {
+      const { email } = req.params;
+      if (email === req.adminUser.email) return res.status(400).json({ message: "Cannot remove yourself" });
+      const target = await db.select().from(adminUsers).where(eqAdmin(adminUsers.email, email));
+      if (!target[0]) return res.status(404).json({ message: "Admin not found" });
+      if (target[0].role === "owner") return res.status(403).json({ message: "Cannot remove owner" });
+      await db.delete(adminUsers).where(eqAdmin(adminUsers.email, email));
+      res.json({ success: true });
+    } catch (error) { res.status(500).json({ message: "Failed to remove admin" }); }
   });
 
   // ============================================
@@ -2007,7 +2018,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Admin routes (protected with middleware)
   
   // Get all courts data for admin (with detailed information)
-  app.get("/api/admin/courts/all", requireAdminAuth, async (req: any, res) => {
+  app.get("/api/admin/courts/all", requireAdmin, async (req: any, res) => {
     try {
       const courts = await storage.getAllCourtsWithDetails();
       res.json(courts);
@@ -2018,7 +2029,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Set commission rate for a specific court
-  app.put("/api/admin/courts/:id/commission", requireAdminAuth, async (req: any, res) => {
+  app.put("/api/admin/courts/:id/commission", requireAdmin, async (req: any, res) => {
     try {
       const { commissionRate } = req.body;
       if (!commissionRate || isNaN(parseFloat(commissionRate))) {
@@ -2037,7 +2048,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Admin routes for vendor approval management
-  app.get('/api/admin/pending-vendors', requireAdminAuth, async (req, res) => {
+  app.get('/api/admin/pending-vendors', requireAdmin, async (req, res) => {
     try {
       const pendingVendors = await storage.getPendingVendors();
       res.json(pendingVendors);
@@ -2047,7 +2058,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/admin/approve-vendor/:vendorId', requireAdminAuth, async (req, res) => {
+  app.post('/api/admin/approve-vendor/:vendorId', requireAdmin, async (req, res) => {
     try {
       const { vendorId } = req.params;
       const updatedVendor = await storage.updateVendorStatus(vendorId, "verified");
@@ -2072,7 +2083,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/admin/reject-vendor/:vendorId', requireAdminAuth, async (req, res) => {
+  app.post('/api/admin/reject-vendor/:vendorId', requireAdmin, async (req, res) => {
     try {
       const { vendorId } = req.params;
       const { reason } = req.body;
@@ -2098,7 +2109,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/admin/pending-courts", requireAdminAuth, async (req: any, res) => {
+  app.get("/api/admin/pending-courts", requireAdmin, async (req: any, res) => {
     try {
       const pendingCourts = await storage.getPendingCourts();
       res.json(pendingCourts);
@@ -2108,7 +2119,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/admin/courts/:id/approve", requireAdminAuth, async (req: any, res) => {
+  app.put("/api/admin/courts/:id/approve", requireAdmin, async (req: any, res) => {
     try {
       const { adminNotes } = req.body;
       const court = await storage.approveCourt(req.params.id, adminNotes);
@@ -2140,7 +2151,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/admin/courts/:id/reject", requireAdminAuth, async (req: any, res) => {
+  app.put("/api/admin/courts/:id/reject", requireAdmin, async (req: any, res) => {
     try {
       const { adminNotes } = req.body;
       const court = await storage.rejectCourt(req.params.id, adminNotes);
@@ -2174,7 +2185,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Fireflies Admin Routes - Venue and Event Approval
-  app.get("/api/admin/pending-venues", requireAdminAuth, async (req: any, res) => {
+  app.get("/api/admin/pending-venues", requireAdmin, async (req: any, res) => {
     try {
       const pendingVenues = await storage.getPendingVenues();
       res.json(pendingVenues);
@@ -2184,7 +2195,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/admin/venues/:id/approve", requireAdminAuth, async (req: any, res) => {
+  app.put("/api/admin/venues/:id/approve", requireAdmin, async (req: any, res) => {
     try {
       const { adminNotes } = req.body;
       const venue = await storage.approveVenue(req.params.id, adminNotes);
@@ -2198,7 +2209,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/admin/venues/:id/reject", requireAdminAuth, async (req: any, res) => {
+  app.put("/api/admin/venues/:id/reject", requireAdmin, async (req: any, res) => {
     try {
       const { adminNotes } = req.body;
       const venue = await storage.rejectVenue(req.params.id, adminNotes);
@@ -2212,7 +2223,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/admin/pending-events", requireAdminAuth, async (req: any, res) => {
+  app.get("/api/admin/pending-events", requireAdmin, async (req: any, res) => {
     try {
       const pendingEvents = await storage.getPendingEvents();
       res.json(pendingEvents);
@@ -2222,7 +2233,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/admin/events/:id/approve", requireAdminAuth, async (req: any, res) => {
+  app.put("/api/admin/events/:id/approve", requireAdmin, async (req: any, res) => {
     try {
       const { adminNotes } = req.body;
       const event = await storage.approveEvent(req.params.id, adminNotes);
@@ -2236,7 +2247,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/admin/events/:id/reject", requireAdminAuth, async (req: any, res) => {
+  app.put("/api/admin/events/:id/reject", requireAdmin, async (req: any, res) => {
     try {
       const { adminNotes } = req.body;
       const event = await storage.rejectEvent(req.params.id, adminNotes);
@@ -2251,7 +2262,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Admin seed sample courts for production
-  app.post("/api/admin/seed-courts", requireAdminAuth, async (req: any, res) => {
+  app.post("/api/admin/seed-courts", requireAdmin, async (req: any, res) => {
     try {
       const sampleCourts = [
         {

@@ -22,8 +22,20 @@ export const sessions = pgTable(
     sess: jsonb("sess").notNull(),
     expire: timestamp("expire").notNull(),
   },
+
   (table) => [index("IDX_session_expire").on(table.expire)],
 );
+
+// Admin users table
+export const adminUsers = pgTable("admin_users", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  email: varchar("email").notNull().unique(),
+  role: varchar("role", { enum: ["owner", "admin"] }).notNull().default("admin"),
+  addedBy: varchar("added_by"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+export type AdminUser = typeof adminUsers.$inferSelect;
+export type InsertAdminUser = typeof adminUsers.$inferInsert;
 
 // User storage table (required for Replit Auth)
 export const users = pgTable("users", {

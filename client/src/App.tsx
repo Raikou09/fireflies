@@ -35,7 +35,7 @@ function Router() {
       <Route path="/fireflies/event/:id" component={EventDetails} />
       <Route path="/booking-history" component={BookingHistory} />
       <Route path="/profile" component={UserProfile} />
-      <Route path="/admin" component={Admin} />
+      <Route path="/ops-center" component={Admin} />
       
       <Route component={NotFound} />
     </Switch>
