@@ -11,7 +11,7 @@ var __export = (target, all) => {
 // shared/schema.ts
 var schema_exports = {};
 __export(schema_exports, {
-  adminUsers: () => adminUsers2,
+  adminUsers: () => adminUsers,
   bookingRelations: () => bookingRelations,
   bookings: () => bookings,
   courtRelations: () => courtRelations,
@@ -72,7 +72,7 @@ import {
 import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
-var sessions, adminUsers2, users, courts, equipment, bookings, reviews, userRelations, courtRelations, equipmentRelations, bookingRelations, reviewRelations, notifications, userNotificationPreferences, venues, seatSections, seats, eventSeatReservations, events, ticketTiers, eventBookings, notificationRelations, userNotificationPreferencesRelations, venueRelations, seatSectionRelations, seatRelations, eventSeatReservationRelations, eventRelations, ticketTierRelations, eventBookingRelations, insertUserSchema, insertCourtSchema, insertEquipmentSchema, insertBookingSchema, insertReviewSchema, insertNotificationSchema, insertUserNotificationPreferencesSchema, insertVenueSchema, insertEventSchema, insertTicketTierSchema, insertEventBookingSchema, insertSeatSectionSchema, insertSeatSchema, insertEventSeatReservationSchema, vendorOnboardingSchema;
+var sessions, adminUsers, users, courts, equipment, bookings, reviews, userRelations, courtRelations, equipmentRelations, bookingRelations, reviewRelations, notifications, userNotificationPreferences, venues, seatSections, seats, eventSeatReservations, events, ticketTiers, eventBookings, notificationRelations, userNotificationPreferencesRelations, venueRelations, seatSectionRelations, seatRelations, eventSeatReservationRelations, eventRelations, ticketTierRelations, eventBookingRelations, insertUserSchema, insertCourtSchema, insertEquipmentSchema, insertBookingSchema, insertReviewSchema, insertNotificationSchema, insertUserNotificationPreferencesSchema, insertVenueSchema, insertEventSchema, insertTicketTierSchema, insertEventBookingSchema, insertSeatSectionSchema, insertSeatSchema, insertEventSeatReservationSchema, vendorOnboardingSchema;
 var init_schema = __esm({
   "shared/schema.ts"() {
     "use strict";
@@ -85,7 +85,7 @@ var init_schema = __esm({
       },
       (table) => [index("IDX_session_expire").on(table.expire)]
     );
-    adminUsers2 = pgTable("admin_users", {
+    adminUsers = pgTable("admin_users", {
       id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
       email: varchar("email").notNull().unique(),
       role: varchar("role", { enum: ["owner", "admin"] }).notNull().default("admin"),
@@ -1502,22 +1502,22 @@ if (!process.env.DATABASE_URL) {
   );
 }
 var pool = new Pool({ connectionString: process.env.DATABASE_URL });
-var db2 = drizzle({ client: pool, schema: schema_exports });
+var db = drizzle({ client: pool, schema: schema_exports });
 
 // server/storage.ts
 import { eq, and, desc, sql as sql2, gte, lte } from "drizzle-orm";
 var DatabaseStorage = class {
   // User operations
   async getUser(id) {
-    const [user] = await db2.select().from(users).where(eq(users.id, id));
+    const [user] = await db.select().from(users).where(eq(users.id, id));
     return user;
   }
   async getUserByEmail(email) {
-    const [user] = await db2.select().from(users).where(eq(users.email, email));
+    const [user] = await db.select().from(users).where(eq(users.email, email));
     return user;
   }
   async upsertUser(userData) {
-    const [user] = await db2.insert(users).values(userData).onConflictDoUpdate({
+    const [user] = await db.insert(users).values(userData).onConflictDoUpdate({
       target: users.id,
       set: {
         ...userData,
@@ -1527,11 +1527,11 @@ var DatabaseStorage = class {
     return user;
   }
   async updateUserProfile(id, updates) {
-    const [updatedUser] = await db2.update(users).set({ ...updates, updatedAt: /* @__PURE__ */ new Date() }).where(eq(users.id, id)).returning();
+    const [updatedUser] = await db.update(users).set({ ...updates, updatedAt: /* @__PURE__ */ new Date() }).where(eq(users.id, id)).returning();
     return updatedUser;
   }
   async updateUser(id, updates) {
-    const [updatedUser] = await db2.update(users).set({ ...updates, updatedAt: /* @__PURE__ */ new Date() }).where(eq(users.id, id)).returning();
+    const [updatedUser] = await db.update(users).set({ ...updates, updatedAt: /* @__PURE__ */ new Date() }).where(eq(users.id, id)).returning();
     return updatedUser;
   }
   // Court operations
@@ -1543,7 +1543,7 @@ var DatabaseStorage = class {
     if (filters?.sport && filters.sport !== "All Sports") {
       whereConditions.push(sql2`${courts.availableSports} @> ARRAY[${filters.sport}]`);
     }
-    const query = db2.select().from(courts).leftJoin(users, eq(courts.vendorId, users.id)).leftJoin(equipment, eq(courts.id, equipment.courtId)).where(and(...whereConditions));
+    const query = db.select().from(courts).leftJoin(users, eq(courts.vendorId, users.id)).leftJoin(equipment, eq(courts.id, equipment.courtId)).where(and(...whereConditions));
     const results = await query.orderBy(desc(courts.createdAt));
     const courtMap = /* @__PURE__ */ new Map();
     for (const row of results) {
@@ -1601,7 +1601,7 @@ var DatabaseStorage = class {
     return deg * (Math.PI / 180);
   }
   async getCourtById(id) {
-    const results = await db2.select().from(courts).leftJoin(users, eq(courts.vendorId, users.id)).leftJoin(equipment, eq(courts.id, equipment.courtId)).where(eq(courts.id, id));
+    const results = await db.select().from(courts).leftJoin(users, eq(courts.vendorId, users.id)).leftJoin(equipment, eq(courts.id, equipment.courtId)).where(eq(courts.id, id));
     if (results.length === 0) return void 0;
     const court = results[0].courts;
     const vendor = results[0].users;
@@ -1613,7 +1613,7 @@ var DatabaseStorage = class {
     };
   }
   async getCourtsByVendor(vendorId) {
-    const results = await db2.select().from(courts).leftJoin(users, eq(courts.vendorId, users.id)).leftJoin(equipment, eq(courts.id, equipment.courtId)).where(eq(courts.vendorId, vendorId)).orderBy(desc(courts.createdAt));
+    const results = await db.select().from(courts).leftJoin(users, eq(courts.vendorId, users.id)).leftJoin(equipment, eq(courts.id, equipment.courtId)).where(eq(courts.vendorId, vendorId)).orderBy(desc(courts.createdAt));
     const courtMap = /* @__PURE__ */ new Map();
     for (const row of results) {
       if (!row.courts) continue;
@@ -1632,7 +1632,7 @@ var DatabaseStorage = class {
     return Array.from(courtMap.values());
   }
   async createCourt(vendorId, court) {
-    const [newCourt] = await db2.insert(courts).values({
+    const [newCourt] = await db.insert(courts).values({
       ...court,
       vendorId,
       approvalStatus: "pending",
@@ -1645,11 +1645,11 @@ var DatabaseStorage = class {
     return newCourt;
   }
   async updateCourt(id, vendorId, court) {
-    const [updatedCourt] = await db2.update(courts).set({ ...court, updatedAt: /* @__PURE__ */ new Date() }).where(and(eq(courts.id, id), eq(courts.vendorId, vendorId))).returning();
+    const [updatedCourt] = await db.update(courts).set({ ...court, updatedAt: /* @__PURE__ */ new Date() }).where(and(eq(courts.id, id), eq(courts.vendorId, vendorId))).returning();
     return updatedCourt;
   }
   async updateCourtDetails(id, vendorId, updates) {
-    const [updatedCourt] = await db2.update(courts).set({
+    const [updatedCourt] = await db.update(courts).set({
       ...updates,
       approvalStatus: "pending",
       adminNotes: "Court details updated by vendor - pending re-approval",
@@ -1658,21 +1658,21 @@ var DatabaseStorage = class {
     return updatedCourt;
   }
   async deleteCourt(id, vendorId) {
-    const result = await db2.delete(courts).where(and(eq(courts.id, id), eq(courts.vendorId, vendorId)));
+    const result = await db.delete(courts).where(and(eq(courts.id, id), eq(courts.vendorId, vendorId)));
     return (result.rowCount || 0) > 0;
   }
   async migrateVendorId(oldId, newId) {
-    await db2.update(courts).set({ vendorId: newId }).where(eq(courts.vendorId, oldId));
+    await db.update(courts).set({ vendorId: newId }).where(eq(courts.vendorId, oldId));
   }
   // Equipment operations
   async getEquipmentByCourt(courtId) {
-    return await db2.select().from(equipment).where(eq(equipment.courtId, courtId)).orderBy(equipment.category, equipment.name);
+    return await db.select().from(equipment).where(eq(equipment.courtId, courtId)).orderBy(equipment.category, equipment.name);
   }
   async getAvailableEquipmentByCourt(courtId) {
-    return await db2.select().from(equipment).where(and(eq(equipment.courtId, courtId), eq(equipment.isAvailable, true))).orderBy(equipment.category, equipment.name);
+    return await db.select().from(equipment).where(and(eq(equipment.courtId, courtId), eq(equipment.isAvailable, true))).orderBy(equipment.category, equipment.name);
   }
   async createEquipment(equipmentData) {
-    const [newEquipment] = await db2.insert(equipment).values({
+    const [newEquipment] = await db.insert(equipment).values({
       ...equipmentData,
       createdAt: /* @__PURE__ */ new Date(),
       updatedAt: /* @__PURE__ */ new Date()
@@ -1680,15 +1680,15 @@ var DatabaseStorage = class {
     return newEquipment;
   }
   async updateEquipment(id, equipmentData) {
-    const [updatedEquipment] = await db2.update(equipment).set({ ...equipmentData, updatedAt: /* @__PURE__ */ new Date() }).where(eq(equipment.id, id)).returning();
+    const [updatedEquipment] = await db.update(equipment).set({ ...equipmentData, updatedAt: /* @__PURE__ */ new Date() }).where(eq(equipment.id, id)).returning();
     return updatedEquipment;
   }
   async deleteEquipment(id) {
-    const result = await db2.delete(equipment).where(eq(equipment.id, id));
+    const result = await db.delete(equipment).where(eq(equipment.id, id));
     return (result.rowCount || 0) > 0;
   }
   async checkEquipmentAvailability(equipmentId, quantity, startTime, endTime) {
-    const [equipmentInfo] = await db2.select().from(equipment).where(eq(equipment.id, equipmentId));
+    const [equipmentInfo] = await db.select().from(equipment).where(eq(equipment.id, equipmentId));
     if (!equipmentInfo || !equipmentInfo.isAvailable) {
       return false;
     }
@@ -1699,11 +1699,11 @@ var DatabaseStorage = class {
   }
   // Booking operations
   async createBooking(booking) {
-    const [newBooking] = await db2.insert(bookings).values(booking).returning();
+    const [newBooking] = await db.insert(bookings).values(booking).returning();
     return newBooking;
   }
   async getBookingsByCustomer(customerId) {
-    const results = await db2.select().from(bookings).leftJoin(courts, eq(bookings.courtId, courts.id)).leftJoin(users, eq(bookings.customerId, users.id)).where(eq(bookings.customerId, customerId)).orderBy(desc(bookings.createdAt));
+    const results = await db.select().from(bookings).leftJoin(courts, eq(bookings.courtId, courts.id)).leftJoin(users, eq(bookings.customerId, users.id)).where(eq(bookings.customerId, customerId)).orderBy(desc(bookings.createdAt));
     return results.map((row) => ({
       ...row.bookings,
       court: row.courts,
@@ -1711,7 +1711,7 @@ var DatabaseStorage = class {
     }));
   }
   async getBookingsByVendor(vendorId) {
-    const results = await db2.select().from(bookings).leftJoin(courts, eq(bookings.courtId, courts.id)).leftJoin(users, eq(bookings.customerId, users.id)).where(eq(courts.vendorId, vendorId)).orderBy(desc(bookings.createdAt));
+    const results = await db.select().from(bookings).leftJoin(courts, eq(bookings.courtId, courts.id)).leftJoin(users, eq(bookings.customerId, users.id)).where(eq(courts.vendorId, vendorId)).orderBy(desc(bookings.createdAt));
     return results.map((row) => ({
       ...row.bookings,
       court: row.courts,
@@ -1722,7 +1722,7 @@ var DatabaseStorage = class {
     const bookingDate = new Date(date);
     const nextDay = new Date(bookingDate);
     nextDay.setDate(nextDay.getDate() + 1);
-    return await db2.select().from(bookings).where(
+    return await db.select().from(bookings).where(
       and(
         eq(bookings.courtId, courtId),
         gte(bookings.bookingDate, bookingDate),
@@ -1731,7 +1731,7 @@ var DatabaseStorage = class {
     );
   }
   async getBookingById(id) {
-    const [result] = await db2.select().from(bookings).leftJoin(courts, eq(bookings.courtId, courts.id)).leftJoin(users, eq(bookings.customerId, users.id)).where(eq(bookings.id, id));
+    const [result] = await db.select().from(bookings).leftJoin(courts, eq(bookings.courtId, courts.id)).leftJoin(users, eq(bookings.customerId, users.id)).where(eq(bookings.id, id));
     if (!result) return void 0;
     return {
       ...result.bookings,
@@ -1740,29 +1740,29 @@ var DatabaseStorage = class {
     };
   }
   async updateBookingStatus(id, status) {
-    const [updatedBooking] = await db2.update(bookings).set({ status, updatedAt: /* @__PURE__ */ new Date() }).where(eq(bookings.id, id)).returning();
+    const [updatedBooking] = await db.update(bookings).set({ status, updatedAt: /* @__PURE__ */ new Date() }).where(eq(bookings.id, id)).returning();
     return updatedBooking;
   }
   async getBooking(id) {
-    const [booking] = await db2.select().from(bookings).where(eq(bookings.id, id));
+    const [booking] = await db.select().from(bookings).where(eq(bookings.id, id));
     return booking;
   }
   async updateBookingPayment(id, data) {
-    const [updatedBooking] = await db2.update(bookings).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq(bookings.id, id)).returning();
+    const [updatedBooking] = await db.update(bookings).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq(bookings.id, id)).returning();
     return updatedBooking;
   }
   async getBookingByCheckoutRequestId(checkoutRequestId) {
-    const [booking] = await db2.select().from(bookings).where(eq(bookings.mpesaCheckoutRequestId, checkoutRequestId));
+    const [booking] = await db.select().from(bookings).where(eq(bookings.mpesaCheckoutRequestId, checkoutRequestId));
     return booking;
   }
   // Review operations
   async createReview(reviewData) {
-    const [newReview] = await db2.insert(reviews).values(reviewData).returning();
+    const [newReview] = await db.insert(reviews).values(reviewData).returning();
     await this.updateCourtRating(reviewData.courtId);
     return newReview;
   }
   async getReviewsByCourt(courtId) {
-    const results = await db2.select().from(reviews).leftJoin(users, eq(reviews.customerId, users.id)).leftJoin(bookings, eq(reviews.bookingId, bookings.id)).where(and(eq(reviews.courtId, courtId), eq(reviews.isVisible, true))).orderBy(desc(reviews.createdAt));
+    const results = await db.select().from(reviews).leftJoin(users, eq(reviews.customerId, users.id)).leftJoin(bookings, eq(reviews.bookingId, bookings.id)).where(and(eq(reviews.courtId, courtId), eq(reviews.isVisible, true))).orderBy(desc(reviews.createdAt));
     return results.map((row) => ({
       ...row.reviews,
       customer: row.users,
@@ -1770,7 +1770,7 @@ var DatabaseStorage = class {
     }));
   }
   async getReviewsByCustomer(customerId) {
-    const results = await db2.select().from(reviews).leftJoin(users, eq(reviews.customerId, users.id)).leftJoin(courts, eq(reviews.courtId, courts.id)).leftJoin(bookings, eq(reviews.bookingId, bookings.id)).where(eq(reviews.customerId, customerId)).orderBy(desc(reviews.createdAt));
+    const results = await db.select().from(reviews).leftJoin(users, eq(reviews.customerId, users.id)).leftJoin(courts, eq(reviews.courtId, courts.id)).leftJoin(bookings, eq(reviews.bookingId, bookings.id)).where(eq(reviews.customerId, customerId)).orderBy(desc(reviews.createdAt));
     return results.map((row) => ({
       ...row.reviews,
       customer: row.users,
@@ -1779,13 +1779,13 @@ var DatabaseStorage = class {
     }));
   }
   async updateReviewHelpfulness(reviewId, increment) {
-    const [updatedReview] = await db2.update(reviews).set({
+    const [updatedReview] = await db.update(reviews).set({
       helpfulVotes: increment ? sql2`${reviews.helpfulVotes} + 1` : sql2`${reviews.helpfulVotes} - 1`
     }).where(eq(reviews.id, reviewId)).returning();
     return updatedReview;
   }
   async reportReview(reviewId) {
-    const [updatedReview] = await db2.update(reviews).set({
+    const [updatedReview] = await db.update(reviews).set({
       reportCount: sql2`${reviews.reportCount} + 1`,
       // Hide review if it gets 5+ reports
       isVisible: sql2`CASE WHEN ${reviews.reportCount} >= 4 THEN false ELSE ${reviews.isVisible} END`
@@ -1794,11 +1794,11 @@ var DatabaseStorage = class {
   }
   // Helper method to update court rating based on reviews
   async updateCourtRating(courtId) {
-    const [{ avg: averageRating, count: totalReviews }] = await db2.select({
+    const [{ avg: averageRating, count: totalReviews }] = await db.select({
       avg: sql2`coalesce(avg(${reviews.rating}), 0)`,
       count: sql2`count(*)`
     }).from(reviews).where(and(eq(reviews.courtId, courtId), eq(reviews.isVisible, true)));
-    await db2.update(courts).set({
+    await db.update(courts).set({
       rating: averageRating.toFixed(2),
       totalBookings: Number(totalReviews)
       // Using this field to store review count for now
@@ -1806,10 +1806,10 @@ var DatabaseStorage = class {
   }
   // Analytics
   async getVendorStats(vendorId) {
-    const [{ count: totalCourts }] = await db2.select({ count: sql2`count(*)` }).from(courts).where(and(eq(courts.vendorId, vendorId), eq(courts.isActive, true)));
+    const [{ count: totalCourts }] = await db.select({ count: sql2`count(*)` }).from(courts).where(and(eq(courts.vendorId, vendorId), eq(courts.isActive, true)));
     const startOfMonth = new Date((/* @__PURE__ */ new Date()).getFullYear(), (/* @__PURE__ */ new Date()).getMonth(), 1);
     const endOfMonth = new Date((/* @__PURE__ */ new Date()).getFullYear(), (/* @__PURE__ */ new Date()).getMonth() + 1, 0);
-    const [{ count: activeBookings }] = await db2.select({ count: sql2`count(*)` }).from(bookings).leftJoin(courts, eq(bookings.courtId, courts.id)).where(
+    const [{ count: activeBookings }] = await db.select({ count: sql2`count(*)` }).from(bookings).leftJoin(courts, eq(bookings.courtId, courts.id)).where(
       and(
         eq(courts.vendorId, vendorId),
         eq(bookings.status, "confirmed"),
@@ -1817,7 +1817,7 @@ var DatabaseStorage = class {
         sql2`${bookings.createdAt} <= ${endOfMonth}`
       )
     );
-    const [{ sum: monthlyRevenue }] = await db2.select({ sum: sql2`coalesce(sum(${bookings.totalAmount}), 0)` }).from(bookings).leftJoin(courts, eq(bookings.courtId, courts.id)).where(
+    const [{ sum: monthlyRevenue }] = await db.select({ sum: sql2`coalesce(sum(${bookings.totalAmount}), 0)` }).from(bookings).leftJoin(courts, eq(bookings.courtId, courts.id)).where(
       and(
         eq(courts.vendorId, vendorId),
         eq(bookings.paymentStatus, "completed"),
@@ -1825,7 +1825,7 @@ var DatabaseStorage = class {
         sql2`${bookings.createdAt} <= ${endOfMonth}`
       )
     );
-    const [{ avg: averageRating }] = await db2.select({ avg: sql2`coalesce(avg(${courts.rating}), 0)` }).from(courts).where(and(eq(courts.vendorId, vendorId), eq(courts.isActive, true)));
+    const [{ avg: averageRating }] = await db.select({ avg: sql2`coalesce(avg(${courts.rating}), 0)` }).from(courts).where(and(eq(courts.vendorId, vendorId), eq(courts.isActive, true)));
     return {
       totalCourts: Number(totalCourts) || 0,
       activeBookings: Number(activeBookings) || 0,
@@ -1835,19 +1835,19 @@ var DatabaseStorage = class {
   }
   // Vendor Court Analytics
   async getVendorCourtAnalytics(vendorId) {
-    const vendorCourts = await db2.select().from(courts).where(and(eq(courts.vendorId, vendorId), eq(courts.isActive, true)));
+    const vendorCourts = await db.select().from(courts).where(and(eq(courts.vendorId, vendorId), eq(courts.isActive, true)));
     const analytics = [];
     for (const court of vendorCourts) {
-      const [{ count: totalBookings }] = await db2.select({ count: sql2`count(*)` }).from(bookings).where(eq(bookings.courtId, court.id));
-      const [{ sum: revenue }] = await db2.select({ sum: sql2`coalesce(sum(${bookings.totalAmount}), 0)` }).from(bookings).where(and(
+      const [{ count: totalBookings }] = await db.select({ count: sql2`count(*)` }).from(bookings).where(eq(bookings.courtId, court.id));
+      const [{ sum: revenue }] = await db.select({ sum: sql2`coalesce(sum(${bookings.totalAmount}), 0)` }).from(bookings).where(and(
         eq(bookings.courtId, court.id),
         eq(bookings.paymentStatus, "completed")
       ));
-      const popularSports = await db2.select({
+      const popularSports = await db.select({
         sport: bookings.selectedSport,
         bookings: sql2`count(*)`
       }).from(bookings).where(eq(bookings.courtId, court.id)).groupBy(bookings.selectedSport).orderBy(sql2`count(*) desc`).limit(5);
-      const recentBookings = await db2.select({
+      const recentBookings = await db.select({
         date: bookings.bookingDate,
         sport: bookings.selectedSport,
         revenue: bookings.totalAmount,
@@ -1876,23 +1876,23 @@ var DatabaseStorage = class {
   }
   // Vendor City Analytics
   async getVendorCityAnalytics(vendorId) {
-    const cities = await db2.select({
+    const cities = await db.select({
       city: courts.city,
       count: sql2`count(*)`
     }).from(courts).where(and(eq(courts.vendorId, vendorId), eq(courts.isActive, true))).groupBy(courts.city);
     const analytics = [];
     for (const cityInfo of cities) {
       const city = cityInfo.city;
-      const [{ count: totalBookings }] = await db2.select({ count: sql2`count(*)` }).from(bookings).leftJoin(courts, eq(bookings.courtId, courts.id)).where(and(
+      const [{ count: totalBookings }] = await db.select({ count: sql2`count(*)` }).from(bookings).leftJoin(courts, eq(bookings.courtId, courts.id)).where(and(
         eq(courts.vendorId, vendorId),
         eq(courts.city, city)
       ));
-      const [{ sum: revenue }] = await db2.select({ sum: sql2`coalesce(sum(${bookings.totalAmount}), 0)` }).from(bookings).leftJoin(courts, eq(bookings.courtId, courts.id)).where(and(
+      const [{ sum: revenue }] = await db.select({ sum: sql2`coalesce(sum(${bookings.totalAmount}), 0)` }).from(bookings).leftJoin(courts, eq(bookings.courtId, courts.id)).where(and(
         eq(courts.vendorId, vendorId),
         eq(courts.city, city),
         eq(bookings.paymentStatus, "completed")
       ));
-      const popularSports = await db2.select({
+      const popularSports = await db.select({
         sport: bookings.selectedSport,
         bookings: sql2`count(*)`
       }).from(bookings).leftJoin(courts, eq(bookings.courtId, courts.id)).where(and(
@@ -1914,7 +1914,7 @@ var DatabaseStorage = class {
   }
   // Admin operations
   async getPendingCourts() {
-    const results = await db2.select().from(courts).leftJoin(users, eq(courts.vendorId, users.id)).leftJoin(equipment, eq(courts.id, equipment.courtId)).where(eq(courts.approvalStatus, "pending")).orderBy(desc(courts.createdAt));
+    const results = await db.select().from(courts).leftJoin(users, eq(courts.vendorId, users.id)).leftJoin(equipment, eq(courts.id, equipment.courtId)).where(eq(courts.approvalStatus, "pending")).orderBy(desc(courts.createdAt));
     const courtMap = /* @__PURE__ */ new Map();
     for (const row of results) {
       if (!row.courts) continue;
@@ -1933,21 +1933,21 @@ var DatabaseStorage = class {
     return Array.from(courtMap.values());
   }
   async getPendingVendors() {
-    const results = await db2.select().from(users).where(and(
+    const results = await db.select().from(users).where(and(
       eq(users.userType, "vendor"),
       eq(users.vendorVerificationStatus, "pending")
     )).orderBy(desc(users.createdAt));
     return results;
   }
   async updateVendorStatus(vendorId, status) {
-    const results = await db2.update(users).set({
+    const results = await db.update(users).set({
       vendorVerificationStatus: status,
       updatedAt: /* @__PURE__ */ new Date()
     }).where(eq(users.id, vendorId)).returning();
     return results[0] || null;
   }
   async approveCourt(courtId, adminNotes) {
-    const [updatedCourt] = await db2.update(courts).set({
+    const [updatedCourt] = await db.update(courts).set({
       approvalStatus: "approved",
       isActive: true,
       // Make court active when approved
@@ -1957,7 +1957,7 @@ var DatabaseStorage = class {
     return updatedCourt;
   }
   async rejectCourt(courtId, adminNotes) {
-    const [updatedCourt] = await db2.update(courts).set({
+    const [updatedCourt] = await db.update(courts).set({
       approvalStatus: "rejected",
       adminNotes,
       updatedAt: /* @__PURE__ */ new Date()
@@ -1966,9 +1966,9 @@ var DatabaseStorage = class {
   }
   async adminDeleteCourt(courtId) {
     try {
-      await db2.delete(bookings).where(eq(bookings.courtId, courtId));
-      await db2.delete(equipment).where(eq(equipment.courtId, courtId));
-      const result = await db2.delete(courts).where(eq(courts.id, courtId));
+      await db.delete(bookings).where(eq(bookings.courtId, courtId));
+      await db.delete(equipment).where(eq(equipment.courtId, courtId));
+      const result = await db.delete(courts).where(eq(courts.id, courtId));
       return true;
     } catch (error) {
       console.error("Error deleting court:", error);
@@ -1977,7 +1977,7 @@ var DatabaseStorage = class {
   }
   // Admin: Get all courts with full details (including pending/rejected)
   async getAllCourtsWithDetails() {
-    const query = db2.select().from(courts).leftJoin(users, eq(courts.vendorId, users.id)).leftJoin(equipment, eq(courts.id, equipment.courtId));
+    const query = db.select().from(courts).leftJoin(users, eq(courts.vendorId, users.id)).leftJoin(equipment, eq(courts.id, equipment.courtId));
     const results = await query.orderBy(desc(courts.createdAt));
     const courtMap = /* @__PURE__ */ new Map();
     for (const row of results) {
@@ -1999,12 +1999,12 @@ var DatabaseStorage = class {
   // Admin: Set commission rate for a specific court
   async setCourtCommission(id, commissionRate) {
     console.log("Setting commission for court:", id, "rate:", commissionRate);
-    const [existingCourt] = await db2.select().from(courts).where(eq(courts.id, id));
+    const [existingCourt] = await db.select().from(courts).where(eq(courts.id, id));
     if (!existingCourt) {
       console.log("Court not found:", id);
       return void 0;
     }
-    const [updatedCourt] = await db2.update(courts).set({
+    const [updatedCourt] = await db.update(courts).set({
       commissionRate: commissionRate.toString(),
       updatedAt: /* @__PURE__ */ new Date()
     }).where(eq(courts.id, id)).returning();
@@ -2198,52 +2198,52 @@ var DatabaseStorage = class {
   }
   // Notification operations
   async createNotification(notificationData) {
-    const [notification] = await db2.insert(notifications).values(notificationData).returning();
+    const [notification] = await db.insert(notifications).values(notificationData).returning();
     return notification;
   }
   async getUserNotifications(userId, limit = 20, offset = 0) {
-    return await db2.select().from(notifications).where(eq(notifications.userId, userId)).orderBy(desc(notifications.createdAt)).limit(limit).offset(offset);
+    return await db.select().from(notifications).where(eq(notifications.userId, userId)).orderBy(desc(notifications.createdAt)).limit(limit).offset(offset);
   }
   async markNotificationAsRead(notificationId, userId) {
-    await db2.update(notifications).set({ isRead: true }).where(and(
+    await db.update(notifications).set({ isRead: true }).where(and(
       eq(notifications.id, notificationId),
       eq(notifications.userId, userId)
     ));
   }
   async markAllNotificationsAsRead(userId) {
-    await db2.update(notifications).set({ isRead: true }).where(and(
+    await db.update(notifications).set({ isRead: true }).where(and(
       eq(notifications.userId, userId),
       eq(notifications.isRead, false)
     ));
   }
   async getUnreadNotificationCount(userId) {
-    const result = await db2.select().from(notifications).where(and(
+    const result = await db.select().from(notifications).where(and(
       eq(notifications.userId, userId),
       eq(notifications.isRead, false)
     ));
     return result.length;
   }
   async deleteNotification(notificationId, userId) {
-    await db2.delete(notifications).where(and(
+    await db.delete(notifications).where(and(
       eq(notifications.id, notificationId),
       eq(notifications.userId, userId)
     ));
   }
   // Notification preferences operations
   async getUserNotificationPreferences(userId) {
-    const [prefs] = await db2.select().from(userNotificationPreferences).where(eq(userNotificationPreferences.userId, userId));
+    const [prefs] = await db.select().from(userNotificationPreferences).where(eq(userNotificationPreferences.userId, userId));
     return prefs;
   }
   async createUserNotificationPreferences(preferencesData) {
-    const [prefs] = await db2.insert(userNotificationPreferences).values(preferencesData).returning();
+    const [prefs] = await db.insert(userNotificationPreferences).values(preferencesData).returning();
     return prefs;
   }
   async updateUserNotificationPreferences(userId, preferences) {
-    await db2.update(userNotificationPreferences).set(preferences).where(eq(userNotificationPreferences.userId, userId));
+    await db.update(userNotificationPreferences).set(preferences).where(eq(userNotificationPreferences.userId, userId));
   }
   // Court reviews operations
   async getCourtReviews(courtId) {
-    const results = await db2.select().from(reviews).innerJoin(users, eq(reviews.customerId, users.id)).where(and(
+    const results = await db.select().from(reviews).innerJoin(users, eq(reviews.customerId, users.id)).where(and(
       eq(reviews.courtId, courtId),
       eq(reviews.isVisible, true)
     )).orderBy(desc(reviews.createdAt));
@@ -2268,7 +2268,7 @@ var DatabaseStorage = class {
         ${venues.address} ILIKE ${`%${filters.search}%`}
       )`);
     }
-    const results = await db2.select().from(venues).leftJoin(users, eq(venues.vendorId, users.id)).leftJoin(events, eq(events.venueId, venues.id)).where(and(...whereConditions));
+    const results = await db.select().from(venues).leftJoin(users, eq(venues.vendorId, users.id)).leftJoin(events, eq(events.venueId, venues.id)).where(and(...whereConditions));
     const venuesMap = /* @__PURE__ */ new Map();
     for (const row of results) {
       if (!row.venues) continue;
@@ -2288,7 +2288,7 @@ var DatabaseStorage = class {
     return Array.from(venuesMap.values());
   }
   async getVenueById(id) {
-    const results = await db2.select().from(venues).leftJoin(users, eq(venues.vendorId, users.id)).leftJoin(events, eq(events.venueId, venues.id)).where(eq(venues.id, id));
+    const results = await db.select().from(venues).leftJoin(users, eq(venues.vendorId, users.id)).leftJoin(events, eq(events.venueId, venues.id)).where(eq(venues.id, id));
     if (results.length === 0 || !results[0].venues) return void 0;
     const venue = {
       ...results[0].venues,
@@ -2298,7 +2298,7 @@ var DatabaseStorage = class {
     return venue;
   }
   async getVenuesByVendor(vendorId) {
-    const results = await db2.select().from(venues).leftJoin(users, eq(venues.vendorId, users.id)).leftJoin(events, eq(events.venueId, venues.id)).where(eq(venues.vendorId, vendorId));
+    const results = await db.select().from(venues).leftJoin(users, eq(venues.vendorId, users.id)).leftJoin(events, eq(events.venueId, venues.id)).where(eq(venues.vendorId, vendorId));
     const venuesMap = /* @__PURE__ */ new Map();
     for (const row of results) {
       if (!row.venues) continue;
@@ -2318,15 +2318,15 @@ var DatabaseStorage = class {
     return Array.from(venuesMap.values());
   }
   async createVenue(vendorId, venueData) {
-    const [venue] = await db2.insert(venues).values({ ...venueData, vendorId }).returning();
+    const [venue] = await db.insert(venues).values({ ...venueData, vendorId }).returning();
     return venue;
   }
   async updateVenue(id, vendorId, venueData) {
-    const [venue] = await db2.update(venues).set({ ...venueData, updatedAt: /* @__PURE__ */ new Date() }).where(and(eq(venues.id, id), eq(venues.vendorId, vendorId))).returning();
+    const [venue] = await db.update(venues).set({ ...venueData, updatedAt: /* @__PURE__ */ new Date() }).where(and(eq(venues.id, id), eq(venues.vendorId, vendorId))).returning();
     return venue;
   }
   async deleteVenue(id, vendorId) {
-    const result = await db2.delete(venues).where(and(eq(venues.id, id), eq(venues.vendorId, vendorId)));
+    const result = await db.delete(venues).where(and(eq(venues.id, id), eq(venues.vendorId, vendorId)));
     return result.rowCount ? result.rowCount > 0 : false;
   }
   // Event operations
@@ -2350,7 +2350,7 @@ var DatabaseStorage = class {
     if (filters?.dateTo) {
       whereConditions.push(lte(events.eventDate, filters.dateTo));
     }
-    const results = await db2.select().from(events).leftJoin(users, eq(events.vendorId, users.id)).leftJoin(venues, eq(events.venueId, venues.id)).leftJoin(ticketTiers, eq(ticketTiers.eventId, events.id)).where(and(...whereConditions)).orderBy(events.eventDate);
+    const results = await db.select().from(events).leftJoin(users, eq(events.vendorId, users.id)).leftJoin(venues, eq(events.venueId, venues.id)).leftJoin(ticketTiers, eq(ticketTiers.eventId, events.id)).where(and(...whereConditions)).orderBy(events.eventDate);
     const eventsMap = /* @__PURE__ */ new Map();
     for (const row of results) {
       if (!row.events) continue;
@@ -2371,7 +2371,7 @@ var DatabaseStorage = class {
     return Array.from(eventsMap.values());
   }
   async getEventById(id) {
-    const results = await db2.select().from(events).leftJoin(users, eq(events.vendorId, users.id)).leftJoin(venues, eq(events.venueId, venues.id)).leftJoin(ticketTiers, eq(ticketTiers.eventId, events.id)).where(eq(events.id, id));
+    const results = await db.select().from(events).leftJoin(users, eq(events.vendorId, users.id)).leftJoin(venues, eq(events.venueId, venues.id)).leftJoin(ticketTiers, eq(ticketTiers.eventId, events.id)).where(eq(events.id, id));
     if (results.length === 0 || !results[0].events) return void 0;
     const event = {
       ...results[0].events,
@@ -2382,7 +2382,7 @@ var DatabaseStorage = class {
     return event;
   }
   async getEventsByVendor(vendorId) {
-    const results = await db2.select().from(events).leftJoin(users, eq(events.vendorId, users.id)).leftJoin(venues, eq(events.venueId, venues.id)).leftJoin(ticketTiers, eq(ticketTiers.eventId, events.id)).where(eq(events.vendorId, vendorId)).orderBy(desc(events.eventDate));
+    const results = await db.select().from(events).leftJoin(users, eq(events.vendorId, users.id)).leftJoin(venues, eq(events.venueId, venues.id)).leftJoin(ticketTiers, eq(ticketTiers.eventId, events.id)).where(eq(events.vendorId, vendorId)).orderBy(desc(events.eventDate));
     const eventsMap = /* @__PURE__ */ new Map();
     for (const row of results) {
       if (!row.events) continue;
@@ -2403,7 +2403,7 @@ var DatabaseStorage = class {
     return Array.from(eventsMap.values());
   }
   async createEvent(vendorId, eventData) {
-    const [event] = await db2.insert(events).values({
+    const [event] = await db.insert(events).values({
       ...eventData,
       vendorId,
       availableSeats: eventData.totalSeats
@@ -2411,46 +2411,46 @@ var DatabaseStorage = class {
     return event;
   }
   async updateEvent(id, vendorId, eventData) {
-    const [event] = await db2.update(events).set({ ...eventData, updatedAt: /* @__PURE__ */ new Date() }).where(and(eq(events.id, id), eq(events.vendorId, vendorId))).returning();
+    const [event] = await db.update(events).set({ ...eventData, updatedAt: /* @__PURE__ */ new Date() }).where(and(eq(events.id, id), eq(events.vendorId, vendorId))).returning();
     return event;
   }
   async deleteEvent(id, vendorId) {
-    const result = await db2.delete(events).where(and(eq(events.id, id), eq(events.vendorId, vendorId)));
+    const result = await db.delete(events).where(and(eq(events.id, id), eq(events.vendorId, vendorId)));
     return result.rowCount ? result.rowCount > 0 : false;
   }
   // Ticket tier operations
   async getTicketTiersByEvent(eventId) {
-    return await db2.select().from(ticketTiers).where(eq(ticketTiers.eventId, eventId)).orderBy(ticketTiers.price);
+    return await db.select().from(ticketTiers).where(eq(ticketTiers.eventId, eventId)).orderBy(ticketTiers.price);
   }
   async createTicketTier(ticketTierData) {
-    const [ticketTier] = await db2.insert(ticketTiers).values({
+    const [ticketTier] = await db.insert(ticketTiers).values({
       ...ticketTierData,
       availableQuantity: ticketTierData.quantity
     }).returning();
     return ticketTier;
   }
   async updateTicketTier(id, ticketTierData) {
-    const [ticketTier] = await db2.update(ticketTiers).set({ ...ticketTierData, updatedAt: /* @__PURE__ */ new Date() }).where(eq(ticketTiers.id, id)).returning();
+    const [ticketTier] = await db.update(ticketTiers).set({ ...ticketTierData, updatedAt: /* @__PURE__ */ new Date() }).where(eq(ticketTiers.id, id)).returning();
     return ticketTier;
   }
   async deleteTicketTier(id) {
-    const result = await db2.delete(ticketTiers).where(eq(ticketTiers.id, id));
+    const result = await db.delete(ticketTiers).where(eq(ticketTiers.id, id));
     return result.rowCount ? result.rowCount > 0 : false;
   }
   // Event booking operations
   async createEventBooking(bookingData) {
-    const [booking] = await db2.insert(eventBookings).values(bookingData).returning();
-    await db2.update(ticketTiers).set({
+    const [booking] = await db.insert(eventBookings).values(bookingData).returning();
+    await db.update(ticketTiers).set({
       availableQuantity: sql2`${ticketTiers.availableQuantity} - ${bookingData.quantity}`
     }).where(eq(ticketTiers.id, bookingData.ticketTierId));
-    await db2.update(events).set({
+    await db.update(events).set({
       availableSeats: sql2`${events.availableSeats} - ${bookingData.quantity}`,
       totalBookings: sql2`${events.totalBookings} + 1`
     }).where(eq(events.id, bookingData.eventId));
     return booking;
   }
   async getEventBookingsByCustomer(customerId) {
-    const results = await db2.select().from(eventBookings).leftJoin(users, eq(eventBookings.customerId, users.id)).leftJoin(events, eq(eventBookings.eventId, events.id)).leftJoin(ticketTiers, eq(eventBookings.ticketTierId, ticketTiers.id)).where(eq(eventBookings.customerId, customerId)).orderBy(desc(eventBookings.createdAt));
+    const results = await db.select().from(eventBookings).leftJoin(users, eq(eventBookings.customerId, users.id)).leftJoin(events, eq(eventBookings.eventId, events.id)).leftJoin(ticketTiers, eq(eventBookings.ticketTierId, ticketTiers.id)).where(eq(eventBookings.customerId, customerId)).orderBy(desc(eventBookings.createdAt));
     return results.map((result) => ({
       ...result.event_bookings,
       customer: result.users,
@@ -2459,7 +2459,7 @@ var DatabaseStorage = class {
     }));
   }
   async getEventBookingsByVendor(vendorId) {
-    const results = await db2.select().from(eventBookings).leftJoin(users, eq(eventBookings.customerId, users.id)).leftJoin(events, eq(eventBookings.eventId, events.id)).leftJoin(ticketTiers, eq(eventBookings.ticketTierId, ticketTiers.id)).where(eq(events.vendorId, vendorId)).orderBy(desc(eventBookings.createdAt));
+    const results = await db.select().from(eventBookings).leftJoin(users, eq(eventBookings.customerId, users.id)).leftJoin(events, eq(eventBookings.eventId, events.id)).leftJoin(ticketTiers, eq(eventBookings.ticketTierId, ticketTiers.id)).where(eq(events.vendorId, vendorId)).orderBy(desc(eventBookings.createdAt));
     return results.map((result) => ({
       ...result.event_bookings,
       customer: result.users,
@@ -2468,7 +2468,7 @@ var DatabaseStorage = class {
     }));
   }
   async getEventBookingById(id) {
-    const results = await db2.select().from(eventBookings).leftJoin(users, eq(eventBookings.customerId, users.id)).leftJoin(events, eq(eventBookings.eventId, events.id)).leftJoin(ticketTiers, eq(eventBookings.ticketTierId, ticketTiers.id)).where(eq(eventBookings.id, id));
+    const results = await db.select().from(eventBookings).leftJoin(users, eq(eventBookings.customerId, users.id)).leftJoin(events, eq(eventBookings.eventId, events.id)).leftJoin(ticketTiers, eq(eventBookings.ticketTierId, ticketTiers.id)).where(eq(eventBookings.id, id));
     if (results.length === 0) return void 0;
     const result = results[0];
     return {
@@ -2479,24 +2479,24 @@ var DatabaseStorage = class {
     };
   }
   async updateEventBookingStatus(id, status) {
-    const [booking] = await db2.update(eventBookings).set({ status, updatedAt: /* @__PURE__ */ new Date() }).where(eq(eventBookings.id, id)).returning();
+    const [booking] = await db.update(eventBookings).set({ status, updatedAt: /* @__PURE__ */ new Date() }).where(eq(eventBookings.id, id)).returning();
     return booking;
   }
   async getEventBooking(id) {
-    const [booking] = await db2.select().from(eventBookings).where(eq(eventBookings.id, id));
+    const [booking] = await db.select().from(eventBookings).where(eq(eventBookings.id, id));
     return booking;
   }
   async updateEventBookingPayment(id, data) {
-    const [updatedBooking] = await db2.update(eventBookings).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq(eventBookings.id, id)).returning();
+    const [updatedBooking] = await db.update(eventBookings).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq(eventBookings.id, id)).returning();
     return updatedBooking;
   }
   async getEventBookingByCheckoutRequestId(checkoutRequestId) {
-    const [booking] = await db2.select().from(eventBookings).where(eq(eventBookings.mpesaCheckoutRequestId, checkoutRequestId));
+    const [booking] = await db.select().from(eventBookings).where(eq(eventBookings.mpesaCheckoutRequestId, checkoutRequestId));
     return booking;
   }
   // Event admin operations
   async getPendingVenues() {
-    const results = await db2.select().from(venues).leftJoin(users, eq(venues.vendorId, users.id)).leftJoin(events, eq(events.venueId, venues.id)).where(eq(venues.approvalStatus, "pending")).orderBy(desc(venues.createdAt));
+    const results = await db.select().from(venues).leftJoin(users, eq(venues.vendorId, users.id)).leftJoin(events, eq(events.venueId, venues.id)).where(eq(venues.approvalStatus, "pending")).orderBy(desc(venues.createdAt));
     const venuesMap = /* @__PURE__ */ new Map();
     for (const row of results) {
       if (!row.venues) continue;
@@ -2516,7 +2516,7 @@ var DatabaseStorage = class {
     return Array.from(venuesMap.values());
   }
   async getPendingEvents() {
-    const results = await db2.select().from(events).leftJoin(users, eq(events.vendorId, users.id)).leftJoin(venues, eq(events.venueId, venues.id)).leftJoin(ticketTiers, eq(ticketTiers.eventId, events.id)).where(eq(events.approvalStatus, "pending")).orderBy(desc(events.createdAt));
+    const results = await db.select().from(events).leftJoin(users, eq(events.vendorId, users.id)).leftJoin(venues, eq(events.venueId, venues.id)).leftJoin(ticketTiers, eq(ticketTiers.eventId, events.id)).where(eq(events.approvalStatus, "pending")).orderBy(desc(events.createdAt));
     const eventsMap = /* @__PURE__ */ new Map();
     for (const row of results) {
       if (!row.events) continue;
@@ -2537,7 +2537,7 @@ var DatabaseStorage = class {
     return Array.from(eventsMap.values());
   }
   async approveVenue(venueId, adminNotes) {
-    const [venue] = await db2.update(venues).set({
+    const [venue] = await db.update(venues).set({
       approvalStatus: "approved",
       adminNotes,
       updatedAt: /* @__PURE__ */ new Date()
@@ -2545,7 +2545,7 @@ var DatabaseStorage = class {
     return venue;
   }
   async rejectVenue(venueId, adminNotes) {
-    const [venue] = await db2.update(venues).set({
+    const [venue] = await db.update(venues).set({
       approvalStatus: "rejected",
       adminNotes,
       updatedAt: /* @__PURE__ */ new Date()
@@ -2553,7 +2553,7 @@ var DatabaseStorage = class {
     return venue;
   }
   async approveEvent(eventId, adminNotes) {
-    const [event] = await db2.update(events).set({
+    const [event] = await db.update(events).set({
       approvalStatus: "approved",
       adminNotes,
       updatedAt: /* @__PURE__ */ new Date()
@@ -2561,7 +2561,7 @@ var DatabaseStorage = class {
     return event;
   }
   async rejectEvent(eventId, adminNotes) {
-    const [event] = await db2.update(events).set({
+    const [event] = await db.update(events).set({
       approvalStatus: "rejected",
       adminNotes,
       updatedAt: /* @__PURE__ */ new Date()
@@ -2570,23 +2570,23 @@ var DatabaseStorage = class {
   }
   // Seat map operations
   async createSeatSection(seatSection) {
-    const [section] = await db2.insert(seatSections).values(seatSection).returning();
+    const [section] = await db.insert(seatSections).values(seatSection).returning();
     return section;
   }
   async getSeatSectionsByVenue(venueId) {
-    return await db2.select().from(seatSections).where(eq(seatSections.venueId, venueId));
+    return await db.select().from(seatSections).where(eq(seatSections.venueId, venueId));
   }
   async updateSeatSection(id, seatSection) {
-    const [section] = await db2.update(seatSections).set({ ...seatSection, updatedAt: /* @__PURE__ */ new Date() }).where(eq(seatSections.id, id)).returning();
+    const [section] = await db.update(seatSections).set({ ...seatSection, updatedAt: /* @__PURE__ */ new Date() }).where(eq(seatSections.id, id)).returning();
     return section;
   }
   async deleteSeatSection(id) {
-    const result = await db2.delete(seatSections).where(eq(seatSections.id, id));
+    const result = await db.delete(seatSections).where(eq(seatSections.id, id));
     return result.rowCount ? result.rowCount > 0 : false;
   }
   async createSeat(seat) {
-    const [newSeat] = await db2.insert(seats).values(seat).returning();
-    await db2.execute(sql2`
+    const [newSeat] = await db.insert(seats).values(seat).returning();
+    await db.execute(sql2`
       UPDATE seat_sections 
       SET seat_count = (SELECT COUNT(*) FROM seats WHERE section_id = ${seat.sectionId})
       WHERE id = ${seat.sectionId}
@@ -2594,24 +2594,24 @@ var DatabaseStorage = class {
     return newSeat;
   }
   async getSeatsByVenue(venueId) {
-    const result = await db2.select().from(seats).leftJoin(seatSections, eq(seats.sectionId, seatSections.id)).where(eq(seats.venueId, venueId));
+    const result = await db.select().from(seats).leftJoin(seatSections, eq(seats.sectionId, seatSections.id)).where(eq(seats.venueId, venueId));
     return result.map((row) => ({
       ...row.seats,
       section: row.seat_sections
     }));
   }
   async getSeatsBySection(sectionId) {
-    return await db2.select().from(seats).where(eq(seats.sectionId, sectionId));
+    return await db.select().from(seats).where(eq(seats.sectionId, sectionId));
   }
   async updateSeat(id, seat) {
-    const [updatedSeat] = await db2.update(seats).set({ ...seat, updatedAt: /* @__PURE__ */ new Date() }).where(eq(seats.id, id)).returning();
+    const [updatedSeat] = await db.update(seats).set({ ...seat, updatedAt: /* @__PURE__ */ new Date() }).where(eq(seats.id, id)).returning();
     return updatedSeat;
   }
   async deleteSeat(id) {
-    const [seat] = await db2.select().from(seats).where(eq(seats.id, id));
+    const [seat] = await db.select().from(seats).where(eq(seats.id, id));
     if (!seat) return false;
-    const result = await db2.delete(seats).where(eq(seats.id, id));
-    await db2.execute(sql2`
+    const result = await db.delete(seats).where(eq(seats.id, id));
+    await db.execute(sql2`
       UPDATE seat_sections 
       SET seat_count = (SELECT COUNT(*) FROM seats WHERE section_id = ${seat.sectionId})
       WHERE id = ${seat.sectionId}
@@ -2620,10 +2620,10 @@ var DatabaseStorage = class {
   }
   async bulkCreateSeats(seatsList) {
     if (seatsList.length === 0) return [];
-    const createdSeats = await db2.insert(seats).values(seatsList).returning();
+    const createdSeats = await db.insert(seats).values(seatsList).returning();
     const sectionIds = Array.from(new Set(seatsList.map((s) => s.sectionId)));
     for (const sectionId of sectionIds) {
-      await db2.execute(sql2`
+      await db.execute(sql2`
         UPDATE seat_sections 
         SET seat_count = (SELECT COUNT(*) FROM seats WHERE section_id = ${sectionId})
         WHERE id = ${sectionId}
@@ -2632,10 +2632,10 @@ var DatabaseStorage = class {
     return createdSeats;
   }
   async getEventSeatAvailability(eventId) {
-    const [event] = await db2.select().from(events).where(eq(events.id, eventId));
+    const [event] = await db.select().from(events).where(eq(events.id, eventId));
     if (!event) return [];
-    const seatsWithSections = await db2.select().from(seats).leftJoin(seatSections, eq(seats.sectionId, seatSections.id)).where(eq(seats.venueId, event.venueId));
-    const reservations = await db2.select().from(eventSeatReservations).where(eq(eventSeatReservations.eventId, eventId));
+    const seatsWithSections = await db.select().from(seats).leftJoin(seatSections, eq(seats.sectionId, seatSections.id)).where(eq(seats.venueId, event.venueId));
+    const reservations = await db.select().from(eventSeatReservations).where(eq(eventSeatReservations.eventId, eventId));
     const reservationMap = new Map(reservations.map((r) => [r.seatId, r]));
     return seatsWithSections.map((row) => {
       const reservation = reservationMap.get(row.seats.id);
@@ -2660,10 +2660,10 @@ var DatabaseStorage = class {
       status: "reserved",
       reservedUntil
     }));
-    return await db2.insert(eventSeatReservations).values(reservations).returning();
+    return await db.insert(eventSeatReservations).values(reservations).returning();
   }
   async releaseExpiredReservations(eventId) {
-    await db2.delete(eventSeatReservations).where(
+    await db.delete(eventSeatReservations).where(
       and(
         eq(eventSeatReservations.eventId, eventId),
         eq(eventSeatReservations.status, "reserved"),
@@ -2673,7 +2673,7 @@ var DatabaseStorage = class {
   }
   async markSeatsAsBooked(eventId, seatIds, bookingId) {
     for (const seatId of seatIds) {
-      await db2.update(eventSeatReservations).set({
+      await db.update(eventSeatReservations).set({
         status: "booked",
         eventBookingId: bookingId,
         reservedUntil: null
@@ -3341,7 +3341,7 @@ var EnhancedNotificationService = class {
   // Create in-app notification
   static async createInAppNotification(data) {
     try {
-      const [notification] = await db2.insert(notifications).values({
+      const [notification] = await db.insert(notifications).values({
         userId: data.userId,
         type: data.type,
         title: data.title,
@@ -3556,7 +3556,7 @@ var EnhancedNotificationService = class {
   // Get notifications for user
   static async getNotifications(userId) {
     try {
-      return await db2.select().from(notifications).where(eq2(notifications.userId, userId)).orderBy(desc2(notifications.createdAt)).limit(50);
+      return await db.select().from(notifications).where(eq2(notifications.userId, userId)).orderBy(desc2(notifications.createdAt)).limit(50);
     } catch (error) {
       console.error("Error fetching notifications:", error);
       throw error;
@@ -3565,7 +3565,7 @@ var EnhancedNotificationService = class {
   // Mark notification as read
   static async markAsRead(notificationId) {
     try {
-      await db2.update(notifications).set({ isRead: true }).where(eq2(notifications.id, notificationId));
+      await db.update(notifications).set({ isRead: true }).where(eq2(notifications.id, notificationId));
     } catch (error) {
       console.error("Error marking notification as read:", error);
       throw error;
@@ -3574,7 +3574,7 @@ var EnhancedNotificationService = class {
   // Get unread notification count
   static async getUnreadCount(userId) {
     try {
-      const result = await db2.select({ count: count() }).from(notifications).where(and2(eq2(notifications.userId, userId), eq2(notifications.isRead, false)));
+      const result = await db.select({ count: count() }).from(notifications).where(and2(eq2(notifications.userId, userId), eq2(notifications.isRead, false)));
       return result[0]?.count || 0;
     } catch (error) {
       console.error("Error getting unread count:", error);
@@ -4226,7 +4226,52 @@ function generatePitchPDF(res) {
   doc.end();
 }
 
+// server/adminAuth.ts
+init_schema();
+import { eq as eq3 } from "drizzle-orm";
+var OWNER_EMAIL = "tavish@dreamcatchers.tv";
+async function seedOwner() {
+  try {
+    const existing = await db.select().from(adminUsers).where(eq3(adminUsers.email, OWNER_EMAIL));
+    if (existing.length === 0) {
+      await db.insert(adminUsers).values({ email: OWNER_EMAIL, role: "owner", addedBy: "system" });
+      console.log("Owner admin seeded:", OWNER_EMAIL);
+    }
+  } catch (error) {
+    console.error("Error seeding owner:", error);
+  }
+}
+async function isAdminEmail(email) {
+  try {
+    const results = await db.select().from(adminUsers).where(eq3(adminUsers.email, email));
+    return results[0] || null;
+  } catch {
+    return null;
+  }
+}
+var requireAdmin = async (req, res, next) => {
+  if (!req.isAuthenticated()) return res.status(401).json({ message: "Authentication required" });
+  const email = req.user?.email;
+  if (!email) return res.status(401).json({ message: "No email found" });
+  const admin = await isAdminEmail(email);
+  if (!admin) return res.status(403).json({ message: "Admin access required" });
+  req.adminUser = admin;
+  next();
+};
+var requireOwner = async (req, res, next) => {
+  if (!req.isAuthenticated()) return res.status(401).json({ message: "Authentication required" });
+  const email = req.user?.email;
+  if (!email) return res.status(401).json({ message: "No email found" });
+  const results = await db.select().from(adminUsers).where(eq3(adminUsers.email, email));
+  const admin = results[0];
+  if (!admin || admin.role !== "owner") return res.status(403).json({ message: "Owner access required" });
+  req.adminUser = admin;
+  next();
+};
+
 // server/routes.ts
+init_schema();
+import { eq as eqAdmin } from "drizzle-orm";
 import { z as z2 } from "zod";
 var verifyVendorStatus = async (userId) => {
   const vendor = await storage.getUser(userId);

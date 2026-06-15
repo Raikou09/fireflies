@@ -24,6 +24,10 @@ import { EmailService } from "./emailService";
 import { SMSService } from "./smsService";
 import { initiateSTKPush, querySTKPushStatus, parseCallbackData, formatPhoneNumber, getSimulatedReceiptNumber, isSimulationMode, type MPesaCallbackData } from "./mpesaService";
 import { generatePitchPDF } from "./pitchDocument";
+import { requireAdmin, requireOwner, seedOwner, isAdminEmail } from "./adminAuth";
+import { adminUsers } from "@shared/schema";
+import { db } from "./db";
+import { eq as eqAdmin } from "drizzle-orm";
 import { z } from "zod";
 
 // Admin middleware moved to server/adminAuth.ts
