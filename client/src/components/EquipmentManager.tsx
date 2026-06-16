@@ -53,8 +53,9 @@ export default function EquipmentManager({ courtId, courtName }: EquipmentManage
       resetForm();
       toast({ title: "Equipment Added", description: "New equipment has been added successfully." });
     },
-    onError: () => {
-      toast({ title: "Error", description: "Failed to add equipment.", variant: "destructive" });
+    onError: (error: any) => {
+      console.error('Equipment add error:', error);
+      toast({ title: "Error", description: error.message || "Failed to add equipment.", variant: "destructive" });
     },
   });
 
