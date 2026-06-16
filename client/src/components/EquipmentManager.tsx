@@ -40,7 +40,7 @@ export default function EquipmentManager({ courtId, courtName }: EquipmentManage
 
   const createEquipmentMutation = useMutation({
     mutationFn: async (data: any) => {
-      return apiRequest("POST", "/api/equipment", {
+      return apiRequest("/api/equipment", "POST", {
         ...data,
         courtId,
         pricePerHour: parseFloat(data.pricePerHour),
@@ -60,7 +60,7 @@ export default function EquipmentManager({ courtId, courtName }: EquipmentManage
 
   const updateEquipmentMutation = useMutation({
     mutationFn: async (data: any) => {
-      return apiRequest("PUT", `/api/equipment/${editingEquipment?.id}`, {
+      return apiRequest(`/api/equipment/${editingEquipment?.id}`, "PUT", {
         ...data,
         courtId,
         pricePerHour: parseFloat(data.pricePerHour),
@@ -80,7 +80,7 @@ export default function EquipmentManager({ courtId, courtName }: EquipmentManage
 
   const deleteEquipmentMutation = useMutation({
     mutationFn: async (equipmentId: string) => {
-      return apiRequest("DELETE", `/api/equipment/${equipmentId}`);
+      return apiRequest(`/api/equipment/${equipmentId}`, "DELETE");
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/courts/${courtId}/equipment`] });
