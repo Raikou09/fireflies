@@ -1115,7 +1115,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete("/api/courts/:id", isAuthenticated, async (req: any, res) => {
     try {
-      const vendorId = req.user.claims.sub;
+      const vendorId = req.user?.claims?.sub || req.user?.id;
       const success = await storage.deleteCourt(req.params.id, vendorId);
       if (!success) {
         return res.status(404).json({ message: "Court not found or unauthorized" });
@@ -1130,7 +1130,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Set court image after upload
   app.put("/api/courts/:id/image", isAuthenticated, async (req: any, res) => {
     try {
-      const vendorId = req.user.claims.sub;
+      const vendorId = req.user?.claims?.sub || req.user?.id;
       if (!req.body.imageURL) {
         return res.status(400).json({ error: "imageURL is required" });
       }
@@ -1162,7 +1162,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Add image to court gallery
   app.post("/api/courts/:id/images", isAuthenticated, upload.single("file"), async (req: any, res) => {
     try {
-      const vendorId = req.user.claims.sub;
+      const vendorId = req.user?.claims?.sub || req.user?.id;
       if (!req.file) {
         return res.status(400).json({ error: "No file provided" });
       }
@@ -1216,7 +1216,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Remove image from court gallery
   app.delete("/api/courts/:id/images", isAuthenticated, async (req: any, res) => {
     try {
-      const vendorId = req.user.claims.sub;
+      const vendorId = req.user?.claims?.sub || req.user?.id;
       const { imageUrl } = req.body;
 
       if (!imageUrl) {
@@ -2461,7 +2461,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Vendor stats with Google auth
   app.get("/api/vendor/stats", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user?.claims?.sub || req.user?.id;
       console.log("Vendor stats - User ID:", userId);
       const user = await storage.getUser(userId);
       console.log("Vendor stats - Found user:", user);
@@ -2482,7 +2482,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Vendor courts with Google auth
   app.get("/api/vendor/courts", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user?.claims?.sub || req.user?.id;
       const user = await storage.getUser(userId);
       
       if (!user || user.userType !== "vendor") {
@@ -2500,7 +2500,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Vendor bookings with Google auth
   app.get("/api/vendor/bookings", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user?.claims?.sub || req.user?.id;
       const user = await storage.getUser(userId);
       
       if (!user || user.userType !== "vendor") {

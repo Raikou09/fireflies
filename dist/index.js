@@ -5159,7 +5159,7 @@ async function registerRoutes(app2) {
   });
   app2.delete("/api/courts/:id", isAuthenticated, async (req, res) => {
     try {
-      const vendorId = req.user.claims.sub;
+      const vendorId = req.user?.claims?.sub || req.user?.id;
       const success = await storage.deleteCourt(req.params.id, vendorId);
       if (!success) {
         return res.status(404).json({ message: "Court not found or unauthorized" });
@@ -5172,7 +5172,7 @@ async function registerRoutes(app2) {
   });
   app2.put("/api/courts/:id/image", isAuthenticated, async (req, res) => {
     try {
-      const vendorId = req.user.claims.sub;
+      const vendorId = req.user?.claims?.sub || req.user?.id;
       if (!req.body.imageURL) {
         return res.status(400).json({ error: "imageURL is required" });
       }
@@ -5199,7 +5199,7 @@ async function registerRoutes(app2) {
   });
   app2.post("/api/courts/:id/images", isAuthenticated, upload.single("file"), async (req, res) => {
     try {
-      const vendorId = req.user.claims.sub;
+      const vendorId = req.user?.claims?.sub || req.user?.id;
       if (!req.file) {
         return res.status(400).json({ error: "No file provided" });
       }
@@ -5238,7 +5238,7 @@ async function registerRoutes(app2) {
   });
   app2.delete("/api/courts/:id/images", isAuthenticated, async (req, res) => {
     try {
-      const vendorId = req.user.claims.sub;
+      const vendorId = req.user?.claims?.sub || req.user?.id;
       const { imageUrl } = req.body;
       if (!imageUrl) {
         return res.status(400).json({ error: "imageUrl is required" });
@@ -6309,7 +6309,7 @@ async function registerRoutes(app2) {
   });
   app2.get("/api/vendor/stats", isAuthenticated, async (req, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user?.claims?.sub || req.user?.id;
       console.log("Vendor stats - User ID:", userId);
       const user = await storage.getUser(userId);
       console.log("Vendor stats - Found user:", user);
@@ -6326,7 +6326,7 @@ async function registerRoutes(app2) {
   });
   app2.get("/api/vendor/courts", isAuthenticated, async (req, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user?.claims?.sub || req.user?.id;
       const user = await storage.getUser(userId);
       if (!user || user.userType !== "vendor") {
         return res.status(403).json({ message: "Access denied. Vendor account required." });
@@ -6340,7 +6340,7 @@ async function registerRoutes(app2) {
   });
   app2.get("/api/vendor/bookings", isAuthenticated, async (req, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user?.claims?.sub || req.user?.id;
       const user = await storage.getUser(userId);
       if (!user || user.userType !== "vendor") {
         return res.status(403).json({ message: "Access denied. Vendor account required." });
