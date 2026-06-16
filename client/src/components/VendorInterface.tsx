@@ -1,3 +1,4 @@
+import { useLocation } from "wouter";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -40,6 +41,7 @@ export default function VendorInterface() {
   const userType = (user as any)?.userType || (user as any)?.user_type;
   const verificationStatus = (user as any)?.vendorVerificationStatus;
   const isVerifiedVendor = userType === "vendor" && verificationStatus === "verified";
+  const [, setLocation] = useLocation();
 
   const { data: stats } = useQuery<{
     totalCourts: number;
