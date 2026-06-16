@@ -36,6 +36,8 @@ export default function EquipmentManager({ courtId, courtName }: EquipmentManage
   const { data: equipment = [], isLoading } = useQuery<Equipment[]>({
     queryKey: [`/api/courts/${courtId}/equipment`],
     refetchInterval: false,
+    refetchOnMount: true,
+    staleTime: 0,
   });
 
   const createEquipmentMutation = useMutation({
