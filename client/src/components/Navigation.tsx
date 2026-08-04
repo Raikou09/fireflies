@@ -71,6 +71,12 @@ export default function Navigation({ userMode, setUserMode, platform = "sportsbo
               >
                 Find Players
               </Link>
+              <Link 
+                href="/communities"
+                className="text-sm font-semibold transition-colors text-gray-600 hover:text-gray-900"
+              >
+                Communities
+              </Link>
             </nav>
           </div>
           

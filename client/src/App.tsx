@@ -12,6 +12,9 @@ import Admin from "@/pages/Admin";
 import Matches from "@/pages/Matches";
 import CreateMatch from "@/pages/CreateMatch";
 import MatchDetail from "@/pages/MatchDetail";
+import Communities from "@/pages/Communities";
+import CreateCommunity from "@/pages/CreateCommunity";
+import CommunityDetail from "@/pages/CommunityDetail";
 import VendorDashboard from "@/pages/VendorDashboard";
 import CourtDetails from "@/pages/CourtDetails";
 import EventDetails from "@/pages/EventDetails";
@@ -42,6 +45,9 @@ function Router() {
       <Route path="/matches" component={Matches} />
       <Route path="/matches/create" component={CreateMatch} />
       <Route path="/matches/:id" component={MatchDetail} />
+      <Route path="/communities" component={Communities} />
+      <Route path="/communities/create" component={CreateCommunity} />
+      <Route path="/communities/:id" component={CommunityDetail} />
       
       <Route component={NotFound} />
     </Switch>
