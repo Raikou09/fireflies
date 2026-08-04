@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { db } from "./db";
-import { communities, communityMembers, users } from "@shared/schema";
-import { eq, desc, and } from "drizzle-orm";
+import { communities, communityMembers, users, communityMessages } from "@shared/schema";
+import { eq, desc, and, gte } from "drizzle-orm";
 import { isAuthenticated } from "./googleAuth";
 
 export function registerCommunityRoutes(app: Express) {
@@ -89,6 +89,53 @@ export function registerCommunityRoutes(app: Express) {
       await db.update(communityMembers).set({ status: "approved" }).where(eq(communityMembers.id, target.id));
       res.json({ success: true });
     } catch (e) { console.error("Error approving member:", e); res.status(500).json({ message: "Failed to approve" }); }
+  });
+
+
+  // Helper: is this user an approved member of the community?
+  async function isApprovedMember(communityId: string, userId: string) {
+    const rows = await db.select().from(communityMembers).where(and(eq(communityMembers.communityId, communityId), eq(communityMembers.userId, userId), eq(communityMembers.status, "approved")));
+    return rows.length > 0;
+  }
+
+  // Get messages (last 7 days only)
+  app.get("/api/communities/:id/messages", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.id; const communityId = req.params.id;
+      if (!(await isApprovedMember(communityId, userId))) return res.status(403).json({ message: "Members only" });
+      const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+      const rows = await db.select({ msg: communityMessages, firstName: users.firstName, lastName: users.lastName })
+        .from(communityMessages).innerJoin(users, eq(communityMessages.userId, users.id))
+        .where(and(eq(communityMessages.communityId, communityId), gte(communityMessages.createdAt, sevenDaysAgo)))
+        .orderBy(communityMessages.createdAt);
+      res.json(rows.map(row => ({ ...row.msg, firstName: row.firstName, lastName: row.lastName })));
+    } catch (e) { console.error("Error fetching messages:", e); res.status(500).json({ message: "Failed to fetch messages" }); }
+  });
+
+  // Post a message
+  app.post("/api/communities/:id/messages", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.id; const communityId = req.params.id; const { message } = req.body;
+      if (!message || !message.trim()) return res.status(400).json({ message: "Message cannot be empty" });
+      if (message.length > 1000) return res.status(400).json({ message: "Message too long" });
+      if (!(await isApprovedMember(communityId, userId))) return res.status(403).json({ message: "Members only" });
+      const [msg] = await db.insert(communityMessages).values({ communityId, userId, message: message.trim() }).returning();
+      res.status(201).json(msg);
+    } catch (e) { console.error("Error posting message:", e); res.status(500).json({ message: "Failed to post message" }); }
+  });
+
+  // Delete a message (author or community creator/moderator)
+  app.delete("/api/communities/:id/messages/:messageId", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.id; const { id: communityId, messageId } = req.params;
+      const [msg] = await db.select().from(communityMessages).where(eq(communityMessages.id, messageId));
+      if (!msg) return res.status(404).json({ message: "Message not found" });
+      const [community] = await db.select().from(communities).where(eq(communities.id, communityId));
+      const isModerator = community && community.creatorId === userId;
+      if (msg.userId !== userId && !isModerator) return res.status(403).json({ message: "You cannot delete this message" });
+      await db.delete(communityMessages).where(eq(communityMessages.id, messageId));
+      res.json({ success: true });
+    } catch (e) { console.error("Error deleting message:", e); res.status(500).json({ message: "Failed to delete message" }); }
   });
 
   // My communities

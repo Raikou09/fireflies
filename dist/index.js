@@ -16,6 +16,7 @@ __export(schema_exports, {
   bookings: () => bookings,
   communities: () => communities,
   communityMembers: () => communityMembers,
+  communityMessages: () => communityMessages,
   courtRelations: () => courtRelations,
   courts: () => courts,
   equipment: () => equipment,
@@ -76,7 +77,7 @@ import {
 import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
-var sessions, adminUsers, users, courts, equipment, bookings, reviews, userRelations, courtRelations, equipmentRelations, bookingRelations, reviewRelations, notifications, userNotificationPreferences, venues, seatSections, seats, eventSeatReservations, events, ticketTiers, eventBookings, notificationRelations, userNotificationPreferencesRelations, venueRelations, seatSectionRelations, seatRelations, eventSeatReservationRelations, eventRelations, ticketTierRelations, eventBookingRelations, insertUserSchema, insertCourtSchema, insertEquipmentSchema, insertBookingSchema, insertReviewSchema, insertNotificationSchema, insertUserNotificationPreferencesSchema, insertVenueSchema, insertEventSchema, insertTicketTierSchema, insertEventBookingSchema, insertSeatSectionSchema, insertSeatSchema, insertEventSeatReservationSchema, vendorOnboardingSchema, matches, matchParticipants, communities, communityMembers;
+var sessions, adminUsers, users, courts, equipment, bookings, reviews, userRelations, courtRelations, equipmentRelations, bookingRelations, reviewRelations, notifications, userNotificationPreferences, venues, seatSections, seats, eventSeatReservations, events, ticketTiers, eventBookings, notificationRelations, userNotificationPreferencesRelations, venueRelations, seatSectionRelations, seatRelations, eventSeatReservationRelations, eventRelations, ticketTierRelations, eventBookingRelations, insertUserSchema, insertCourtSchema, insertEquipmentSchema, insertBookingSchema, insertReviewSchema, insertNotificationSchema, insertUserNotificationPreferencesSchema, insertVenueSchema, insertEventSchema, insertTicketTierSchema, insertEventBookingSchema, insertSeatSectionSchema, insertSeatSchema, insertEventSeatReservationSchema, vendorOnboardingSchema, matches, matchParticipants, communities, communityMembers, communityMessages;
 var init_schema = __esm({
   "shared/schema.ts"() {
     "use strict";
@@ -754,6 +755,13 @@ var init_schema = __esm({
       role: varchar("role", { enum: ["creator", "member"] }).notNull().default("member"),
       status: varchar("status", { enum: ["pending", "approved"] }).notNull().default("approved"),
       joinedAt: timestamp("joined_at").defaultNow()
+    });
+    communityMessages = pgTable("community_messages", {
+      id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+      communityId: varchar("community_id").notNull(),
+      userId: varchar("user_id").notNull(),
+      message: text("message").notNull(),
+      createdAt: timestamp("created_at").defaultNow()
     });
   }
 });
@@ -4630,7 +4638,7 @@ function registerMatchRoutes(app2) {
 
 // server/communityRoutes.ts
 init_schema();
-import { eq as eq5, desc as desc4, and as and3 } from "drizzle-orm";
+import { eq as eq5, desc as desc4, and as and3, gte as gte2 } from "drizzle-orm";
 function registerCommunityRoutes(app2) {
   app2.post("/api/communities", isAuthenticated, async (req, res) => {
     try {
@@ -4732,6 +4740,54 @@ function registerCommunityRoutes(app2) {
     } catch (e) {
       console.error("Error approving member:", e);
       res.status(500).json({ message: "Failed to approve" });
+    }
+  });
+  async function isApprovedMember(communityId, userId) {
+    const rows = await db.select().from(communityMembers).where(and3(eq5(communityMembers.communityId, communityId), eq5(communityMembers.userId, userId), eq5(communityMembers.status, "approved")));
+    return rows.length > 0;
+  }
+  app2.get("/api/communities/:id/messages", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.user?.id;
+      const communityId = req.params.id;
+      if (!await isApprovedMember(communityId, userId)) return res.status(403).json({ message: "Members only" });
+      const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1e3);
+      const rows = await db.select({ msg: communityMessages, firstName: users.firstName, lastName: users.lastName }).from(communityMessages).innerJoin(users, eq5(communityMessages.userId, users.id)).where(and3(eq5(communityMessages.communityId, communityId), gte2(communityMessages.createdAt, sevenDaysAgo))).orderBy(communityMessages.createdAt);
+      res.json(rows.map((row) => ({ ...row.msg, firstName: row.firstName, lastName: row.lastName })));
+    } catch (e) {
+      console.error("Error fetching messages:", e);
+      res.status(500).json({ message: "Failed to fetch messages" });
+    }
+  });
+  app2.post("/api/communities/:id/messages", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.user?.id;
+      const communityId = req.params.id;
+      const { message } = req.body;
+      if (!message || !message.trim()) return res.status(400).json({ message: "Message cannot be empty" });
+      if (message.length > 1e3) return res.status(400).json({ message: "Message too long" });
+      if (!await isApprovedMember(communityId, userId)) return res.status(403).json({ message: "Members only" });
+      const [msg] = await db.insert(communityMessages).values({ communityId, userId, message: message.trim() }).returning();
+      res.status(201).json(msg);
+    } catch (e) {
+      console.error("Error posting message:", e);
+      res.status(500).json({ message: "Failed to post message" });
+    }
+  });
+  app2.delete("/api/communities/:id/messages/:messageId", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.user?.id;
+      const { id: communityId, messageId } = req.params;
+      const [msg] = await db.select().from(communityMessages).where(eq5(communityMessages.id, messageId));
+      if (!msg) return res.status(404).json({ message: "Message not found" });
+      const [community] = await db.select().from(communities).where(eq5(communities.id, communityId));
+      const isModerator = community && community.creatorId === userId;
+      if (msg.userId !== userId && !isModerator) return res.status(403).json({ message: "You cannot delete this message" });
+      await db.delete(communityMessages).where(eq5(communityMessages.id, messageId));
+      res.json({ success: true });
+    } catch (e) {
+      console.error("Error deleting message:", e);
+      res.status(500).json({ message: "Failed to delete message" });
     }
   });
   app2.get("/api/my-communities", isAuthenticated, async (req, res) => {

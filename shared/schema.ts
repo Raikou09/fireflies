@@ -789,3 +789,14 @@ export const communityMembers = pgTable("community_members", {
   joinedAt: timestamp("joined_at").defaultNow(),
 });
 export type CommunityMember = typeof communityMembers.$inferSelect;
+
+
+// Community chat messages (lazy 7-day retention — old messages simply aren't returned)
+export const communityMessages = pgTable("community_messages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  communityId: varchar("community_id").notNull(),
+  userId: varchar("user_id").notNull(),
+  message: text("message").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+export type CommunityMessage = typeof communityMessages.$inferSelect;
