@@ -186,7 +186,7 @@ export default function VendorOnboarding({ isOpen, onClose, existingData, isEdit
       const formData = new FormData();
       formData.append("file", file);
 
-      const uploadResponse = await fetch("https://fireflies-production-ba72.up.railway.app/api/vendor/upload-document", {
+      const uploadResponse = await fetch("https://www.bookmyspot.africa/api/vendor/upload-document", {
         method: "POST",
         body: formData,
         credentials: "include",
