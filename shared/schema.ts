@@ -725,3 +725,36 @@ export type EventBookingWithDetails = EventBooking & {
   event: Event;
   ticketTier: TicketTier;
 };
+
+
+// Player matching — matches
+export const matches = pgTable("matches", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  creatorId: varchar("creator_id").notNull(),
+  courtId: varchar("court_id").notNull(),
+  sport: varchar("sport").notNull(),
+  matchDate: varchar("match_date").notNull(),
+  startTime: varchar("start_time").notNull(),
+  duration: integer("duration").notNull().default(1),
+  totalSpots: integer("total_spots").notNull(),
+  totalAmount: decimal("total_amount", { precision: 10, scale: 2 }).notNull(),
+  pricePerSpot: decimal("price_per_spot", { precision: 10, scale: 2 }).notNull(),
+  notes: text("notes"),
+  status: varchar("status", { enum: ["open", "full", "confirmed", "cancelled"] }).notNull().default("open"),
+  bookingId: varchar("booking_id"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+export type Match = typeof matches.$inferSelect;
+
+// Player matching — participants
+export const matchParticipants = pgTable("match_participants", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  matchId: varchar("match_id").notNull(),
+  userId: varchar("user_id").notNull(),
+  paymentStatus: varchar("payment_status", { enum: ["unpaid", "paid"] }).notNull().default("unpaid"),
+  mpesaCheckoutRequestId: varchar("mpesa_checkout_request_id"),
+  mpesaReceiptNumber: varchar("mpesa_receipt_number"),
+  joinedAt: timestamp("joined_at").defaultNow(),
+});
+export type MatchParticipant = typeof matchParticipants.$inferSelect;

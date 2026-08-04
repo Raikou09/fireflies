@@ -38,6 +38,8 @@ __export(schema_exports, {
   insertUserNotificationPreferencesSchema: () => insertUserNotificationPreferencesSchema,
   insertUserSchema: () => insertUserSchema,
   insertVenueSchema: () => insertVenueSchema,
+  matchParticipants: () => matchParticipants,
+  matches: () => matches,
   notificationRelations: () => notificationRelations,
   notifications: () => notifications,
   reviewRelations: () => reviewRelations,
@@ -72,7 +74,7 @@ import {
 import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
-var sessions, adminUsers, users, courts, equipment, bookings, reviews, userRelations, courtRelations, equipmentRelations, bookingRelations, reviewRelations, notifications, userNotificationPreferences, venues, seatSections, seats, eventSeatReservations, events, ticketTiers, eventBookings, notificationRelations, userNotificationPreferencesRelations, venueRelations, seatSectionRelations, seatRelations, eventSeatReservationRelations, eventRelations, ticketTierRelations, eventBookingRelations, insertUserSchema, insertCourtSchema, insertEquipmentSchema, insertBookingSchema, insertReviewSchema, insertNotificationSchema, insertUserNotificationPreferencesSchema, insertVenueSchema, insertEventSchema, insertTicketTierSchema, insertEventBookingSchema, insertSeatSectionSchema, insertSeatSchema, insertEventSeatReservationSchema, vendorOnboardingSchema;
+var sessions, adminUsers, users, courts, equipment, bookings, reviews, userRelations, courtRelations, equipmentRelations, bookingRelations, reviewRelations, notifications, userNotificationPreferences, venues, seatSections, seats, eventSeatReservations, events, ticketTiers, eventBookings, notificationRelations, userNotificationPreferencesRelations, venueRelations, seatSectionRelations, seatRelations, eventSeatReservationRelations, eventRelations, ticketTierRelations, eventBookingRelations, insertUserSchema, insertCourtSchema, insertEquipmentSchema, insertBookingSchema, insertReviewSchema, insertNotificationSchema, insertUserNotificationPreferencesSchema, insertVenueSchema, insertEventSchema, insertTicketTierSchema, insertEventBookingSchema, insertSeatSectionSchema, insertSeatSchema, insertEventSeatReservationSchema, vendorOnboardingSchema, matches, matchParticipants;
 var init_schema = __esm({
   "shared/schema.ts"() {
     "use strict";
@@ -701,6 +703,32 @@ var init_schema = __esm({
         path: ["mpesaNumber"]
       }
     );
+    matches = pgTable("matches", {
+      id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+      creatorId: varchar("creator_id").notNull(),
+      courtId: varchar("court_id").notNull(),
+      sport: varchar("sport").notNull(),
+      matchDate: varchar("match_date").notNull(),
+      startTime: varchar("start_time").notNull(),
+      duration: integer("duration").notNull().default(1),
+      totalSpots: integer("total_spots").notNull(),
+      totalAmount: decimal("total_amount", { precision: 10, scale: 2 }).notNull(),
+      pricePerSpot: decimal("price_per_spot", { precision: 10, scale: 2 }).notNull(),
+      notes: text("notes"),
+      status: varchar("status", { enum: ["open", "full", "confirmed", "cancelled"] }).notNull().default("open"),
+      bookingId: varchar("booking_id"),
+      createdAt: timestamp("created_at").defaultNow(),
+      updatedAt: timestamp("updated_at").defaultNow()
+    });
+    matchParticipants = pgTable("match_participants", {
+      id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+      matchId: varchar("match_id").notNull(),
+      userId: varchar("user_id").notNull(),
+      paymentStatus: varchar("payment_status", { enum: ["unpaid", "paid"] }).notNull().default("unpaid"),
+      mpesaCheckoutRequestId: varchar("mpesa_checkout_request_id"),
+      mpesaReceiptNumber: varchar("mpesa_receipt_number"),
+      joinedAt: timestamp("joined_at").defaultNow()
+    });
   }
 });
 
@@ -3917,10 +3945,10 @@ function bulletPoint(doc, text2, indent = 72) {
   doc.fillColor(TEXT_DARK).fontSize(10).text(text2, indent + 14, y, { width: 461 - indent });
   doc.moveDown(0.3);
 }
-function featureCard(doc, x, y, title, desc3, color = BRAND_GREEN) {
+function featureCard(doc, x, y, title, desc4, color = BRAND_GREEN) {
   doc.rect(x, y, 215, 80).fillAndStroke(LIGHT_GRAY, color);
   doc.fillColor(color).font("Helvetica-Bold").fontSize(11).text(title, x + 10, y + 10, { width: 195 });
-  doc.fillColor(GRAY).font("Helvetica").fontSize(9).text(desc3, x + 10, y + 28, { width: 195 });
+  doc.fillColor(GRAY).font("Helvetica").fontSize(9).text(desc4, x + 10, y + 28, { width: 195 });
 }
 function generatePitchPDF(res) {
   const doc = new PDFDocument({
@@ -4008,9 +4036,9 @@ function generatePitchPDF(res) {
     ["Guest & Registered Bookings", "Customers can book courts without an account. Registered users receive a 10% first-booking discount as a signup incentive."],
     ["Automated Notifications", "Email and SMS confirmations, reminders, vendor earning alerts, and booking receipts are sent automatically on every transaction."]
   ];
-  solutions.forEach(([title, desc3]) => {
+  solutions.forEach(([title, desc4]) => {
     doc.fillColor(BRAND_GREEN).font("Helvetica-Bold").fontSize(10).text(`\u25B8 ${title}`, 72);
-    doc.fillColor(TEXT_DARK).font("Helvetica").fontSize(10).text(desc3, 86, doc.y, { width: 447, lineGap: 2 });
+    doc.fillColor(TEXT_DARK).font("Helvetica").fontSize(10).text(desc4, 86, doc.y, { width: 447, lineGap: 2 });
     doc.moveDown(0.5);
   });
   addPage(doc);
@@ -4025,8 +4053,8 @@ function generatePitchPDF(res) {
   ];
   let fx = 60;
   let fy = doc.y;
-  sbFeatures.forEach(([title, desc3], i) => {
-    featureCard(doc, fx, fy, title, desc3, BRAND_GREEN);
+  sbFeatures.forEach(([title, desc4], i) => {
+    featureCard(doc, fx, fy, title, desc4, BRAND_GREEN);
     if (i % 2 === 1) {
       fy += 92;
       fx = 60;
@@ -4047,8 +4075,8 @@ function generatePitchPDF(res) {
   ];
   fx = 60;
   fy = doc.y;
-  ffFeatures.forEach(([title, desc3], i) => {
-    featureCard(doc, fx, fy, title, desc3, BRAND_ORANGE);
+  ffFeatures.forEach(([title, desc4], i) => {
+    featureCard(doc, fx, fy, title, desc4, BRAND_ORANGE);
     if (i % 2 === 1) {
       fy += 92;
       fx = 60;
@@ -4116,11 +4144,11 @@ function generatePitchPDF(res) {
     ["Corporate & Group Bookings", "Custom pricing packages for corporate sports days, school tournaments, and large group events.", BRAND_DARK],
     ["Data & Analytics Products", "Aggregated market insights (venue performance, sport trends, city-level demand) sold to venue operators and sports bodies.", BRAND_ORANGE]
   ];
-  revenueStreams.forEach(([title, desc3, color]) => {
+  revenueStreams.forEach(([title, desc4, color]) => {
     const startY = doc.y;
     doc.rect(60, startY, 8, 44).fill(color);
     doc.fillColor(color).font("Helvetica-Bold").fontSize(11).text(title, 76, startY, { width: 457 });
-    doc.fillColor(GRAY).font("Helvetica").fontSize(10).text(desc3, 76, doc.y, { width: 457, lineGap: 2 });
+    doc.fillColor(GRAY).font("Helvetica").fontSize(10).text(desc4, 76, doc.y, { width: 457, lineGap: 2 });
     doc.moveDown(0.8);
   });
   doc.moveDown(0.5);
@@ -4183,11 +4211,11 @@ function generatePitchPDF(res) {
     ["Maps & Location", "Google Maps API, Haversine distance calculations, GPS geolocation"],
     ["Deployment", "Cloud-hosted, HTTPS, auto-scaling infrastructure \u2014 live and accessible 24/7"]
   ];
-  techStack.forEach(([category, desc3]) => {
+  techStack.forEach(([category, desc4]) => {
     const ty = doc.y;
     doc.rect(60, ty, 110, 24).fill(BRAND_GREEN);
     doc.fillColor(WHITE).font("Helvetica-Bold").fontSize(9).text(category, 60, ty + 7, { width: 110, align: "center" });
-    doc.fillColor(TEXT_DARK).font("Helvetica").fontSize(9).text(desc3, 178, ty + 7, { width: 357 });
+    doc.fillColor(TEXT_DARK).font("Helvetica").fontSize(9).text(desc4, 178, ty + 7, { width: 357 });
     doc.y = ty + 28;
     doc.moveDown(0.1);
   });
@@ -4269,6 +4297,229 @@ var requireOwner = async (req, res, next) => {
   next();
 };
 
+// server/matchRoutes.ts
+init_schema();
+import { eq as eq4, desc as desc3 } from "drizzle-orm";
+async function maybeConfirmMatch(matchId) {
+  const [match] = await db.select().from(matches).where(eq4(matches.id, matchId));
+  if (!match || match.status === "confirmed") return;
+  const parts = await db.select().from(matchParticipants).where(eq4(matchParticipants.matchId, matchId));
+  if (parts.length < match.totalSpots) return;
+  if (!parts.every((p) => p.paymentStatus === "paid")) return;
+  const startHour = parseInt(match.startTime.split(":")[0]);
+  const endTime = `${startHour + match.duration}:00`;
+  try {
+    const booking = await storage.createBooking({
+      courtId: match.courtId,
+      selectedSport: match.sport,
+      sportSegments: null,
+      bookingDate: match.matchDate,
+      timeSlot: match.startTime,
+      startTime: match.startTime,
+      endTime,
+      duration: match.duration,
+      courtAmount: match.totalAmount,
+      totalAmount: match.totalAmount,
+      paymentMethod: "mpesa",
+      paymentStatus: "completed",
+      status: "confirmed",
+      customerId: match.creatorId,
+      isGuestBooking: false,
+      courtsBooked: 1
+    });
+    await db.update(matches).set({ status: "confirmed", bookingId: booking.id, updatedAt: /* @__PURE__ */ new Date() }).where(eq4(matches.id, matchId));
+  } catch (e) {
+    console.error("Error creating booking from match:", e);
+  }
+}
+function registerMatchRoutes(app2) {
+  app2.post("/api/matches", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.user?.id;
+      const { courtId, sport, matchDate, startTime, duration, totalSpots, notes } = req.body;
+      if (!courtId || !sport || !matchDate || !startTime || !totalSpots)
+        return res.status(400).json({ message: "Missing required fields" });
+      const spots = parseInt(totalSpots);
+      if (isNaN(spots) || spots < 2) return res.status(400).json({ message: "Need at least 2 spots" });
+      const dur = parseInt(duration) || 1;
+      const [court] = await db.select().from(courts).where(eq4(courts.id, courtId));
+      if (!court) return res.status(404).json({ message: "Court not found" });
+      const totalAmount = (Number(court.hourlyRate) || 0) * dur;
+      const [match] = await db.insert(matches).values({
+        creatorId: userId,
+        courtId,
+        sport,
+        matchDate,
+        startTime,
+        duration: dur,
+        totalSpots: spots,
+        totalAmount: totalAmount.toFixed(2),
+        pricePerSpot: (totalAmount / spots).toFixed(2),
+        notes: notes || null,
+        status: "open"
+      }).returning();
+      await db.insert(matchParticipants).values({ matchId: match.id, userId, paymentStatus: "unpaid" });
+      res.status(201).json(match);
+    } catch (e) {
+      console.error("Error creating match:", e);
+      res.status(500).json({ message: "Failed to create match" });
+    }
+  });
+  app2.get("/api/matches", async (req, res) => {
+    try {
+      const { sport, city } = req.query;
+      const rows = await db.select({ match: matches, courtName: courts.name, courtCity: courts.city, courtArea: courts.area }).from(matches).innerJoin(courts, eq4(matches.courtId, courts.id)).where(eq4(matches.status, "open")).orderBy(desc3(matches.createdAt));
+      const result = [];
+      for (const r of rows) {
+        if (sport && r.match.sport !== sport) continue;
+        if (city && r.courtCity !== city) continue;
+        const parts = await db.select().from(matchParticipants).where(eq4(matchParticipants.matchId, r.match.id));
+        result.push({
+          ...r.match,
+          courtName: r.courtName,
+          courtCity: r.courtCity,
+          courtArea: r.courtArea,
+          filledSpots: parts.length,
+          spotsRemaining: r.match.totalSpots - parts.length
+        });
+      }
+      res.json(result);
+    } catch (e) {
+      console.error("Error fetching matches:", e);
+      res.status(500).json({ message: "Failed to fetch matches" });
+    }
+  });
+  app2.get("/api/matches/:id", async (req, res) => {
+    try {
+      const [row] = await db.select({ match: matches, courtName: courts.name, courtCity: courts.city, courtArea: courts.area }).from(matches).innerJoin(courts, eq4(matches.courtId, courts.id)).where(eq4(matches.id, req.params.id));
+      if (!row) return res.status(404).json({ message: "Match not found" });
+      const parts = await db.select({ participant: matchParticipants, firstName: users.firstName, lastName: users.lastName, profileImageUrl: users.profileImageUrl }).from(matchParticipants).innerJoin(users, eq4(matchParticipants.userId, users.id)).where(eq4(matchParticipants.matchId, req.params.id));
+      res.json({
+        ...row.match,
+        courtName: row.courtName,
+        courtCity: row.courtCity,
+        courtArea: row.courtArea,
+        participants: parts.map((p) => ({ ...p.participant, firstName: p.firstName, lastName: p.lastName, profileImageUrl: p.profileImageUrl })),
+        filledSpots: parts.length,
+        spotsRemaining: row.match.totalSpots - parts.length
+      });
+    } catch (e) {
+      console.error("Error fetching match:", e);
+      res.status(500).json({ message: "Failed to fetch match" });
+    }
+  });
+  app2.post("/api/matches/:id/join", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.user?.id;
+      const matchId = req.params.id;
+      const [match] = await db.select().from(matches).where(eq4(matches.id, matchId));
+      if (!match) return res.status(404).json({ message: "Match not found" });
+      if (match.status !== "open") return res.status(400).json({ message: "This match is no longer open" });
+      const parts = await db.select().from(matchParticipants).where(eq4(matchParticipants.matchId, matchId));
+      if (parts.find((p) => p.userId === userId)) return res.status(409).json({ message: "You already joined this match" });
+      if (parts.length >= match.totalSpots) return res.status(400).json({ message: "This match is full" });
+      await db.insert(matchParticipants).values({ matchId, userId, paymentStatus: "unpaid" });
+      const newCount = parts.length + 1;
+      if (newCount >= match.totalSpots) await db.update(matches).set({ status: "full", updatedAt: /* @__PURE__ */ new Date() }).where(eq4(matches.id, matchId));
+      res.json({ success: true, filledSpots: newCount, isFull: newCount >= match.totalSpots });
+    } catch (e) {
+      console.error("Error joining match:", e);
+      res.status(500).json({ message: "Failed to join match" });
+    }
+  });
+  app2.post("/api/matches/:id/leave", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.user?.id;
+      const matchId = req.params.id;
+      const [match] = await db.select().from(matches).where(eq4(matches.id, matchId));
+      if (!match) return res.status(404).json({ message: "Match not found" });
+      if (match.status === "confirmed") return res.status(400).json({ message: "Cannot leave a confirmed match" });
+      const parts = await db.select().from(matchParticipants).where(eq4(matchParticipants.matchId, matchId));
+      const mine = parts.find((p) => p.userId === userId);
+      if (!mine) return res.status(404).json({ message: "You are not in this match" });
+      if (mine.paymentStatus === "paid") return res.status(400).json({ message: "You already paid; contact support" });
+      await db.delete(matchParticipants).where(eq4(matchParticipants.id, mine.id));
+      if (parts.length - 1 <= 0) await db.update(matches).set({ status: "cancelled", updatedAt: /* @__PURE__ */ new Date() }).where(eq4(matches.id, matchId));
+      else if (match.status === "full") await db.update(matches).set({ status: "open", updatedAt: /* @__PURE__ */ new Date() }).where(eq4(matches.id, matchId));
+      res.json({ success: true });
+    } catch (e) {
+      console.error("Error leaving match:", e);
+      res.status(500).json({ message: "Failed to leave match" });
+    }
+  });
+  app2.post("/api/matches/:id/pay", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.user?.id;
+      const matchId = req.params.id;
+      const { phone } = req.body;
+      if (!phone) return res.status(400).json({ message: "Phone number is required" });
+      const [match] = await db.select().from(matches).where(eq4(matches.id, matchId));
+      if (!match) return res.status(404).json({ message: "Match not found" });
+      if (match.status !== "full") return res.status(400).json({ message: "Payment opens once all spots are filled" });
+      const parts = await db.select().from(matchParticipants).where(eq4(matchParticipants.matchId, matchId));
+      const mine = parts.find((p) => p.userId === userId);
+      if (!mine) return res.status(403).json({ message: "You are not in this match" });
+      if (mine.paymentStatus === "paid") return res.status(400).json({ message: "You already paid" });
+      const response = await initiateSTKPush({
+        phone,
+        amount: Number(match.pricePerSpot),
+        accountReference: `MT${matchId.slice(0, 8).toUpperCase()}`,
+        transactionDesc: "Match Spot"
+      });
+      await db.update(matchParticipants).set({ mpesaCheckoutRequestId: response.CheckoutRequestID }).where(eq4(matchParticipants.id, mine.id));
+      res.json({ success: true, message: "Payment prompt sent to your phone", checkoutRequestId: response.CheckoutRequestID });
+    } catch (e) {
+      console.error("Match payment error:", e);
+      res.status(500).json({ message: e.message || "Failed to initiate payment" });
+    }
+  });
+  app2.get("/api/matches/:id/payment-status", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.user?.id;
+      const matchId = req.params.id;
+      const parts = await db.select().from(matchParticipants).where(eq4(matchParticipants.matchId, matchId));
+      const mine = parts.find((p) => p.userId === userId);
+      if (!mine) return res.status(404).json({ message: "You are not in this match" });
+      if (mine.paymentStatus === "paid") return res.json({ status: "paid", mpesaReceiptNumber: mine.mpesaReceiptNumber });
+      if (!mine.mpesaCheckoutRequestId) return res.json({ status: "unpaid" });
+      let isSuccess = false;
+      try {
+        const r = await querySTKPushStatus(mine.mpesaCheckoutRequestId);
+        isSuccess = r.ResultCode === "0";
+      } catch {
+        return res.json({ status: "pending" });
+      }
+      if (isSuccess) {
+        await db.update(matchParticipants).set({ paymentStatus: "paid" }).where(eq4(matchParticipants.id, mine.id));
+        await maybeConfirmMatch(matchId);
+        return res.json({ status: "paid" });
+      }
+      res.json({ status: "pending" });
+    } catch (e) {
+      console.error("Error checking match payment:", e);
+      res.status(500).json({ message: "Failed to check payment" });
+    }
+  });
+  app2.get("/api/my-matches", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.user?.id;
+      const myParts = await db.select().from(matchParticipants).where(eq4(matchParticipants.userId, userId));
+      const result = [];
+      for (const mp of myParts) {
+        const [row] = await db.select({ match: matches, courtName: courts.name, courtCity: courts.city }).from(matches).innerJoin(courts, eq4(matches.courtId, courts.id)).where(eq4(matches.id, mp.matchId));
+        if (row) {
+          const parts = await db.select().from(matchParticipants).where(eq4(matchParticipants.matchId, mp.matchId));
+          result.push({ ...row.match, courtName: row.courtName, courtCity: row.courtCity, filledSpots: parts.length, myPaymentStatus: mp.paymentStatus });
+        }
+      }
+      res.json(result);
+    } catch (e) {
+      console.error("Error fetching my matches:", e);
+      res.status(500).json({ message: "Failed to fetch your matches" });
+    }
+  });
+}
+
 // server/routes.ts
 init_schema();
 import { eq as eqAdmin } from "drizzle-orm";
@@ -4306,6 +4557,7 @@ var verifyVendorStatus = async (userId) => {
 async function registerRoutes(app2) {
   setupGoogleAuth(app2);
   seedOwner();
+  registerMatchRoutes(app2);
   app2.get("/api/auth/user", isAuthenticated, async (req, res) => {
     try {
       const userId = req.user?.id;

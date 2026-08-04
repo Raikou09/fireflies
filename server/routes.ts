@@ -25,6 +25,7 @@ import { SMSService } from "./smsService";
 import { initiateSTKPush, querySTKPushStatus, parseCallbackData, formatPhoneNumber, getSimulatedReceiptNumber, isSimulationMode, type MPesaCallbackData } from "./mpesaService";
 import { generatePitchPDF } from "./pitchDocument";
 import { requireAdmin, requireOwner, seedOwner, isAdminEmail } from "./adminAuth";
+import { registerMatchRoutes } from "./matchRoutes";
 import { adminUsers } from "@shared/schema";
 import { db } from "./db";
 import { eq as eqAdmin } from "drizzle-orm";
@@ -74,6 +75,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Google OAuth disabled - using Replit Auth instead
   // setupGoogleAuth(app);
   seedOwner();
+  registerMatchRoutes(app);
 
   // Auth routes
   app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
