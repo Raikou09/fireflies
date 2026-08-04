@@ -65,6 +65,12 @@ export default function Navigation({ userMode, setUserMode, platform = "sportsbo
               >
                 Fireflies
               </Link>
+              <Link 
+                href="/matches"
+                className="text-sm font-semibold transition-colors text-gray-600 hover:text-gray-900"
+              >
+                Find Players
+              </Link>
             </nav>
           </div>
           
