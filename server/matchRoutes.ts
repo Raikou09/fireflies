@@ -6,6 +6,32 @@ import { isAuthenticated } from "./googleAuth";
 import { storage } from "./storage";
 import { initiateSTKPush, querySTKPushStatus } from "./mpesaService";
 
+async function recomputeConfirming(matchId: string) {
+  const [match] = await db.select().from(matches).where(eq(matches.id, matchId));
+  if (!match || match.status !== "confirming") return;
+  const parts = await db.select().from(matchParticipants).where(eq(matchParticipants.matchId, matchId));
+  const active = parts.filter(p => p.confirmStatus !== "dropped");
+  if (active.length === 0) {
+    await db.update(matches).set({ status: "cancelled", updatedAt: new Date() }).where(eq(matches.id, matchId));
+    return;
+  }
+  const newPer = (Number(match.totalAmount) / active.length).toFixed(2);
+  // If the per-spot price changed, reset all "confirmed" back to "none" so everyone re-confirms
+  if (newPer !== Number(match.pricePerSpot).toFixed(2)) {
+    await db.update(matches).set({ pricePerSpot: newPer, updatedAt: new Date() }).where(eq(matches.id, matchId));
+    for (const p of active) {
+      if (p.confirmStatus === "confirmed") {
+        await db.update(matchParticipants).set({ confirmStatus: "none" }).where(eq(matchParticipants.id, p.id));
+      }
+    }
+    return;
+  }
+  // Price stable — if everyone active has confirmed, lock the match to payment
+  if (active.every(p => p.confirmStatus === "confirmed")) {
+    await db.update(matches).set({ status: "full", totalSpots: active.length, updatedAt: new Date() }).where(eq(matches.id, matchId));
+  }
+}
+
 async function maybeConfirmMatch(matchId: string) {
   const [match] = await db.select().from(matches).where(eq(matches.id, matchId));
   if (!match || match.status === "confirmed") return;
@@ -30,7 +56,7 @@ export function registerMatchRoutes(app: Express) {
   app.post("/api/matches", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user?.id;
-      const { courtId, sport, matchDate, startTime, duration, totalSpots, notes } = req.body;
+      const { courtId, sport, matchDate, startTime, duration, totalSpots, notes, communityId } = req.body;
       if (!courtId || !sport || !matchDate || !startTime || !totalSpots)
         return res.status(400).json({ message: "Missing required fields" });
       const spots = parseInt(totalSpots);
@@ -42,7 +68,7 @@ export function registerMatchRoutes(app: Express) {
       const [match] = await db.insert(matches).values({
         creatorId: userId, courtId, sport, matchDate, startTime, duration: dur, totalSpots: spots,
         totalAmount: totalAmount.toFixed(2), pricePerSpot: (totalAmount / spots).toFixed(2),
-        notes: notes || null, status: "open",
+        notes: notes || null, status: "open", communityId: communityId || null,
       }).returning();
       await db.insert(matchParticipants).values({ matchId: match.id, userId, paymentStatus: "unpaid" });
       res.status(201).json(match);
@@ -149,6 +175,60 @@ export function registerMatchRoutes(app: Express) {
       }
       res.json({ status: "pending" });
     } catch (e) { console.error("Error checking match payment:", e); res.status(500).json({ message: "Failed to check payment" }); }
+  });
+
+
+  // Creator triggers the match early with fewer players
+  app.post("/api/matches/:id/trigger-early", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.id; const matchId = req.params.id;
+      const [match] = await db.select().from(matches).where(eq(matches.id, matchId));
+      if (!match) return res.status(404).json({ message: "Match not found" });
+      if (match.creatorId !== userId) return res.status(403).json({ message: "Only the creator can start early" });
+      if (match.status !== "open") return res.status(400).json({ message: "Match is not open" });
+      const parts = await db.select().from(matchParticipants).where(eq(matchParticipants.matchId, matchId));
+      if (parts.length < 1) return res.status(400).json({ message: "No players have joined" });
+      const newPer = (Number(match.totalAmount) / parts.length).toFixed(2);
+      await db.update(matches).set({ status: "confirming", pricePerSpot: newPer, updatedAt: new Date() }).where(eq(matches.id, matchId));
+      // Reset everyone to "none" so they explicitly confirm the new price
+      for (const p of parts) {
+        await db.update(matchParticipants).set({ confirmStatus: "none" }).where(eq(matchParticipants.id, p.id));
+      }
+      res.json({ success: true, pricePerSpot: newPer, players: parts.length });
+    } catch (e) { console.error("Error triggering early:", e); res.status(500).json({ message: "Failed to start early" }); }
+  });
+
+  // A participant confirms they're in at the current price
+  app.post("/api/matches/:id/confirm", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.id; const matchId = req.params.id;
+      const [match] = await db.select().from(matches).where(eq(matches.id, matchId));
+      if (!match) return res.status(404).json({ message: "Match not found" });
+      if (match.status !== "confirming") return res.status(400).json({ message: "Match is not in confirming stage" });
+      const parts = await db.select().from(matchParticipants).where(eq(matchParticipants.matchId, matchId));
+      const mine = parts.find(p => p.userId === userId);
+      if (!mine) return res.status(403).json({ message: "You are not in this match" });
+      if (mine.confirmStatus === "dropped") return res.status(400).json({ message: "You already dropped out" });
+      await db.update(matchParticipants).set({ confirmStatus: "confirmed" }).where(eq(matchParticipants.id, mine.id));
+      await recomputeConfirming(matchId);
+      res.json({ success: true });
+    } catch (e) { console.error("Error confirming:", e); res.status(500).json({ message: "Failed to confirm" }); }
+  });
+
+  // A participant drops out during confirming (recalculates for the rest)
+  app.post("/api/matches/:id/drop", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.id; const matchId = req.params.id;
+      const [match] = await db.select().from(matches).where(eq(matches.id, matchId));
+      if (!match) return res.status(404).json({ message: "Match not found" });
+      const parts = await db.select().from(matchParticipants).where(eq(matchParticipants.matchId, matchId));
+      const mine = parts.find(p => p.userId === userId);
+      if (!mine) return res.status(403).json({ message: "You are not in this match" });
+      if (mine.paymentStatus === "paid") return res.status(400).json({ message: "You already paid" });
+      await db.update(matchParticipants).set({ confirmStatus: "dropped" }).where(eq(matchParticipants.id, mine.id));
+      await recomputeConfirming(matchId);
+      res.json({ success: true });
+    } catch (e) { console.error("Error dropping:", e); res.status(500).json({ message: "Failed to drop out" }); }
   });
 
   app.get("/api/my-matches", isAuthenticated, async (req: any, res) => {

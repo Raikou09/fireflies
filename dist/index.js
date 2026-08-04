@@ -717,7 +717,8 @@ var init_schema = __esm({
       totalAmount: decimal("total_amount", { precision: 10, scale: 2 }).notNull(),
       pricePerSpot: decimal("price_per_spot", { precision: 10, scale: 2 }).notNull(),
       notes: text("notes"),
-      status: varchar("status", { enum: ["open", "full", "confirmed", "cancelled"] }).notNull().default("open"),
+      status: varchar("status", { enum: ["open", "full", "confirming", "confirmed", "cancelled"] }).notNull().default("open"),
+      communityId: varchar("community_id"),
       bookingId: varchar("booking_id"),
       createdAt: timestamp("created_at").defaultNow(),
       updatedAt: timestamp("updated_at").defaultNow()
@@ -727,6 +728,7 @@ var init_schema = __esm({
       matchId: varchar("match_id").notNull(),
       userId: varchar("user_id").notNull(),
       paymentStatus: varchar("payment_status", { enum: ["unpaid", "paid"] }).notNull().default("unpaid"),
+      confirmStatus: varchar("confirm_status", { enum: ["none", "confirmed", "dropped"] }).notNull().default("none"),
       mpesaCheckoutRequestId: varchar("mpesa_checkout_request_id"),
       mpesaReceiptNumber: varchar("mpesa_receipt_number"),
       joinedAt: timestamp("joined_at").defaultNow()
@@ -4324,6 +4326,29 @@ var requireOwner = async (req, res, next) => {
 // server/matchRoutes.ts
 init_schema();
 import { eq as eq4, desc as desc3 } from "drizzle-orm";
+async function recomputeConfirming(matchId) {
+  const [match] = await db.select().from(matches).where(eq4(matches.id, matchId));
+  if (!match || match.status !== "confirming") return;
+  const parts = await db.select().from(matchParticipants).where(eq4(matchParticipants.matchId, matchId));
+  const active = parts.filter((p) => p.confirmStatus !== "dropped");
+  if (active.length === 0) {
+    await db.update(matches).set({ status: "cancelled", updatedAt: /* @__PURE__ */ new Date() }).where(eq4(matches.id, matchId));
+    return;
+  }
+  const newPer = (Number(match.totalAmount) / active.length).toFixed(2);
+  if (newPer !== Number(match.pricePerSpot).toFixed(2)) {
+    await db.update(matches).set({ pricePerSpot: newPer, updatedAt: /* @__PURE__ */ new Date() }).where(eq4(matches.id, matchId));
+    for (const p of active) {
+      if (p.confirmStatus === "confirmed") {
+        await db.update(matchParticipants).set({ confirmStatus: "none" }).where(eq4(matchParticipants.id, p.id));
+      }
+    }
+    return;
+  }
+  if (active.every((p) => p.confirmStatus === "confirmed")) {
+    await db.update(matches).set({ status: "full", totalSpots: active.length, updatedAt: /* @__PURE__ */ new Date() }).where(eq4(matches.id, matchId));
+  }
+}
 async function maybeConfirmMatch(matchId) {
   const [match] = await db.select().from(matches).where(eq4(matches.id, matchId));
   if (!match || match.status === "confirmed") return;
@@ -4360,7 +4385,7 @@ function registerMatchRoutes(app2) {
   app2.post("/api/matches", isAuthenticated, async (req, res) => {
     try {
       const userId = req.user?.id;
-      const { courtId, sport, matchDate, startTime, duration, totalSpots, notes } = req.body;
+      const { courtId, sport, matchDate, startTime, duration, totalSpots, notes, communityId } = req.body;
       if (!courtId || !sport || !matchDate || !startTime || !totalSpots)
         return res.status(400).json({ message: "Missing required fields" });
       const spots = parseInt(totalSpots);
@@ -4380,7 +4405,8 @@ function registerMatchRoutes(app2) {
         totalAmount: totalAmount.toFixed(2),
         pricePerSpot: (totalAmount / spots).toFixed(2),
         notes: notes || null,
-        status: "open"
+        status: "open",
+        communityId: communityId || null
       }).returning();
       await db.insert(matchParticipants).values({ matchId: match.id, userId, paymentStatus: "unpaid" });
       res.status(201).json(match);
@@ -4522,6 +4548,64 @@ function registerMatchRoutes(app2) {
     } catch (e) {
       console.error("Error checking match payment:", e);
       res.status(500).json({ message: "Failed to check payment" });
+    }
+  });
+  app2.post("/api/matches/:id/trigger-early", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.user?.id;
+      const matchId = req.params.id;
+      const [match] = await db.select().from(matches).where(eq4(matches.id, matchId));
+      if (!match) return res.status(404).json({ message: "Match not found" });
+      if (match.creatorId !== userId) return res.status(403).json({ message: "Only the creator can start early" });
+      if (match.status !== "open") return res.status(400).json({ message: "Match is not open" });
+      const parts = await db.select().from(matchParticipants).where(eq4(matchParticipants.matchId, matchId));
+      if (parts.length < 1) return res.status(400).json({ message: "No players have joined" });
+      const newPer = (Number(match.totalAmount) / parts.length).toFixed(2);
+      await db.update(matches).set({ status: "confirming", pricePerSpot: newPer, updatedAt: /* @__PURE__ */ new Date() }).where(eq4(matches.id, matchId));
+      for (const p of parts) {
+        await db.update(matchParticipants).set({ confirmStatus: "none" }).where(eq4(matchParticipants.id, p.id));
+      }
+      res.json({ success: true, pricePerSpot: newPer, players: parts.length });
+    } catch (e) {
+      console.error("Error triggering early:", e);
+      res.status(500).json({ message: "Failed to start early" });
+    }
+  });
+  app2.post("/api/matches/:id/confirm", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.user?.id;
+      const matchId = req.params.id;
+      const [match] = await db.select().from(matches).where(eq4(matches.id, matchId));
+      if (!match) return res.status(404).json({ message: "Match not found" });
+      if (match.status !== "confirming") return res.status(400).json({ message: "Match is not in confirming stage" });
+      const parts = await db.select().from(matchParticipants).where(eq4(matchParticipants.matchId, matchId));
+      const mine = parts.find((p) => p.userId === userId);
+      if (!mine) return res.status(403).json({ message: "You are not in this match" });
+      if (mine.confirmStatus === "dropped") return res.status(400).json({ message: "You already dropped out" });
+      await db.update(matchParticipants).set({ confirmStatus: "confirmed" }).where(eq4(matchParticipants.id, mine.id));
+      await recomputeConfirming(matchId);
+      res.json({ success: true });
+    } catch (e) {
+      console.error("Error confirming:", e);
+      res.status(500).json({ message: "Failed to confirm" });
+    }
+  });
+  app2.post("/api/matches/:id/drop", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.user?.id;
+      const matchId = req.params.id;
+      const [match] = await db.select().from(matches).where(eq4(matches.id, matchId));
+      if (!match) return res.status(404).json({ message: "Match not found" });
+      const parts = await db.select().from(matchParticipants).where(eq4(matchParticipants.matchId, matchId));
+      const mine = parts.find((p) => p.userId === userId);
+      if (!mine) return res.status(403).json({ message: "You are not in this match" });
+      if (mine.paymentStatus === "paid") return res.status(400).json({ message: "You already paid" });
+      await db.update(matchParticipants).set({ confirmStatus: "dropped" }).where(eq4(matchParticipants.id, mine.id));
+      await recomputeConfirming(matchId);
+      res.json({ success: true });
+    } catch (e) {
+      console.error("Error dropping:", e);
+      res.status(500).json({ message: "Failed to drop out" });
     }
   });
   app2.get("/api/my-matches", isAuthenticated, async (req, res) => {
