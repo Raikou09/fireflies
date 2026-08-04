@@ -52,6 +52,22 @@ export default function MatchDetail() {
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
+  const triggerEarlyM = useMutation({
+    mutationFn: async () => { const r = await fetch(`/api/matches/${id}/trigger-early`, { method: "POST", credentials: "include" }); if (!r.ok) { const e = await r.json(); throw new Error(e.message); } return r.json(); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: [`/api/matches/${id}`] }); toast({ title: "Started early — players are confirming" }); },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+  const confirmM = useMutation({
+    mutationFn: async () => { const r = await fetch(`/api/matches/${id}/confirm`, { method: "POST", credentials: "include" }); if (!r.ok) { const e = await r.json(); throw new Error(e.message); } return r.json(); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: [`/api/matches/${id}`] }); toast({ title: "You're confirmed" }); },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+  const dropM = useMutation({
+    mutationFn: async () => { const r = await fetch(`/api/matches/${id}/drop`, { method: "POST", credentials: "include" }); if (!r.ok) { const e = await r.json(); throw new Error(e.message); } return r.json(); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: [`/api/matches/${id}`] }); toast({ title: "You dropped out" }); },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
   if (isLoading) return <div className="min-h-screen bg-gray-50"><Navigation userMode="customer" setUserMode={() => {}} /><div className="flex justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-gray-400" /></div></div>;
   if (!match) return <div className="min-h-screen bg-gray-50"><Navigation userMode="customer" setUserMode={() => {}} /><div className="text-center py-20 text-gray-500">Match not found</div></div>;
 
@@ -102,6 +118,34 @@ export default function MatchDetail() {
                 <CheckCircle className="h-8 w-8 text-blue-500 mx-auto mb-2" />
                 <p className="font-medium text-blue-800">Match confirmed & court booked!</p>
               </div>
+            ) : match.status === "confirming" ? (
+              (() => {
+                const me = match.participants.find((p: any) => p.userId === myId);
+                const active = match.participants.filter((p: any) => p.confirmStatus !== "dropped");
+                const confirmedCount = active.filter((p: any) => p.confirmStatus === "confirmed").length;
+                const droppedCount = match.participants.filter((p: any) => p.confirmStatus === "dropped").length;
+                return (
+                  <div className="space-y-3">
+                    <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 text-sm text-orange-800">
+                      The creator started early. Your share is now <strong>KES {Number(match.pricePerSpot).toFixed(0)}</strong>. Confirm to lock your spot.
+                    </div>
+                    <div className="flex gap-3 text-sm">
+                      <span className="text-green-700 font-medium">{confirmedCount}/{active.length} confirmed</span>
+                      {droppedCount > 0 && <span className="text-red-600">{droppedCount} dropped</span>}
+                    </div>
+                    {me && me.confirmStatus === "dropped" ? (
+                      <div className="bg-gray-50 border rounded-lg p-3 text-center text-gray-500 text-sm">You dropped out of this match</div>
+                    ) : me && me.confirmStatus === "confirmed" ? (
+                      <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-center text-green-800 text-sm">You've confirmed — waiting for the rest</div>
+                    ) : me ? (
+                      <div className="flex gap-2">
+                        <Button className="flex-1 bg-green-600 hover:bg-green-700" disabled={confirmM.isPending} onClick={() => confirmM.mutate()}>{confirmM.isPending ? "..." : `Confirm — KES ${Number(match.pricePerSpot).toFixed(0)}`}</Button>
+                        <Button variant="outline" className="text-red-600 hover:text-red-700" disabled={dropM.isPending} onClick={() => dropM.mutate()}>Drop out</Button>
+                      </div>
+                    ) : null}
+                  </div>
+                );
+              })()
             ) : !iAmIn ? (
               <Button className="w-full bg-green-600 hover:bg-green-700" disabled={joinMutation.isPending || match.spotsRemaining <= 0} onClick={() => joinMutation.mutate()}>
                 {match.spotsRemaining <= 0 ? "Match Full" : joinMutation.isPending ? "Joining..." : "Join this Match (free)"}
@@ -117,9 +161,16 @@ export default function MatchDetail() {
             ) : iPaid ? (
               <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-center text-green-800 font-medium">You've paid! Waiting for others…</div>
             ) : (
-              <Button variant="outline" className="w-full text-red-600 hover:text-red-700" disabled={leaveMutation.isPending} onClick={() => leaveMutation.mutate()}>
-                {leaveMutation.isPending ? "Leaving..." : "Leave Match"}
-              </Button>
+              <div className="space-y-2">
+                {match.creatorId === myId && match.status === "open" && match.filledSpots >= 1 && (
+                  <Button className="w-full bg-orange-500 hover:bg-orange-600" disabled={triggerEarlyM.isPending} onClick={() => triggerEarlyM.mutate()}>
+                    {triggerEarlyM.isPending ? "..." : `Start now with ${match.filledSpots} player${match.filledSpots === 1 ? "" : "s"}`}
+                  </Button>
+                )}
+                <Button variant="outline" className="w-full text-red-600 hover:text-red-700" disabled={leaveMutation.isPending} onClick={() => leaveMutation.mutate()}>
+                  {leaveMutation.isPending ? "Leaving..." : "Leave Match"}
+                </Button>
+              </div>
             )}
           </CardContent>
         </Card>

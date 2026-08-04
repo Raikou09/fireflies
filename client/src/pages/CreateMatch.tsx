@@ -12,6 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 export default function CreateMatch() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const communityId = new URLSearchParams(window.location.search).get("community") || undefined;
   const [form, setForm] = useState({ courtId: "", sport: "", matchDate: "", startTime: "", duration: "1", totalSpots: "", notes: "" });
 
   const { data: courts = [] } = useQuery<any[]>({
@@ -25,7 +26,7 @@ export default function CreateMatch() {
     mutationFn: async () => {
       const res = await fetch("/api/matches", {
         method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include",
-        body: JSON.stringify({ ...form, duration: parseInt(form.duration), totalSpots: parseInt(form.totalSpots) }),
+        body: JSON.stringify({ ...form, duration: parseInt(form.duration), totalSpots: parseInt(form.totalSpots), communityId }),
       });
       if (!res.ok) { const e = await res.json(); throw new Error(e.message); }
       return res.json();

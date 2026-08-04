@@ -24,6 +24,13 @@ export default function CommunityDetail() {
   });
 
   const inv = () => qc.invalidateQueries({ queryKey: [`/api/communities/${id}`] });
+
+  const { data: allMatches = [] } = useQuery<any[]>({
+    queryKey: ["community-matches", id],
+    queryFn: async () => { const r = await fetch("/api/matches", { credentials: "include" }); return r.ok ? r.json() : []; },
+    refetchInterval: 6000,
+  });
+  const communityMatches = allMatches.filter((m: any) => m.communityId === id);
   const joinM = useMutation({ mutationFn: async () => { const r = await fetch(`/api/communities/${id}/join`, { method: "POST", credentials: "include" }); if (!r.ok) { const e = await r.json(); throw new Error(e.message); } return r.json(); }, onSuccess: (d) => { inv(); toast({ title: d.status === "pending" ? "Request sent — awaiting approval" : "You joined!" }); }, onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }) });
   const leaveM = useMutation({ mutationFn: async () => { const r = await fetch(`/api/communities/${id}/leave`, { method: "POST", credentials: "include" }); if (!r.ok) { const e = await r.json(); throw new Error(e.message); } return r.json(); }, onSuccess: () => { inv(); toast({ title: "You left the community" }); }, onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }) });
   const approveM = useMutation({ mutationFn: async (targetUserId: string) => { const r = await fetch(`/api/communities/${id}/approve/${targetUserId}`, { method: "POST", credentials: "include" }); if (!r.ok) { const e = await r.json(); throw new Error(e.message); } return r.json(); }, onSuccess: () => { inv(); toast({ title: "Member approved" }); }, onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }) });
@@ -73,6 +80,30 @@ export default function CommunityDetail() {
                     </div>
                   ))}
                 </div>
+              </div>
+            )}
+
+            {isMember && (
+              <div className="mt-6">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="font-semibold text-gray-900">Community Matches</h3>
+                  <Button size="sm" className="h-8 bg-green-600 hover:bg-green-700" onClick={() => setLocation(`/matches/create?community=${id}`)}>+ Create Match</Button>
+                </div>
+                {communityMatches.length === 0 ? (
+                  <p className="text-sm text-gray-500">No matches yet. Create one for the community!</p>
+                ) : (
+                  <div className="space-y-2">
+                    {communityMatches.map((m: any) => (
+                      <div key={m.id} className="flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2 cursor-pointer hover:bg-gray-100" onClick={() => setLocation(`/matches/${m.id}`)}>
+                        <div>
+                          <span className="text-sm font-medium">{m.sport}</span>
+                          <span className="text-xs text-gray-500 ml-2">{m.matchDate} · {m.startTime}</span>
+                        </div>
+                        <span className="text-xs text-gray-500">{m.filledSpots}/{m.totalSpots} · KES {Number(m.pricePerSpot).toFixed(0)}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 
