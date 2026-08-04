@@ -9,6 +9,9 @@ import Landing from "@/pages/Landing";
 import Home from "@/pages/Home";
 import FirefliesHome from "@/pages/FirefliesHome";
 import Admin from "@/pages/Admin";
+import Matches from "@/pages/Matches";
+import CreateMatch from "@/pages/CreateMatch";
+import MatchDetail from "@/pages/MatchDetail";
 import VendorDashboard from "@/pages/VendorDashboard";
 import CourtDetails from "@/pages/CourtDetails";
 import EventDetails from "@/pages/EventDetails";
@@ -36,6 +39,9 @@ function Router() {
       <Route path="/booking-history" component={BookingHistory} />
       <Route path="/profile" component={UserProfile} />
       <Route path="/ops-center" component={Admin} />
+      <Route path="/matches" component={Matches} />
+      <Route path="/matches/create" component={CreateMatch} />
+      <Route path="/matches/:id" component={MatchDetail} />
       
       <Route component={NotFound} />
     </Switch>
