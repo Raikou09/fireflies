@@ -14,6 +14,8 @@ __export(schema_exports, {
   adminUsers: () => adminUsers,
   bookingRelations: () => bookingRelations,
   bookings: () => bookings,
+  communities: () => communities,
+  communityMembers: () => communityMembers,
   courtRelations: () => courtRelations,
   courts: () => courts,
   equipment: () => equipment,
@@ -74,7 +76,7 @@ import {
 import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
-var sessions, adminUsers, users, courts, equipment, bookings, reviews, userRelations, courtRelations, equipmentRelations, bookingRelations, reviewRelations, notifications, userNotificationPreferences, venues, seatSections, seats, eventSeatReservations, events, ticketTiers, eventBookings, notificationRelations, userNotificationPreferencesRelations, venueRelations, seatSectionRelations, seatRelations, eventSeatReservationRelations, eventRelations, ticketTierRelations, eventBookingRelations, insertUserSchema, insertCourtSchema, insertEquipmentSchema, insertBookingSchema, insertReviewSchema, insertNotificationSchema, insertUserNotificationPreferencesSchema, insertVenueSchema, insertEventSchema, insertTicketTierSchema, insertEventBookingSchema, insertSeatSectionSchema, insertSeatSchema, insertEventSeatReservationSchema, vendorOnboardingSchema, matches, matchParticipants;
+var sessions, adminUsers, users, courts, equipment, bookings, reviews, userRelations, courtRelations, equipmentRelations, bookingRelations, reviewRelations, notifications, userNotificationPreferences, venues, seatSections, seats, eventSeatReservations, events, ticketTiers, eventBookings, notificationRelations, userNotificationPreferencesRelations, venueRelations, seatSectionRelations, seatRelations, eventSeatReservationRelations, eventRelations, ticketTierRelations, eventBookingRelations, insertUserSchema, insertCourtSchema, insertEquipmentSchema, insertBookingSchema, insertReviewSchema, insertNotificationSchema, insertUserNotificationPreferencesSchema, insertVenueSchema, insertEventSchema, insertTicketTierSchema, insertEventBookingSchema, insertSeatSectionSchema, insertSeatSchema, insertEventSeatReservationSchema, vendorOnboardingSchema, matches, matchParticipants, communities, communityMembers;
 var init_schema = __esm({
   "shared/schema.ts"() {
     "use strict";
@@ -727,6 +729,28 @@ var init_schema = __esm({
       paymentStatus: varchar("payment_status", { enum: ["unpaid", "paid"] }).notNull().default("unpaid"),
       mpesaCheckoutRequestId: varchar("mpesa_checkout_request_id"),
       mpesaReceiptNumber: varchar("mpesa_receipt_number"),
+      joinedAt: timestamp("joined_at").defaultNow()
+    });
+    communities = pgTable("communities", {
+      id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+      creatorId: varchar("creator_id").notNull(),
+      name: varchar("name").notNull(),
+      description: text("description"),
+      imageUrl: varchar("image_url"),
+      sports: text("sports").array().default([]),
+      skillLevel: varchar("skill_level", { enum: ["beginner", "casual", "competitive", "all"] }).notNull().default("all"),
+      city: varchar("city"),
+      area: varchar("area"),
+      joinPolicy: varchar("join_policy", { enum: ["open", "request"] }).notNull().default("open"),
+      createdAt: timestamp("created_at").defaultNow(),
+      updatedAt: timestamp("updated_at").defaultNow()
+    });
+    communityMembers = pgTable("community_members", {
+      id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+      communityId: varchar("community_id").notNull(),
+      userId: varchar("user_id").notNull(),
+      role: varchar("role", { enum: ["creator", "member"] }).notNull().default("member"),
+      status: varchar("status", { enum: ["pending", "approved"] }).notNull().default("approved"),
       joinedAt: timestamp("joined_at").defaultNow()
     });
   }
@@ -3945,10 +3969,10 @@ function bulletPoint(doc, text2, indent = 72) {
   doc.fillColor(TEXT_DARK).fontSize(10).text(text2, indent + 14, y, { width: 461 - indent });
   doc.moveDown(0.3);
 }
-function featureCard(doc, x, y, title, desc4, color = BRAND_GREEN) {
+function featureCard(doc, x, y, title, desc5, color = BRAND_GREEN) {
   doc.rect(x, y, 215, 80).fillAndStroke(LIGHT_GRAY, color);
   doc.fillColor(color).font("Helvetica-Bold").fontSize(11).text(title, x + 10, y + 10, { width: 195 });
-  doc.fillColor(GRAY).font("Helvetica").fontSize(9).text(desc4, x + 10, y + 28, { width: 195 });
+  doc.fillColor(GRAY).font("Helvetica").fontSize(9).text(desc5, x + 10, y + 28, { width: 195 });
 }
 function generatePitchPDF(res) {
   const doc = new PDFDocument({
@@ -4036,9 +4060,9 @@ function generatePitchPDF(res) {
     ["Guest & Registered Bookings", "Customers can book courts without an account. Registered users receive a 10% first-booking discount as a signup incentive."],
     ["Automated Notifications", "Email and SMS confirmations, reminders, vendor earning alerts, and booking receipts are sent automatically on every transaction."]
   ];
-  solutions.forEach(([title, desc4]) => {
+  solutions.forEach(([title, desc5]) => {
     doc.fillColor(BRAND_GREEN).font("Helvetica-Bold").fontSize(10).text(`\u25B8 ${title}`, 72);
-    doc.fillColor(TEXT_DARK).font("Helvetica").fontSize(10).text(desc4, 86, doc.y, { width: 447, lineGap: 2 });
+    doc.fillColor(TEXT_DARK).font("Helvetica").fontSize(10).text(desc5, 86, doc.y, { width: 447, lineGap: 2 });
     doc.moveDown(0.5);
   });
   addPage(doc);
@@ -4053,8 +4077,8 @@ function generatePitchPDF(res) {
   ];
   let fx = 60;
   let fy = doc.y;
-  sbFeatures.forEach(([title, desc4], i) => {
-    featureCard(doc, fx, fy, title, desc4, BRAND_GREEN);
+  sbFeatures.forEach(([title, desc5], i) => {
+    featureCard(doc, fx, fy, title, desc5, BRAND_GREEN);
     if (i % 2 === 1) {
       fy += 92;
       fx = 60;
@@ -4075,8 +4099,8 @@ function generatePitchPDF(res) {
   ];
   fx = 60;
   fy = doc.y;
-  ffFeatures.forEach(([title, desc4], i) => {
-    featureCard(doc, fx, fy, title, desc4, BRAND_ORANGE);
+  ffFeatures.forEach(([title, desc5], i) => {
+    featureCard(doc, fx, fy, title, desc5, BRAND_ORANGE);
     if (i % 2 === 1) {
       fy += 92;
       fx = 60;
@@ -4144,11 +4168,11 @@ function generatePitchPDF(res) {
     ["Corporate & Group Bookings", "Custom pricing packages for corporate sports days, school tournaments, and large group events.", BRAND_DARK],
     ["Data & Analytics Products", "Aggregated market insights (venue performance, sport trends, city-level demand) sold to venue operators and sports bodies.", BRAND_ORANGE]
   ];
-  revenueStreams.forEach(([title, desc4, color]) => {
+  revenueStreams.forEach(([title, desc5, color]) => {
     const startY = doc.y;
     doc.rect(60, startY, 8, 44).fill(color);
     doc.fillColor(color).font("Helvetica-Bold").fontSize(11).text(title, 76, startY, { width: 457 });
-    doc.fillColor(GRAY).font("Helvetica").fontSize(10).text(desc4, 76, doc.y, { width: 457, lineGap: 2 });
+    doc.fillColor(GRAY).font("Helvetica").fontSize(10).text(desc5, 76, doc.y, { width: 457, lineGap: 2 });
     doc.moveDown(0.8);
   });
   doc.moveDown(0.5);
@@ -4211,11 +4235,11 @@ function generatePitchPDF(res) {
     ["Maps & Location", "Google Maps API, Haversine distance calculations, GPS geolocation"],
     ["Deployment", "Cloud-hosted, HTTPS, auto-scaling infrastructure \u2014 live and accessible 24/7"]
   ];
-  techStack.forEach(([category, desc4]) => {
+  techStack.forEach(([category, desc5]) => {
     const ty = doc.y;
     doc.rect(60, ty, 110, 24).fill(BRAND_GREEN);
     doc.fillColor(WHITE).font("Helvetica-Bold").fontSize(9).text(category, 60, ty + 7, { width: 110, align: "center" });
-    doc.fillColor(TEXT_DARK).font("Helvetica").fontSize(9).text(desc4, 178, ty + 7, { width: 357 });
+    doc.fillColor(TEXT_DARK).font("Helvetica").fontSize(9).text(desc5, 178, ty + 7, { width: 357 });
     doc.y = ty + 28;
     doc.moveDown(0.1);
   });
@@ -4520,6 +4544,129 @@ function registerMatchRoutes(app2) {
   });
 }
 
+// server/communityRoutes.ts
+init_schema();
+import { eq as eq5, desc as desc4, and as and3 } from "drizzle-orm";
+function registerCommunityRoutes(app2) {
+  app2.post("/api/communities", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.user?.id;
+      const { name, description, imageUrl, sports, skillLevel, city, area, joinPolicy } = req.body;
+      if (!name) return res.status(400).json({ message: "Name is required" });
+      const [community] = await db.insert(communities).values({
+        creatorId: userId,
+        name,
+        description: description || null,
+        imageUrl: imageUrl || null,
+        sports: Array.isArray(sports) ? sports : [],
+        skillLevel: skillLevel || "all",
+        city: city || null,
+        area: area || null,
+        joinPolicy: joinPolicy || "open"
+      }).returning();
+      await db.insert(communityMembers).values({ communityId: community.id, userId, role: "creator", status: "approved" });
+      res.status(201).json(community);
+    } catch (e) {
+      console.error("Error creating community:", e);
+      res.status(500).json({ message: "Failed to create community" });
+    }
+  });
+  app2.get("/api/communities", async (req, res) => {
+    try {
+      const { sport, city, skillLevel } = req.query;
+      const rows = await db.select().from(communities).orderBy(desc4(communities.createdAt));
+      const result = [];
+      for (const c of rows) {
+        if (sport && !(c.sports || []).includes(sport)) continue;
+        if (city && c.city !== city) continue;
+        if (skillLevel && c.skillLevel !== skillLevel) continue;
+        const members = await db.select().from(communityMembers).where(and3(eq5(communityMembers.communityId, c.id), eq5(communityMembers.status, "approved")));
+        result.push({ ...c, memberCount: members.length });
+      }
+      res.json(result);
+    } catch (e) {
+      console.error("Error fetching communities:", e);
+      res.status(500).json({ message: "Failed to fetch communities" });
+    }
+  });
+  app2.get("/api/communities/:id", async (req, res) => {
+    try {
+      const [community] = await db.select().from(communities).where(eq5(communities.id, req.params.id));
+      if (!community) return res.status(404).json({ message: "Community not found" });
+      const members = await db.select({ member: communityMembers, firstName: users.firstName, lastName: users.lastName, profileImageUrl: users.profileImageUrl }).from(communityMembers).innerJoin(users, eq5(communityMembers.userId, users.id)).where(eq5(communityMembers.communityId, req.params.id));
+      res.json({
+        ...community,
+        members: members.filter((m) => m.member.status === "approved").map((m) => ({ ...m.member, firstName: m.firstName, lastName: m.lastName, profileImageUrl: m.profileImageUrl })),
+        pendingMembers: members.filter((m) => m.member.status === "pending").map((m) => ({ ...m.member, firstName: m.firstName, lastName: m.lastName, profileImageUrl: m.profileImageUrl })),
+        memberCount: members.filter((m) => m.member.status === "approved").length
+      });
+    } catch (e) {
+      console.error("Error fetching community:", e);
+      res.status(500).json({ message: "Failed to fetch community" });
+    }
+  });
+  app2.post("/api/communities/:id/join", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.user?.id;
+      const communityId = req.params.id;
+      const [community] = await db.select().from(communities).where(eq5(communities.id, communityId));
+      if (!community) return res.status(404).json({ message: "Community not found" });
+      const existing = await db.select().from(communityMembers).where(and3(eq5(communityMembers.communityId, communityId), eq5(communityMembers.userId, userId)));
+      if (existing.length > 0) return res.status(409).json({ message: "You already joined or requested" });
+      const status = community.joinPolicy === "open" ? "approved" : "pending";
+      await db.insert(communityMembers).values({ communityId, userId, role: "member", status });
+      res.json({ success: true, status });
+    } catch (e) {
+      console.error("Error joining community:", e);
+      res.status(500).json({ message: "Failed to join" });
+    }
+  });
+  app2.post("/api/communities/:id/leave", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.user?.id;
+      const communityId = req.params.id;
+      const existing = await db.select().from(communityMembers).where(and3(eq5(communityMembers.communityId, communityId), eq5(communityMembers.userId, userId)));
+      if (!existing[0]) return res.status(404).json({ message: "You are not a member" });
+      if (existing[0].role === "creator") return res.status(400).json({ message: "Creator cannot leave their own community" });
+      await db.delete(communityMembers).where(eq5(communityMembers.id, existing[0].id));
+      res.json({ success: true });
+    } catch (e) {
+      console.error("Error leaving community:", e);
+      res.status(500).json({ message: "Failed to leave" });
+    }
+  });
+  app2.post("/api/communities/:id/approve/:userId", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.user?.id;
+      const { id: communityId, userId: targetUserId } = req.params;
+      const [community] = await db.select().from(communities).where(eq5(communities.id, communityId));
+      if (!community || community.creatorId !== userId) return res.status(403).json({ message: "Only the creator can approve members" });
+      const [target] = await db.select().from(communityMembers).where(and3(eq5(communityMembers.communityId, communityId), eq5(communityMembers.userId, targetUserId)));
+      if (!target) return res.status(404).json({ message: "Request not found" });
+      await db.update(communityMembers).set({ status: "approved" }).where(eq5(communityMembers.id, target.id));
+      res.json({ success: true });
+    } catch (e) {
+      console.error("Error approving member:", e);
+      res.status(500).json({ message: "Failed to approve" });
+    }
+  });
+  app2.get("/api/my-communities", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.user?.id;
+      const mine = await db.select().from(communityMembers).where(eq5(communityMembers.userId, userId));
+      const result = [];
+      for (const m of mine) {
+        const [c] = await db.select().from(communities).where(eq5(communities.id, m.communityId));
+        if (c) result.push({ ...c, myRole: m.role, myStatus: m.status });
+      }
+      res.json(result);
+    } catch (e) {
+      console.error("Error fetching my communities:", e);
+      res.status(500).json({ message: "Failed to fetch" });
+    }
+  });
+}
+
 // server/routes.ts
 init_schema();
 import { eq as eqAdmin } from "drizzle-orm";
@@ -4558,6 +4705,7 @@ async function registerRoutes(app2) {
   setupGoogleAuth(app2);
   seedOwner();
   registerMatchRoutes(app2);
+  registerCommunityRoutes(app2);
   app2.get("/api/auth/user", isAuthenticated, async (req, res) => {
     try {
       const userId = req.user?.id;

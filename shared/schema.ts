@@ -758,3 +758,32 @@ export const matchParticipants = pgTable("match_participants", {
   joinedAt: timestamp("joined_at").defaultNow(),
 });
 export type MatchParticipant = typeof matchParticipants.$inferSelect;
+
+
+// Communities
+export const communities = pgTable("communities", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  creatorId: varchar("creator_id").notNull(),
+  name: varchar("name").notNull(),
+  description: text("description"),
+  imageUrl: varchar("image_url"),
+  sports: text("sports").array().default([]),
+  skillLevel: varchar("skill_level", { enum: ["beginner", "casual", "competitive", "all"] }).notNull().default("all"),
+  city: varchar("city"),
+  area: varchar("area"),
+  joinPolicy: varchar("join_policy", { enum: ["open", "request"] }).notNull().default("open"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+export type Community = typeof communities.$inferSelect;
+
+// Community members
+export const communityMembers = pgTable("community_members", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  communityId: varchar("community_id").notNull(),
+  userId: varchar("user_id").notNull(),
+  role: varchar("role", { enum: ["creator", "member"] }).notNull().default("member"),
+  status: varchar("status", { enum: ["pending", "approved"] }).notNull().default("approved"),
+  joinedAt: timestamp("joined_at").defaultNow(),
+});
+export type CommunityMember = typeof communityMembers.$inferSelect;

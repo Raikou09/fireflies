@@ -26,6 +26,7 @@ import { initiateSTKPush, querySTKPushStatus, parseCallbackData, formatPhoneNumb
 import { generatePitchPDF } from "./pitchDocument";
 import { requireAdmin, requireOwner, seedOwner, isAdminEmail } from "./adminAuth";
 import { registerMatchRoutes } from "./matchRoutes";
+import { registerCommunityRoutes } from "./communityRoutes";
 import { adminUsers } from "@shared/schema";
 import { db } from "./db";
 import { eq as eqAdmin } from "drizzle-orm";
@@ -76,6 +77,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // setupGoogleAuth(app);
   seedOwner();
   registerMatchRoutes(app);
+  registerCommunityRoutes(app);
 
   // Auth routes
   app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
