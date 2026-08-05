@@ -34,7 +34,9 @@ export default function SearchBar({ onSearch }: SearchBarProps) {
     "Hockey", 
     "Handball", 
     "Squash",
-    "Boxing"
+    "Pickleball",
+    "Padel",
+    "Golf"
   ];
 
   return (

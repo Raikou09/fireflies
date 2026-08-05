@@ -305,7 +305,7 @@ export default function AddCourtModal({ isOpen, onClose, courtToEdit }: AddCourt
   const sportsOptions = [
     "Football", "Basketball", "Volleyball", "Tennis", "Netball", "Rugby",
     "Cricket", "Badminton", "Table Tennis", "Swimming", "Athletics", 
-    "Hockey", "Handball", "Squash", "Boxing"
+    "Hockey", "Handball", "Squash", "Pickleball", "Padel", "Golf"
   ];
 
   const handleSubmit = (e: React.FormEvent) => {

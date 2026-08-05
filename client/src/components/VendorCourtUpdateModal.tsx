@@ -195,7 +195,7 @@ export default function VendorCourtUpdateModal({ court, isOpen, onClose }: Vendo
   const sports = [
     "Football", "Basketball", "Tennis", "Volleyball", "Badminton", 
     "Table Tennis", "Cricket", "Rugby", "Hockey", "Netball",
-    "Baseball", "Swimming", "Athletics", "Boxing", "Wrestling"
+    "Baseball", "Swimming", "Athletics", "Wrestling", "Pickleball", "Padel", "Golf"
   ];
 
   const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];

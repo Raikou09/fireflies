@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 
-const SPORTS = ["Football", "Basketball", "Cricket", "Tennis", "Badminton", "Volleyball", "Netball", "Swimming", "Athletics"];
+const SPORTS = ["Football", "Basketball", "Cricket", "Tennis", "Badminton", "Volleyball", "Netball", "Swimming", "Athletics", "Pickleball", "Padel", "Golf"];
 
 export default function CreateCommunity() {
   const [, setLocation] = useLocation();
