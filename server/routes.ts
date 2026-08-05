@@ -1342,13 +1342,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const now = new Date();
       const hoursUntilBooking = (bookingDateTime.getTime() - now.getTime()) / (1000 * 60 * 60);
 
-      if (hoursUntilBooking < 2) {
-        return res.status(400).json({
-          message: "Cancellations are only allowed up to 2 hours before the booking start time"
-        });
-      }
+      const isFullRefund = hoursUntilBooking >= 2;
 
       const cancelled = await storage.updateBookingStatus(booking.id, "cancelled");
+
+      // --- Refund handling ---
+      // >2h before slot  -> full refund owed: flip paymentStatus to "refunded" (removes it from
+      //                     vendor earnings immediately) and create a pending refund row.
+      // <2h before slot  -> no refund: booking is cancelled (slot frees) but paymentStatus stays
+      //                     "completed" so the vendor still earns their share.
+      if (isFullRefund) {
+        try {
+          const paidReceipt = (booking as any).mpesaReceiptNumber || (booking as any).mpesa_receipt_number;
+          const paidPhone = (booking as any).mpesaPhoneNumber || (booking as any).mpesa_phone_number || (booking as any).customerPhone || (booking as any).phoneNumber;
+          const paidAmount = (booking as any).totalAmount;
+          const wasPaid = (booking as any).paymentStatus === "completed" && paidReceipt;
+          if (wasPaid && paidPhone && Number(paidAmount) > 0) {
+            const existing = await db.select().from(refunds).where(eqAdmin(refunds.bookingId, booking.id));
+            if (existing.length === 0) {
+              await db.insert(refunds).values({
+                bookingId: booking.id,
+                customerPhone: String(paidPhone),
+                amount: String(paidAmount),
+                originalReceipt: String(paidReceipt),
+                reason: "Customer cancellation (>2h before slot)",
+                status: "pending",
+              });
+            }
+            // Drop it from vendor earnings the moment the refund is owed.
+            await storage.updateBookingPayment(booking.id, { paymentStatus: "refunded" } as any);
+            console.log("Full refund owed + booking marked refunded:", booking.id, paidAmount);
+          } else {
+            console.log("Cancelled >2h but no paid amount to refund:", booking.id);
+          }
+        } catch (refundErr) {
+          console.error("Refund record creation failed (cancellation still succeeded):", refundErr);
+        }
+      } else {
+        console.log("Late cancellation (<2h) — slot freed, no refund, vendor keeps share:", booking.id);
+      }
 
       // Send emails asynchronously — don't block the response
       (async () => {

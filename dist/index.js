@@ -45,6 +45,7 @@ __export(schema_exports, {
   matches: () => matches,
   notificationRelations: () => notificationRelations,
   notifications: () => notifications,
+  refunds: () => refunds2,
   reviewRelations: () => reviewRelations,
   reviews: () => reviews,
   seatRelations: () => seatRelations,
@@ -77,7 +78,7 @@ import {
 import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
-var sessions, adminUsers, users, courts, equipment, bookings, reviews, userRelations, courtRelations, equipmentRelations, bookingRelations, reviewRelations, notifications, userNotificationPreferences, venues, seatSections, seats, eventSeatReservations, events, ticketTiers, eventBookings, notificationRelations, userNotificationPreferencesRelations, venueRelations, seatSectionRelations, seatRelations, eventSeatReservationRelations, eventRelations, ticketTierRelations, eventBookingRelations, insertUserSchema, insertCourtSchema, insertEquipmentSchema, insertBookingSchema, insertReviewSchema, insertNotificationSchema, insertUserNotificationPreferencesSchema, insertVenueSchema, insertEventSchema, insertTicketTierSchema, insertEventBookingSchema, insertSeatSectionSchema, insertSeatSchema, insertEventSeatReservationSchema, vendorOnboardingSchema, matches, matchParticipants, communities, communityMembers, communityMessages;
+var sessions, adminUsers, users, courts, equipment, bookings, reviews, userRelations, courtRelations, equipmentRelations, bookingRelations, reviewRelations, notifications, userNotificationPreferences, venues, seatSections, seats, eventSeatReservations, events, ticketTiers, eventBookings, notificationRelations, userNotificationPreferencesRelations, venueRelations, seatSectionRelations, seatRelations, eventSeatReservationRelations, eventRelations, ticketTierRelations, eventBookingRelations, insertUserSchema, insertCourtSchema, insertEquipmentSchema, insertBookingSchema, insertReviewSchema, insertNotificationSchema, insertUserNotificationPreferencesSchema, insertVenueSchema, insertEventSchema, insertTicketTierSchema, insertEventBookingSchema, insertSeatSectionSchema, insertSeatSchema, insertEventSeatReservationSchema, vendorOnboardingSchema, matches, matchParticipants, communities, communityMembers, communityMessages, refunds2;
 var init_schema = __esm({
   "shared/schema.ts"() {
     "use strict";
@@ -241,7 +242,7 @@ var init_schema = __esm({
       originalAmount: decimal("original_amount", { precision: 10, scale: 2 }),
       // Amount before discount
       paymentMethod: varchar("payment_method", { enum: ["mpesa", "card"] }).default("mpesa"),
-      paymentStatus: varchar("payment_status", { enum: ["pending", "completed", "failed"] }).default("pending"),
+      paymentStatus: varchar("payment_status", { enum: ["pending", "completed", "failed", "refunded"] }).default("pending"),
       mpesaReceiptNumber: varchar("mpesa_receipt_number"),
       mpesaPhoneNumber: varchar("mpesa_phone_number"),
       mpesaCheckoutRequestId: varchar("mpesa_checkout_request_id"),
@@ -762,6 +763,20 @@ var init_schema = __esm({
       userId: varchar("user_id").notNull(),
       message: text("message").notNull(),
       createdAt: timestamp("created_at").defaultNow()
+    });
+    refunds2 = pgTable("refunds", {
+      id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+      bookingId: varchar("booking_id").notNull().unique(),
+      customerPhone: varchar("customer_phone").notNull(),
+      amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+      originalReceipt: varchar("original_receipt"),
+      reason: varchar("reason"),
+      status: varchar("status", { enum: ["pending", "processing", "sent", "failed"] }).notNull().default("pending"),
+      mpesaConversationId: varchar("mpesa_conversation_id"),
+      failureReason: text("failure_reason"),
+      requestedAt: timestamp("requested_at").defaultNow(),
+      sentAt: timestamp("sent_at"),
+      processedBy: varchar("processed_by")
     });
   }
 });
@@ -5882,12 +5897,37 @@ async function registerRoutes(app2) {
       const bookingDateTime = /* @__PURE__ */ new Date(`${booking.bookingDate}T${booking.startTime}`);
       const now = /* @__PURE__ */ new Date();
       const hoursUntilBooking = (bookingDateTime.getTime() - now.getTime()) / (1e3 * 60 * 60);
-      if (hoursUntilBooking < 2) {
-        return res.status(400).json({
-          message: "Cancellations are only allowed up to 2 hours before the booking start time"
-        });
-      }
+      const isFullRefund = hoursUntilBooking >= 2;
       const cancelled = await storage.updateBookingStatus(booking.id, "cancelled");
+      if (isFullRefund) {
+        try {
+          const paidReceipt = booking.mpesaReceiptNumber || booking.mpesa_receipt_number;
+          const paidPhone = booking.mpesaPhoneNumber || booking.mpesa_phone_number || booking.customerPhone || booking.phoneNumber;
+          const paidAmount = booking.totalAmount;
+          const wasPaid = booking.paymentStatus === "completed" && paidReceipt;
+          if (wasPaid && paidPhone && Number(paidAmount) > 0) {
+            const existing = await db.select().from(refunds).where(eqAdmin(refunds.bookingId, booking.id));
+            if (existing.length === 0) {
+              await db.insert(refunds).values({
+                bookingId: booking.id,
+                customerPhone: String(paidPhone),
+                amount: String(paidAmount),
+                originalReceipt: String(paidReceipt),
+                reason: "Customer cancellation (>2h before slot)",
+                status: "pending"
+              });
+            }
+            await storage.updateBookingPayment(booking.id, { paymentStatus: "refunded" });
+            console.log("Full refund owed + booking marked refunded:", booking.id, paidAmount);
+          } else {
+            console.log("Cancelled >2h but no paid amount to refund:", booking.id);
+          }
+        } catch (refundErr) {
+          console.error("Refund record creation failed (cancellation still succeeded):", refundErr);
+        }
+      } else {
+        console.log("Late cancellation (<2h) \u2014 slot freed, no refund, vendor keeps share:", booking.id);
+      }
       (async () => {
         try {
           const court = await storage.getCourt(booking.courtId);

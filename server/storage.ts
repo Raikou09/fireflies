@@ -94,7 +94,7 @@ export interface IStorage {
   getBooking(id: string): Promise<Booking | undefined>;
   updateBookingStatus(id: string, status: string): Promise<Booking | undefined>;
   updateBookingPayment(id: string, data: {
-    paymentStatus?: "pending" | "completed" | "failed";
+    paymentStatus?: "pending" | "completed" | "failed" | "refunded";
     mpesaReceiptNumber?: string;
     mpesaPhoneNumber?: string;
     mpesaCheckoutRequestId?: string;
@@ -198,7 +198,7 @@ export interface IStorage {
   getEventBooking(id: string): Promise<EventBooking | undefined>;
   updateEventBookingStatus(id: string, status: string): Promise<EventBooking | undefined>;
   updateEventBookingPayment(id: string, data: {
-    paymentStatus?: "pending" | "completed" | "failed";
+    paymentStatus?: "pending" | "completed" | "failed" | "refunded";
     mpesaReceiptNumber?: string;
     mpesaPhoneNumber?: string;
     mpesaCheckoutRequestId?: string;
@@ -654,7 +654,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateBookingPayment(id: string, data: {
-    paymentStatus?: "pending" | "completed" | "failed";
+    paymentStatus?: "pending" | "completed" | "failed" | "refunded";
     mpesaReceiptNumber?: string;
     mpesaPhoneNumber?: string;
     mpesaCheckoutRequestId?: string;
@@ -1860,7 +1860,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateEventBookingPayment(id: string, data: {
-    paymentStatus?: "pending" | "completed" | "failed";
+    paymentStatus?: "pending" | "completed" | "failed" | "refunded";
     mpesaReceiptNumber?: string;
     mpesaPhoneNumber?: string;
     mpesaCheckoutRequestId?: string;

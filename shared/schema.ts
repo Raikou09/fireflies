@@ -161,7 +161,7 @@ export const bookings = pgTable("bookings", {
   originalAmount: decimal("original_amount", { precision: 10, scale: 2 }), // Amount before discount
   
   paymentMethod: varchar("payment_method", { enum: ["mpesa", "card"] }).default("mpesa"),
-  paymentStatus: varchar("payment_status", { enum: ["pending", "completed", "failed"] }).default("pending"),
+  paymentStatus: varchar("payment_status", { enum: ["pending", "completed", "failed", "refunded"] }).default("pending"),
   mpesaReceiptNumber: varchar("mpesa_receipt_number"),
   mpesaPhoneNumber: varchar("mpesa_phone_number"),
   mpesaCheckoutRequestId: varchar("mpesa_checkout_request_id"),
@@ -800,3 +800,22 @@ export const communityMessages = pgTable("community_messages", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 export type CommunityMessage = typeof communityMessages.$inferSelect;
+
+
+// Refunds — a row exists only when a full refund is owed (customer cancelled >2h before slot).
+// Money moves only on explicit admin confirm in the Ops Center.
+export const refunds = pgTable("refunds", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  bookingId: varchar("booking_id").notNull().unique(),
+  customerPhone: varchar("customer_phone").notNull(),
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  originalReceipt: varchar("original_receipt"),
+  reason: varchar("reason"),
+  status: varchar("status", { enum: ["pending", "processing", "sent", "failed"] }).notNull().default("pending"),
+  mpesaConversationId: varchar("mpesa_conversation_id"),
+  failureReason: text("failure_reason"),
+  requestedAt: timestamp("requested_at").defaultNow(),
+  sentAt: timestamp("sent_at"),
+  processedBy: varchar("processed_by"),
+});
+export type Refund = typeof refunds.$inferSelect;
