@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useParams, useLocation } from "wouter";
 import Navigation from "@/components/Navigation";
@@ -5,7 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
-import { Users, MapPin, Loader2, Check, Clock } from "lucide-react";
+import { Users, MapPin, Loader2, Check, Clock, Send, Trash2 } from "lucide-react";
 
 const skillLabel: Record<string, string> = { beginner: "Beginner-friendly", casual: "Casual", competitive: "Competitive", all: "All levels" };
 
@@ -31,6 +32,23 @@ export default function CommunityDetail() {
     refetchInterval: 6000,
   });
   const communityMatches = allMatches.filter((m: any) => m.communityId === id);
+
+  const [draft, setDraft] = useState("");
+  const { data: messages = [] } = useQuery<any[]>({
+    queryKey: ["community-chat", id],
+    queryFn: async () => { const r = await fetch(`/api/communities/${id}/messages`, { credentials: "include" }); return r.ok ? r.json() : []; },
+    refetchInterval: 4000,
+  });
+  const sendM = useMutation({
+    mutationFn: async (text: string) => { const r = await fetch(`/api/communities/${id}/messages`, { method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include", body: JSON.stringify({ message: text }) }); if (!r.ok) { const e = await r.json(); throw new Error(e.message); } return r.json(); },
+    onSuccess: () => { setDraft(""); qc.invalidateQueries({ queryKey: ["community-chat", id] }); },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+  const deleteMsgM = useMutation({
+    mutationFn: async (messageId: string) => { const r = await fetch(`/api/communities/${id}/messages/${messageId}`, { method: "DELETE", credentials: "include" }); if (!r.ok) { const e = await r.json(); throw new Error(e.message); } return r.json(); },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["community-chat", id] }),
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
   const joinM = useMutation({ mutationFn: async () => { const r = await fetch(`/api/communities/${id}/join`, { method: "POST", credentials: "include" }); if (!r.ok) { const e = await r.json(); throw new Error(e.message); } return r.json(); }, onSuccess: (d) => { inv(); toast({ title: d.status === "pending" ? "Request sent — awaiting approval" : "You joined!" }); }, onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }) });
   const leaveM = useMutation({ mutationFn: async () => { const r = await fetch(`/api/communities/${id}/leave`, { method: "POST", credentials: "include" }); if (!r.ok) { const e = await r.json(); throw new Error(e.message); } return r.json(); }, onSuccess: () => { inv(); toast({ title: "You left the community" }); }, onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }) });
   const approveM = useMutation({ mutationFn: async (targetUserId: string) => { const r = await fetch(`/api/communities/${id}/approve/${targetUserId}`, { method: "POST", credentials: "include" }); if (!r.ok) { const e = await r.json(); throw new Error(e.message); } return r.json(); }, onSuccess: () => { inv(); toast({ title: "Member approved" }); }, onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }) });
@@ -104,6 +122,45 @@ export default function CommunityDetail() {
                     ))}
                   </div>
                 )}
+              </div>
+            )}
+
+            {isMember && (
+              <div className="mt-6" data-testid="community-chat">
+                <h3 className="font-semibold text-gray-900 mb-2">Community Chat</h3>
+                <div className="border rounded-lg overflow-hidden">
+                  <div className="max-h-80 overflow-y-auto p-3 space-y-2 bg-gray-50">
+                    {messages.length === 0 ? (
+                      <p className="text-sm text-gray-400 text-center py-6">No messages yet. Say hi!</p>
+                    ) : messages.map((m: any) => (
+                      <div key={m.id} className="group flex items-start gap-2">
+                        <div className="flex-1">
+                          <span className="text-xs font-semibold text-gray-700">{m.firstName} {m.lastName}</span>
+                          <p className="text-sm text-gray-800 whitespace-pre-wrap break-words">{m.message}</p>
+                        </div>
+                        {(m.userId === myId || isCreator) && (
+                          <button onClick={() => deleteMsgM.mutate(m.id)} className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 transition-opacity mt-1">
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex items-center gap-2 border-t p-2 bg-white">
+                    <input
+                      value={draft}
+                      onChange={(e) => setDraft(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === "Enter" && draft.trim()) sendM.mutate(draft.trim()); }}
+                      placeholder="Type a message..."
+                      maxLength={1000}
+                      className="flex-1 text-sm px-3 py-2 rounded-md border border-gray-200 focus:outline-none focus:ring-1 focus:ring-green-500"
+                    />
+                    <Button size="sm" className="bg-green-600 hover:bg-green-700 h-9" disabled={sendM.isPending || !draft.trim()} onClick={() => sendM.mutate(draft.trim())}>
+                      <Send className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+                <p className="text-xs text-gray-400 mt-1">Messages are kept for 7 days.</p>
               </div>
             )}
 
