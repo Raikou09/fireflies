@@ -1569,17 +1569,19 @@ init_schema();
 
 // server/db.ts
 init_schema();
-import { Pool, neonConfig } from "@neondatabase/serverless";
-import { drizzle } from "drizzle-orm/neon-serverless";
-import ws from "ws";
-neonConfig.webSocketConstructor = ws;
+import pkg from "pg";
+import { drizzle } from "drizzle-orm/node-postgres";
+var { Pool } = pkg;
 if (!process.env.DATABASE_URL) {
   throw new Error(
     "DATABASE_URL must be set. Did you forget to provision a database?"
   );
 }
-var pool = new Pool({ connectionString: process.env.DATABASE_URL });
-var db = drizzle({ client: pool, schema: schema_exports });
+var pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false }
+});
+var db = drizzle(pool, { schema: schema_exports });
 
 // server/storage.ts
 import { eq, and, desc, sql as sql2, gte, lte } from "drizzle-orm";
