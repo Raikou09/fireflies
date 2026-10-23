@@ -382,3 +382,89 @@ export const parseCallbackData = (data: MPesaCallbackData) => {
     phoneNumber,
   };
 };
+
+// ─── M-Pesa Reversal (refunds) ──────────────────────────────────────────────
+export interface ReversalRequest {
+  transactionId: string;   // the original M-Pesa receipt, e.g. "UFCAK7FPOR"
+  amount: number;
+  remarks?: string;
+}
+
+export interface ReversalResponse {
+  OriginatorConversationID: string;
+  ConversationID: string;
+  ResponseCode: string;
+  ResponseDescription: string;
+}
+
+export const initiateReversal = async (request: ReversalRequest): Promise<ReversalResponse> => {
+  const initiator = process.env.MPESA_INITIATOR_NAME;
+  const securityCredential = process.env.MPESA_SECURITY_CREDENTIAL;
+  const shortCode = process.env.MPESA_BUSINESS_SHORT_CODE;
+
+  if (!initiator || !securityCredential || !shortCode) {
+    throw new Error('M-Pesa reversal not configured: missing initiator name, security credential, or short code');
+  }
+  if (!request.transactionId) {
+    throw new Error('Reversal requires the original M-Pesa transaction ID');
+  }
+
+  // Result/timeout URLs — derive from the STK callback domain unless set explicitly
+  const callbackUrl = process.env.MPESA_CALLBACK_URL || '';
+  const origin = callbackUrl.replace(/\/api\/mpesa\/callback\/?$/, '');
+  const resultUrl = process.env.MPESA_REVERSAL_RESULT_URL || (origin ? `${origin}/api/mpesa/reversal/result` : '');
+  const timeoutUrl = process.env.MPESA_REVERSAL_TIMEOUT_URL || (origin ? `${origin}/api/mpesa/reversal/timeout` : '');
+
+  if (!resultUrl || !timeoutUrl) {
+    throw new Error('M-Pesa reversal result/timeout URLs not configured');
+  }
+
+  const accessToken = await getAccessToken();
+
+  const payload = {
+    Initiator: initiator,
+    SecurityCredential: securityCredential,
+    CommandID: 'TransactionReversal',
+    TransactionID: request.transactionId,
+    Amount: Math.ceil(request.amount),
+    ReceiverParty: shortCode,
+    RecieverIdentifierType: '11',
+    ResultURL: resultUrl,
+    QueueTimeOutURL: timeoutUrl,
+    Remarks: (request.remarks || 'Booking cancellation refund').slice(0, 100),
+    Occasion: 'Refund',
+  };
+
+  console.log('Initiating M-Pesa Reversal:', {
+    transactionId: request.transactionId,
+    amount: payload.Amount,
+    shortCode,
+    resultUrl,
+  });
+
+  try {
+    const response = await axios.post(
+      `${getBaseUrl()}/mpesa/reversal/v1/request`,
+      payload,
+      {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+    console.log('M-Pesa Reversal response:', response.data);
+    return response.data;
+  } catch (error: any) {
+    console.error('M-Pesa Reversal Error:', {
+      status: error.response?.status,
+      data: error.response?.data,
+      message: error.message,
+    });
+    const errorMessage = error.response?.data?.errorMessage
+      || error.response?.data?.error_description
+      || error.message
+      || 'Failed to initiate M-Pesa reversal';
+    throw new Error(errorMessage);
+  }
+};
