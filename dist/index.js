@@ -3965,6 +3965,66 @@ var parseCallbackData = (data) => {
     phoneNumber
   };
 };
+var initiateReversal = async (request) => {
+  const initiator = process.env.MPESA_INITIATOR_NAME;
+  const securityCredential = process.env.MPESA_SECURITY_CREDENTIAL;
+  const shortCode = process.env.MPESA_BUSINESS_SHORT_CODE;
+  if (!initiator || !securityCredential || !shortCode) {
+    throw new Error("M-Pesa reversal not configured: missing initiator name, security credential, or short code");
+  }
+  if (!request.transactionId) {
+    throw new Error("Reversal requires the original M-Pesa transaction ID");
+  }
+  const callbackUrl = process.env.MPESA_CALLBACK_URL || "";
+  const origin = callbackUrl.replace(/\/api\/mpesa\/callback\/?$/, "");
+  const resultUrl = process.env.MPESA_REVERSAL_RESULT_URL || (origin ? `${origin}/api/mpesa/reversal/result` : "");
+  const timeoutUrl = process.env.MPESA_REVERSAL_TIMEOUT_URL || (origin ? `${origin}/api/mpesa/reversal/timeout` : "");
+  if (!resultUrl || !timeoutUrl) {
+    throw new Error("M-Pesa reversal result/timeout URLs not configured");
+  }
+  const accessToken = await getAccessToken();
+  const payload = {
+    Initiator: initiator,
+    SecurityCredential: securityCredential,
+    CommandID: "TransactionReversal",
+    TransactionID: request.transactionId,
+    Amount: Math.ceil(request.amount),
+    ReceiverParty: shortCode,
+    RecieverIdentifierType: "11",
+    ResultURL: resultUrl,
+    QueueTimeOutURL: timeoutUrl,
+    Remarks: (request.remarks || "Booking cancellation refund").slice(0, 100),
+    Occasion: "Refund"
+  };
+  console.log("Initiating M-Pesa Reversal:", {
+    transactionId: request.transactionId,
+    amount: payload.Amount,
+    shortCode,
+    resultUrl
+  });
+  try {
+    const response = await axios.post(
+      `${getBaseUrl()}/mpesa/reversal/v1/request`,
+      payload,
+      {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json"
+        }
+      }
+    );
+    console.log("M-Pesa Reversal response:", response.data);
+    return response.data;
+  } catch (error) {
+    console.error("M-Pesa Reversal Error:", {
+      status: error.response?.status,
+      data: error.response?.data,
+      message: error.message
+    });
+    const errorMessage = error.response?.data?.errorMessage || error.response?.data?.error_description || error.message || "Failed to initiate M-Pesa reversal";
+    throw new Error(errorMessage);
+  }
+};
 
 // server/pitchDocument.ts
 import PDFDocument from "pdfkit";
@@ -6006,6 +6066,92 @@ async function registerRoutes(app2) {
     req.logout(() => {
       res.json({ success: true });
     });
+  });
+  app2.post("/api/mpesa/reversal/result", async (req, res) => {
+    try {
+      console.log("Reversal result received:", JSON.stringify(req.body));
+      const result = req.body && req.body.Result;
+      const conversationId = result && (result.ConversationID || result.OriginatorConversationID);
+      const resultCode = result && result.ResultCode;
+      if (conversationId) {
+        const rows = await db.select().from(refunds).where(eqAdmin(refunds.mpesaConversationId, String(conversationId)));
+        const refund = rows[0];
+        if (refund) {
+          if (String(resultCode) === "0") {
+            await db.update(refunds).set({ status: "sent", sentAt: /* @__PURE__ */ new Date() }).where(eqAdmin(refunds.id, refund.id));
+            console.log("Refund marked sent:", refund.id);
+          } else {
+            await db.update(refunds).set({ status: "failed", failureReason: String(result && result.ResultDesc || "Reversal failed") }).where(eqAdmin(refunds.id, refund.id));
+            console.log("Refund marked failed:", refund.id);
+          }
+        }
+      }
+      res.json({ ResultCode: 0, ResultDesc: "Accepted" });
+    } catch (e) {
+      console.error("Error handling reversal result:", e);
+      res.json({ ResultCode: 0, ResultDesc: "Accepted" });
+    }
+  });
+  app2.post("/api/mpesa/reversal/timeout", async (req, res) => {
+    try {
+      console.log("Reversal timeout received:", JSON.stringify(req.body));
+      const result = req.body && req.body.Result;
+      const conversationId = result && (result.ConversationID || result.OriginatorConversationID);
+      if (conversationId) {
+        const rows = await db.select().from(refunds).where(eqAdmin(refunds.mpesaConversationId, String(conversationId)));
+        const refund = rows[0];
+        if (refund && refund.status === "processing") {
+          await db.update(refunds).set({ status: "failed", failureReason: "M-Pesa timed out" }).where(eqAdmin(refunds.id, refund.id));
+        }
+      }
+      res.json({ ResultCode: 0, ResultDesc: "Accepted" });
+    } catch (e) {
+      console.error("Error handling reversal timeout:", e);
+      res.json({ ResultCode: 0, ResultDesc: "Accepted" });
+    }
+  });
+  app2.get("/api/admin/refunds", requireAdmin, async (req, res) => {
+    try {
+      const rows = await db.select().from(refunds);
+      const rank = { pending: 0, processing: 1, failed: 2, sent: 3 };
+      rows.sort((a, b) => {
+        const ao = rank[a.status] != null ? rank[a.status] : 9;
+        const bo = rank[b.status] != null ? rank[b.status] : 9;
+        if (ao !== bo) return ao - bo;
+        return new Date(b.requestedAt).getTime() - new Date(a.requestedAt).getTime();
+      });
+      res.json(rows);
+    } catch (e) {
+      console.error("Error fetching refunds:", e);
+      res.status(500).json({ message: "Failed to fetch refunds" });
+    }
+  });
+  app2.post("/api/admin/refunds/:id/process", requireAdmin, async (req, res) => {
+    try {
+      const refundId = req.params.id;
+      const rows = await db.select().from(refunds).where(eqAdmin(refunds.id, refundId));
+      const refund = rows[0];
+      if (!refund) return res.status(404).json({ message: "Refund not found" });
+      if (refund.status === "sent") return res.status(400).json({ message: "This refund was already sent" });
+      if (refund.status === "processing") return res.status(400).json({ message: "This refund is already being processed" });
+      if (!refund.originalReceipt) return res.status(400).json({ message: "No original M-Pesa receipt on this refund" });
+      await db.update(refunds).set({ status: "processing", processedBy: req.adminUser && req.adminUser.email || "admin" }).where(eqAdmin(refunds.id, refund.id));
+      try {
+        const reversal = await initiateReversal({
+          transactionId: refund.originalReceipt,
+          amount: Number(refund.amount),
+          remarks: refund.reason || "Booking cancellation refund"
+        });
+        await db.update(refunds).set({ mpesaConversationId: String(reversal.ConversationID || reversal.OriginatorConversationID || "") }).where(eqAdmin(refunds.id, refund.id));
+        res.json({ success: true, message: "Reversal sent to M-Pesa. It will confirm shortly." });
+      } catch (reversalErr) {
+        await db.update(refunds).set({ status: "failed", failureReason: reversalErr.message || "Reversal request failed" }).where(eqAdmin(refunds.id, refund.id));
+        res.status(500).json({ message: reversalErr.message || "Failed to send reversal" });
+      }
+    } catch (e) {
+      console.error("Error processing refund:", e);
+      res.status(500).json({ message: "Failed to process refund" });
+    }
   });
   app2.get("/api/admin/admins", requireOwner, async (req, res) => {
     try {

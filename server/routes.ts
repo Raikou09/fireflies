@@ -22,7 +22,7 @@ import { notificationService } from "./notificationService";
 import { EnhancedNotificationService } from "./enhancedNotificationService";
 import { EmailService } from "./emailService";
 import { SMSService } from "./smsService";
-import { initiateSTKPush, querySTKPushStatus, parseCallbackData, formatPhoneNumber, getSimulatedReceiptNumber, isSimulationMode, type MPesaCallbackData } from "./mpesaService";
+import { initiateSTKPush, querySTKPushStatus, parseCallbackData, formatPhoneNumber, getSimulatedReceiptNumber, isSimulationMode, initiateReversal, type MPesaCallbackData } from "./mpesaService";
 import { generatePitchPDF } from "./pitchDocument";
 import { requireAdmin, requireOwner, seedOwner, isAdminEmail } from "./adminAuth";
 import { registerMatchRoutes } from "./matchRoutes";
@@ -1465,6 +1465,101 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/admin/logout", (req: any, res) => {
     req.logout(() => { res.json({ success: true }); });
+  });
+
+  // === Refunds (Ops Center) ===
+  // M-Pesa posts the reversal outcome here (no auth — called by Safaricom)
+  app.post("/api/mpesa/reversal/result", async (req, res) => {
+    try {
+      console.log("Reversal result received:", JSON.stringify(req.body));
+      const result = req.body && req.body.Result;
+      const conversationId = result && (result.ConversationID || result.OriginatorConversationID);
+      const resultCode = result && result.ResultCode;
+      if (conversationId) {
+        const rows = await db.select().from(refunds).where(eqAdmin(refunds.mpesaConversationId, String(conversationId)));
+        const refund = rows[0];
+        if (refund) {
+          if (String(resultCode) === "0") {
+            await db.update(refunds).set({ status: "sent", sentAt: new Date() }).where(eqAdmin(refunds.id, refund.id));
+            console.log("Refund marked sent:", refund.id);
+          } else {
+            await db.update(refunds).set({ status: "failed", failureReason: String((result && result.ResultDesc) || "Reversal failed") }).where(eqAdmin(refunds.id, refund.id));
+            console.log("Refund marked failed:", refund.id);
+          }
+        }
+      }
+      res.json({ ResultCode: 0, ResultDesc: "Accepted" });
+    } catch (e) {
+      console.error("Error handling reversal result:", e);
+      res.json({ ResultCode: 0, ResultDesc: "Accepted" });
+    }
+  });
+
+  app.post("/api/mpesa/reversal/timeout", async (req, res) => {
+    try {
+      console.log("Reversal timeout received:", JSON.stringify(req.body));
+      const result = req.body && req.body.Result;
+      const conversationId = result && (result.ConversationID || result.OriginatorConversationID);
+      if (conversationId) {
+        const rows = await db.select().from(refunds).where(eqAdmin(refunds.mpesaConversationId, String(conversationId)));
+        const refund = rows[0];
+        if (refund && refund.status === "processing") {
+          await db.update(refunds).set({ status: "failed", failureReason: "M-Pesa timed out" }).where(eqAdmin(refunds.id, refund.id));
+        }
+      }
+      res.json({ ResultCode: 0, ResultDesc: "Accepted" });
+    } catch (e) {
+      console.error("Error handling reversal timeout:", e);
+      res.json({ ResultCode: 0, ResultDesc: "Accepted" });
+    }
+  });
+
+  // List refunds for the Ops Center (pending first, then most recent)
+  app.get("/api/admin/refunds", requireAdmin, async (req, res) => {
+    try {
+      const rows = await db.select().from(refunds);
+      const rank = { pending: 0, processing: 1, failed: 2, sent: 3 };
+      rows.sort((a, b) => {
+        const ao = rank[a.status] != null ? rank[a.status] : 9;
+        const bo = rank[b.status] != null ? rank[b.status] : 9;
+        if (ao !== bo) return ao - bo;
+        return new Date(b.requestedAt).getTime() - new Date(a.requestedAt).getTime();
+      });
+      res.json(rows);
+    } catch (e) {
+      console.error("Error fetching refunds:", e);
+      res.status(500).json({ message: "Failed to fetch refunds" });
+    }
+  });
+
+  // Process a refund — fires the real M-Pesa reversal (human-confirmed)
+  app.post("/api/admin/refunds/:id/process", requireAdmin, async (req, res) => {
+    try {
+      const refundId = req.params.id;
+      const rows = await db.select().from(refunds).where(eqAdmin(refunds.id, refundId));
+      const refund = rows[0];
+      if (!refund) return res.status(404).json({ message: "Refund not found" });
+      if (refund.status === "sent") return res.status(400).json({ message: "This refund was already sent" });
+      if (refund.status === "processing") return res.status(400).json({ message: "This refund is already being processed" });
+      if (!refund.originalReceipt) return res.status(400).json({ message: "No original M-Pesa receipt on this refund" });
+      // Lock it immediately so a double-click cannot fire twice
+      await db.update(refunds).set({ status: "processing", processedBy: (req.adminUser && req.adminUser.email) || "admin" }).where(eqAdmin(refunds.id, refund.id));
+      try {
+        const reversal = await initiateReversal({
+          transactionId: refund.originalReceipt,
+          amount: Number(refund.amount),
+          remarks: refund.reason || "Booking cancellation refund",
+        });
+        await db.update(refunds).set({ mpesaConversationId: String(reversal.ConversationID || reversal.OriginatorConversationID || "") }).where(eqAdmin(refunds.id, refund.id));
+        res.json({ success: true, message: "Reversal sent to M-Pesa. It will confirm shortly." });
+      } catch (reversalErr) {
+        await db.update(refunds).set({ status: "failed", failureReason: reversalErr.message || "Reversal request failed" }).where(eqAdmin(refunds.id, refund.id));
+        res.status(500).json({ message: reversalErr.message || "Failed to send reversal" });
+      }
+    } catch (e) {
+      console.error("Error processing refund:", e);
+      res.status(500).json({ message: "Failed to process refund" });
+    }
   });
 
   app.get("/api/admin/admins", requireOwner, async (req: any, res) => {
