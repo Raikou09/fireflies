@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import Navigation from "@/components/Navigation";
 import AdminInterface from "@/components/AdminInterface";
 import AdminManagement from "@/components/AdminManagement";
+import RefundsPanel from "@/components/RefundsPanel";
 import { useAuth } from "@/hooks/useAuth";
 import { Shield, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -68,6 +69,7 @@ export default function OpsCenter() {
           </Button>
         </div>
         {adminData.role === "owner" && <div className="mb-6"><AdminManagement /></div>}
+        <RefundsPanel />
         <AdminInterface />
       </div>
     </div>
