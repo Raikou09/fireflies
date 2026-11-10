@@ -111,7 +111,7 @@ export const courts = pgTable("courts", {
   adminNotes: text("admin_notes"),
   rating: decimal("rating", { precision: 3, scale: 2 }).default("0"),
   totalBookings: integer("total_bookings").default(0),
-  commissionRate: decimal("commission_rate", { precision: 5, scale: 2 }).default("10.00"), // Admin commission percentage per booking
+  commissionRate: decimal("commission_rate", { precision: 5, scale: 2 }).default("5.00"), // Admin commission percentage per booking
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -356,7 +356,7 @@ export const events = pgTable("events", {
   adminNotes: text("admin_notes"),
   rating: decimal("rating", { precision: 3, scale: 2 }).default("0"),
   totalBookings: integer("total_bookings").default(0),
-  commissionRate: decimal("commission_rate", { precision: 5, scale: 2 }).default("10.00"),
+  commissionRate: decimal("commission_rate", { precision: 5, scale: 2 }).default("5.00"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

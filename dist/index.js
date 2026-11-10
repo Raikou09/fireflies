@@ -183,7 +183,7 @@ var init_schema = __esm({
       adminNotes: text("admin_notes"),
       rating: decimal("rating", { precision: 3, scale: 2 }).default("0"),
       totalBookings: integer("total_bookings").default(0),
-      commissionRate: decimal("commission_rate", { precision: 5, scale: 2 }).default("10.00"),
+      commissionRate: decimal("commission_rate", { precision: 5, scale: 2 }).default("5.00"),
       // Admin commission percentage per booking
       createdAt: timestamp("created_at").defaultNow(),
       updatedAt: timestamp("updated_at").defaultNow()
@@ -441,7 +441,7 @@ var init_schema = __esm({
       adminNotes: text("admin_notes"),
       rating: decimal("rating", { precision: 3, scale: 2 }).default("0"),
       totalBookings: integer("total_bookings").default(0),
-      commissionRate: decimal("commission_rate", { precision: 5, scale: 2 }).default("10.00"),
+      commissionRate: decimal("commission_rate", { precision: 5, scale: 2 }).default("5.00"),
       createdAt: timestamp("created_at").defaultNow(),
       updatedAt: timestamp("updated_at").defaultNow()
     });
@@ -1726,7 +1726,7 @@ var DatabaseStorage = class {
       // Courts need admin approval
       isActive: false,
       // Inactive until approved
-      commissionRate: "15.00"
+      commissionRate: "5.00"
       // Set default commission rate
     }).returning();
     return newCourt;
@@ -2127,7 +2127,7 @@ var DatabaseStorage = class {
         [courtId]
       );
       const stats = bookingStats.rows[0];
-      const commissionRate = parseFloat(court.commission_rate || "15") / 100;
+      const commissionRate = parseFloat(court.commission_rate || "5") / 100;
       const totalRevenue = parseFloat(stats.total_revenue || "0");
       const commissionEarned = totalRevenue * commissionRate;
       const monthlyTrends = await client.query(
@@ -2178,7 +2178,7 @@ var DatabaseStorage = class {
           sport: court.available_sports?.[0] || "Unknown",
           hourlyRate: parseFloat(court.hourly_rate || "0"),
           peakHourRate: parseFloat(court.peak_hour_rate || "0"),
-          commissionRate: parseFloat(court.commission_rate || "15"),
+          commissionRate: parseFloat(court.commission_rate || "5"),
           vendor: {
             name: `${court.first_name || ""} ${court.last_name || ""}`.trim() || court.vendor_email,
             email: court.vendor_email
@@ -2247,7 +2247,7 @@ var DatabaseStorage = class {
       `);
       return overviewResult.rows.map((row) => {
         const totalRevenue = parseFloat(row.total_revenue || "0");
-        const commissionRate = parseFloat(row.commission_rate || "15") / 100;
+        const commissionRate = parseFloat(row.commission_rate || "5") / 100;
         const commissionEarned = totalRevenue * commissionRate;
         const bookingTrend = parseInt(row.recent_bookings || "0") - parseInt(row.previous_bookings || "0");
         return {
@@ -2264,7 +2264,7 @@ var DatabaseStorage = class {
             commissionEarned,
             vendorEarnings: totalRevenue - commissionEarned,
             hourlyRate: parseFloat(row.hourly_rate || "0"),
-            commissionRate: parseFloat(row.commission_rate || "15")
+            commissionRate: parseFloat(row.commission_rate || "5")
           },
           performance: {
             totalBookings: parseInt(row.total_bookings || "0"),
@@ -5674,7 +5674,7 @@ async function registerRoutes(app2) {
   });
   app2.get("/api/default-commission-rate", async (req, res) => {
     try {
-      const defaultRate = 15;
+      const defaultRate = 5;
       res.json({ defaultCommissionRate: defaultRate });
     } catch (error) {
       console.error("Error fetching default commission rate:", error);

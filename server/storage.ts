@@ -456,7 +456,7 @@ export class DatabaseStorage implements IStorage {
         vendorId,
         approvalStatus: "pending", // Courts need admin approval
         isActive: false, // Inactive until approved
-        commissionRate: "15.00" // Set default commission rate
+        commissionRate: "5.00" // Set default commission rate
       })
       .returning();
     return newCourt;
@@ -1164,8 +1164,8 @@ export class DatabaseStorage implements IStorage {
 
       const stats = bookingStats.rows[0];
 
-      // Calculate commission earned (15% default or court-specific rate)
-      const commissionRate = parseFloat(court.commission_rate || '15') / 100;
+      // Calculate commission earned (5% default or court-specific rate)
+      const commissionRate = parseFloat(court.commission_rate || '5') / 100;
       const totalRevenue = parseFloat(stats.total_revenue || '0');
       const commissionEarned = totalRevenue * commissionRate;
 
@@ -1224,7 +1224,7 @@ export class DatabaseStorage implements IStorage {
           sport: court.available_sports?.[0] || 'Unknown',
           hourlyRate: parseFloat(court.hourly_rate || '0'),
           peakHourRate: parseFloat(court.peak_hour_rate || '0'),
-          commissionRate: parseFloat(court.commission_rate || '15'),
+          commissionRate: parseFloat(court.commission_rate || '5'),
           vendor: {
             name: `${court.first_name || ''} ${court.last_name || ''}`.trim() || court.vendor_email,
             email: court.vendor_email
@@ -1296,7 +1296,7 @@ export class DatabaseStorage implements IStorage {
 
       return overviewResult.rows.map((row: any) => {
         const totalRevenue = parseFloat(row.total_revenue || '0');
-        const commissionRate = parseFloat(row.commission_rate || '15') / 100;
+        const commissionRate = parseFloat(row.commission_rate || '5') / 100;
         const commissionEarned = totalRevenue * commissionRate;
         const bookingTrend = parseInt(row.recent_bookings || '0') - parseInt(row.previous_bookings || '0');
 
@@ -1314,7 +1314,7 @@ export class DatabaseStorage implements IStorage {
             commissionEarned: commissionEarned,
             vendorEarnings: totalRevenue - commissionEarned,
             hourlyRate: parseFloat(row.hourly_rate || '0'),
-            commissionRate: parseFloat(row.commission_rate || '15')
+            commissionRate: parseFloat(row.commission_rate || '5')
           },
           performance: {
             totalBookings: parseInt(row.total_bookings || '0'),
