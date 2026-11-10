@@ -112,6 +112,7 @@ export default function VendorOnboarding({ isOpen, onClose, existingData, isEdit
       bankName: existingData?.bankName || "",
       bankAccountNumber: existingData?.bankAccountNumber || "",
       bankAccountName: existingData?.bankAccountName || "",
+      bankBranch: existingData?.bankBranch || "",
       mpesaNumber: existingData?.mpesaNumber || "",
       paymentPreference: existingData?.paymentPreference || "mpesa",
       businessLicense: existingData?.businessLicense || "",
@@ -266,14 +267,14 @@ export default function VendorOnboarding({ isOpen, onClose, existingData, isEdit
           form.setError("businessType", { message: "Business type is required" });
           return false;
         }
+        if (values.businessType !== "Individual" && (!values.businessRegistrationNumber || values.businessRegistrationNumber.trim() === "")) {
+          form.setError("businessRegistrationNumber", { message: "Business registration number is required" });
+          return false;
+        }
         return true;
 
       case "legal":
-        // Required: KRA PIN or M-Pesa/Bank details based on preference
-        if (!values.kraPin || values.kraPin.trim() === "") {
-          form.setError("kraPin", { message: "KRA PIN is required for tax compliance" });
-          return false;
-        }
+        // Required: payment details based on preference (KRA PIN now optional)
         if (!values.paymentPreference) {
           toast({
             title: "Payment Preference Required",
@@ -556,7 +557,7 @@ export default function VendorOnboarding({ isOpen, onClose, existingData, isEdit
                 name="businessRegistrationNumber"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Business Registration Number</FormLabel>
+                    <FormLabel>Business Registration Number {form.watch("businessType") !== "Individual" && <span className="text-red-500">*</span>}</FormLabel>
                     <FormControl>
                       <Input placeholder="Company registration number" {...field} />
                     </FormControl>
@@ -610,7 +611,7 @@ export default function VendorOnboarding({ isOpen, onClose, existingData, isEdit
               name="kraPin"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>KRA PIN <span className="text-red-500">*</span></FormLabel>
+                  <FormLabel>KRA PIN</FormLabel>
                   <FormControl>
                     <Input placeholder="Enter your KRA PIN" {...field} />
                   </FormControl>
@@ -714,6 +715,20 @@ export default function VendorOnboarding({ isOpen, onClose, existingData, isEdit
                         <FormLabel>Account Name <span className="text-red-500">*</span></FormLabel>
                         <FormControl>
                           <Input placeholder="Account holder name" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="bankBranch"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Bank Branch</FormLabel>
+                        <FormControl>
+                          <Input placeholder="e.g. Westlands branch" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>

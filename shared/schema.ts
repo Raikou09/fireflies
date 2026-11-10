@@ -55,6 +55,7 @@ export const users = pgTable("users", {
   bankName: varchar("bank_name"),
   bankAccountNumber: varchar("bank_account_number"),
   bankAccountName: varchar("bank_account_name"),
+  bankBranch: varchar("bank_branch"),
   mpesaNumber: varchar("mpesa_number"), // Alternative payment method
   paymentPreference: varchar("payment_preference", { enum: ["bank", "mpesa", "both"] }),
   vendorVerificationStatus: varchar("vendor_verification_status", { enum: ["pending", "verified", "rejected"] }).default("pending"),
@@ -626,6 +627,7 @@ export const vendorOnboardingSchema = z.object({
   bankName: z.string().optional(),
   bankAccountNumber: z.string().optional(),
   bankAccountName: z.string().optional(),
+  bankBranch: z.string().optional(),
   mpesaNumber: z.string().optional(),
   paymentPreference: z.enum(["bank", "mpesa", "both"]),
   
@@ -633,6 +635,12 @@ export const vendorOnboardingSchema = z.object({
   businessLicense: z.string().optional(),
   taxCertificate: z.string().optional(),
 }).refine(
+  (data) => data.businessType === "Individual" || Boolean(data.businessRegistrationNumber && data.businessRegistrationNumber.trim()),
+  {
+    message: "Business registration number is required",
+    path: ["businessRegistrationNumber"],
+  }
+).refine(
   (data) => {
     if (data.paymentPreference === "bank" || data.paymentPreference === "both") {
       return data.bankName && data.bankAccountNumber && data.bankAccountName;

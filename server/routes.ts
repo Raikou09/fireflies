@@ -200,6 +200,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         bankName: z.string().optional(),
         bankAccountNumber: z.string().optional(),
         bankAccountName: z.string().optional(),
+        bankBranch: z.string().optional(),
       }).superRefine((data, ctx) => {
         if (data.paymentPreference === "mpesa" || data.paymentPreference === "both") {
           if (!data.mpesaNumber || data.mpesaNumber.length < 10) {
@@ -222,6 +223,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         bankName: validatedData.bankName || user.bankName,
         bankAccountNumber: validatedData.bankAccountNumber || user.bankAccountNumber,
         bankAccountName: validatedData.bankAccountName || user.bankAccountName,
+        bankBranch: validatedData.bankBranch || user.bankBranch,
       });
 
       res.json(updatedUser);
@@ -281,7 +283,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!user.phoneNumber) missingRequirements.push("Phone number");
       if (!user.businessName) missingRequirements.push("Business name");
       if (!user.businessAddress) missingRequirements.push("Business address");
-      if (!user.kraPin) missingRequirements.push("KRA PIN");
+      if (user.businessType !== "Individual" && !user.businessRegistrationNumber) missingRequirements.push("Business registration number");
 
       const verificationStatus = {
         status: user.vendorVerificationStatus,

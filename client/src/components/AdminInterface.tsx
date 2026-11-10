@@ -56,6 +56,7 @@ interface PendingVendor {
   bankName?: string;
   bankAccountNumber?: string;
   bankAccountName?: string;
+  bankBranch?: string;
   mpesaNumber?: string;
   paymentPreference?: string;
   nationalIdDocument?: string;
@@ -533,6 +534,7 @@ export default function AdminInterface() {
                           {vendor.paymentPreference && <p><strong>Payment Method:</strong> {vendor.paymentPreference.toUpperCase()}</p>}
                           {vendor.bankName && <p><strong>Bank:</strong> {vendor.bankName}</p>}
                           {vendor.bankAccountName && <p><strong>Account Name:</strong> {vendor.bankAccountName}</p>}
+                          {vendor.bankBranch && <p><strong>Branch:</strong> {vendor.bankBranch}</p>}
                           {vendor.bankAccountNumber && <p><strong>Account Number:</strong> {vendor.bankAccountNumber}</p>}
                           {vendor.mpesaNumber && <p><strong>M-Pesa:</strong> {vendor.mpesaNumber}</p>}
                         </div>

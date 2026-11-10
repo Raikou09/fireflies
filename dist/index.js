@@ -116,6 +116,7 @@ var init_schema = __esm({
       bankName: varchar("bank_name"),
       bankAccountNumber: varchar("bank_account_number"),
       bankAccountName: varchar("bank_account_name"),
+      bankBranch: varchar("bank_branch"),
       mpesaNumber: varchar("mpesa_number"),
       // Alternative payment method
       paymentPreference: varchar("payment_preference", { enum: ["bank", "mpesa", "both"] }),
@@ -679,12 +680,19 @@ var init_schema = __esm({
       bankName: z.string().optional(),
       bankAccountNumber: z.string().optional(),
       bankAccountName: z.string().optional(),
+      bankBranch: z.string().optional(),
       mpesaNumber: z.string().optional(),
       paymentPreference: z.enum(["bank", "mpesa", "both"]),
       // Optional Documents for verification
       businessLicense: z.string().optional(),
       taxCertificate: z.string().optional()
     }).refine(
+      (data) => data.businessType === "Individual" || Boolean(data.businessRegistrationNumber && data.businessRegistrationNumber.trim()),
+      {
+        message: "Business registration number is required",
+        path: ["businessRegistrationNumber"]
+      }
+    ).refine(
       (data) => {
         if (data.paymentPreference === "bank" || data.paymentPreference === "both") {
           return data.bankName && data.bankAccountNumber && data.bankAccountName;
@@ -5015,7 +5023,8 @@ async function registerRoutes(app2) {
         mpesaNumber: z2.string().optional(),
         bankName: z2.string().optional(),
         bankAccountNumber: z2.string().optional(),
-        bankAccountName: z2.string().optional()
+        bankAccountName: z2.string().optional(),
+        bankBranch: z2.string().optional()
       }).superRefine((data, ctx) => {
         if (data.paymentPreference === "mpesa" || data.paymentPreference === "both") {
           if (!data.mpesaNumber || data.mpesaNumber.length < 10) {
@@ -5035,7 +5044,8 @@ async function registerRoutes(app2) {
         mpesaNumber: validatedData.mpesaNumber || user.mpesaNumber,
         bankName: validatedData.bankName || user.bankName,
         bankAccountNumber: validatedData.bankAccountNumber || user.bankAccountNumber,
-        bankAccountName: validatedData.bankAccountName || user.bankAccountName
+        bankAccountName: validatedData.bankAccountName || user.bankAccountName,
+        bankBranch: validatedData.bankBranch || user.bankBranch
       });
       res.json(updatedUser);
     } catch (error) {
@@ -5080,7 +5090,7 @@ async function registerRoutes(app2) {
       if (!user.phoneNumber) missingRequirements.push("Phone number");
       if (!user.businessName) missingRequirements.push("Business name");
       if (!user.businessAddress) missingRequirements.push("Business address");
-      if (!user.kraPin) missingRequirements.push("KRA PIN");
+      if (user.businessType !== "Individual" && !user.businessRegistrationNumber) missingRequirements.push("Business registration number");
       const verificationStatus = {
         status: user.vendorVerificationStatus,
         canCreateCourts: user.vendorVerificationStatus === "verified",
