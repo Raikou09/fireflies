@@ -700,6 +700,16 @@ export default function VendorDashboard() {
 
           {/* Manage Courts Tab */}
           <TabsContent value="manage" className="space-y-6">
+            <div className="flex justify-between items-center gap-3 flex-wrap mb-2">
+              <h2 className="text-xl font-semibold text-gray-900">Your Courts</h2>
+              <Button
+                onClick={() => setShowAddCourtModal(true)}
+                className="bg-primary hover:bg-green-700 flex items-center gap-2"
+              >
+                <Building2 className="h-4 w-4" />
+                Add Court
+              </Button>
+            </div>
             <div className="grid gap-6">
               {vendorCourts.map((court: any) => (
                 <Card key={court.id}>
